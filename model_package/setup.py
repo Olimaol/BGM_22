@@ -1,9 +1,10 @@
 # setuptools
 try:
+    print('Checking for setuptools... ', end='')
     import setuptools
-    print('Checking for setuptools... OK')
+    print('OK')
 except:
-    print('Checking for setuptools... NO')
+    print('NO')
     print('Error : Python package "setuptools" is required.')
     exit(0)
 
@@ -12,10 +13,23 @@ except:
 try:
     print('Checking for ANNarchy... ', end='')
     import ANNarchy
+    print('OK')
 except:
     print('NO')
     print('Error : Python package "ANNarchy" is required.')
     print('For installation check: https://annarchy.readthedocs.io/en/latest/')
+    exit(0)
+
+
+# CompNeuroPy
+try:
+    print('Checking for CompNeuroPy... ', end='')
+    import CompNeuroPy
+    print('OK')
+except:
+    print('NO')
+    print('Error : Python package "CompNeuroPy" is required.')
+    print('For installation check: https://github.com/Olimaol/CompNeuroPy')
     exit(0)
 
 dependencies = [
