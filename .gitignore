@@ -1,0 +1,4 @@
+*__pycache__/
+build/
+BGM_22.egg-info/
+dist/
