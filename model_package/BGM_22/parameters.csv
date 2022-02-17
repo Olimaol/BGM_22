@@ -1,271 +1,321 @@
-### GENERAL PARAMS,
-general_id,BGM
-general_overlapGoStop,1.0
-general_NrConInput,1.0
-general_NrConIntrinsic,10.0
-general_dt,0.1
-general_synDelays,10.0
-general_population_size,100.0
-general_dt,0.1
-general_threads,1.0
-general_msSmooth,20.0
-### SIMULATION TIME PARAMS,
-t_init,600.0
-t_SSD,250.0
-t_decay,300.0
-t_cortexPauseDuration,5.0
-t_delayGo,75.0
-t_delayGoSD,0.0
-t_delayStopAfterCue,50.0
-t_delayStopAfterAction,50.0
-t_cortexStopDurationAfterCue,5.0
-t_cortexStopDurationAfterAction,200.0
-### POPULATIONS AND NEURON PARAMS,
-### CORTEX-GO PARAMS,
-cor_go__rates,400.0
-cor_go__rates_sd,0.0
-cor_go__tau_up,200.0
-cor_go__tau_down,10.0
-### CORTEX-PAUSE PARAMS,
-cor_pause__rates,500.0
-cor_pause__rates_second_resp_mod,1.2
-cor_pause__rates_sd,0.0
-cor_pause__tau_up,1.0
-cor_pause__tau_down,150.0
-### CORTEX-STOP PARAMS,
-cor_stop__rates_after_cue,400.0
-cor_stop__rates_after_action,400.0
-cor_stop__rates_sd,0.0
-cor_stop__tau_up,1.0
-cor_stop__tau_down,70.0
-### STRIATUM D1 PARAMS,
-str_d1__C,50.0
-str_d1__k,1.14
-str_d1__v_r,-80
-str_d1__v_t,-33.8
-str_d1__a,0.05
-str_d1__b,-20.0
-str_d1__c,-55.0
-str_d1__d,377.0
-str_d1__v_peak,40
-str_d1__tau_ampa,10.0
-str_d1__tau_gaba,20.0
-str_d1__E_ampa,0.0
-srt_d1__E_gaba,-90
-str_d1__I_add,0.0
-str_d1__v_init,-80
-str_d1__u_init,0.0
-### STRIATUM D2 PARAMS,
-str_d2__C,50.0
-str_d2__k,1.14
-str_d2__v_r,-80
-str_d2__v_t,-33.8
-str_d2__a,0.05
-str_d2__b,-20.0
-str_d2__C,-55.0
-str_d2__d,377.0
-str_d2__v_peak,40
-str_d2__tau_ampa,10.0
-str_d2__tau_gaba,20.0
-str_d2__E_ampa,0.0
-srt_d2__E_gaba,-90
-str_d2__I_add,0.0
-str_d2__v_init,-80
-str_d2__u_init,0.0
-### STRIATUM FSI PARAMS,
-str_fsi__C,80.0
-str_fsi__k,1.0
-str_fsi__v_r,-70
-str_fsi__v_t,-50
-str_fsi__v_b,-55
-str_fsi__a,0.2
-str_fsi__b,0.025
-str_fsi__c,-60.0
-str_fsi__d,0.0
-str_fsi__v_peak,25.0
-str_fsi__tau_ampa,10.0
-str_fsi__tau_gaba,20.0
-str_fsi__E_ampa,0.0
-srt_fsi__E_gaba,-90
-str_fsi__I_add,0.0
-str_fsi__v_init,-70
-str_fsi__u_init,0.0
-### STN PARAMS,
-stn__a,0.005
-stn__b,0.265   
-stn__c,-65.
-stn__d,2.0     
-stn__tau_ampa,10.0
-stn__tau_gaba,20.0
-stn__E_ampa,0.0
-stn__E_gaba,-90
-stn__I_add,0.0
-stn__v_init,-69.42
-stn__u_init,-14.34
-### SNr PARAMS,
-snr__a,0.005
-snr__b,0.585
-snr__c,-65.
-snr__d,4.0
-snr__tau_ampa,10.0
-snr__tau_gaba,20.0
-snr__E_ampa,0.0
-snr__E_gaba,-90
-snr__I_add,0.0
-snr__v_init,-69.9
-snr__u_init,-14.08
-### GPE-PROTO PARAMS,"optimized fit of Abdi,Mallet et al."
-gpe_proto__a,0.0058
-gpe_proto__b,0.56
-gpe_proto__c,-65
-gpe_proto__d,3.8
-gpe_proto__n0,117
-gpe_proto__n1,4.86
-gpe_proto__n2,0.043
-gpe_proto__refractory,5.0
-gpe_proto__tau_ampa,10.0
-gpe_proto__tau_gaba,20.0
-gpe_proto__E_ampa,0.0
-gpe_proto__E_gaba,-90
-gpe_proto__I_add,0.0
-gpe_proto__v_init,-65
-gpe_proto__u_init,-17.34
-### GPE-ARKY PARAMS,"optimized fit of Abdi,Mallet et al."
-gpe_arky__a,0.0054
-gpe_arky__b,0.34
-gpe_arky__c,-71
-gpe_arky__d,9.81
-gpe_arky__n0,113
-gpe_arky__n1,4.47
-gpe_arky__n2,0.04
-gpe_arky__refractory,5.0
-gpe_arky__tau_ampa,10.0
-gpe_arky__tau_gaba,20.0
-gpe_arky__E_ampa,0.0
-gpe_arky__E_gaba,-90
-gpe_arky__I_add,0.0
-gpe_arky__v_init,-71
-gpe_arky__u_init,-2.71
-### GPE-CP PARAMS,just like gpe proto
-gpe_cp__a,0.0058
-gpe_cp__b,0.56
-gpe_cp__c,-65
-gpe_cp__d,3.8
-gpe_cp__n0,117
-gpe_cp__n1,4.86
-gpe_cp__n2,0.043
-gpe_cp__refractory,5.0
-gpe_cp__tau_ampa,10.0
-gpe_cp__tau_gaba,20.0
-gpe_cp__E_ampa,0.0
-gpe_cp__E_gaba,-90
-gpe_cp__I_add,0.0
-gpe_cp__v_init,-65
-gpe_cp__u_init,-17.34
-### THALAMUS PARAMS,
-thal__a,0.02
-thal__b,0.2
-thal__c,-65
-thal__d,6
-thal__tau_ampa,10.0
-thal__tau_gaba,20.0
-thal__E_ampa,0.0
-thal__E_gaba,-90
-thal__I_add,5.0
-thal__v_init,-73.89
-thal__u_init,-6.1
-### StrD1 NOISE PARAMS,
-str_d1_n_exc__mean,10.0
-str_d1_n_exc__sd,2.0
-### StrD2 NOISE PARAMS,
-str_d2_n_exc__mean,10.0
-str_d2_n_exc__sd,2.0
-### StrFSI NOISE PARAMS,
-str_fsi_n_exc__mean,10.0
-str_fsi_n_exc__sd,2.0
-### STN NOISE PARAMS,
-stn_n_exc__mean,400.0
-stn_n_exc__sd,80.0
-### SNR NOISE PARAMS,
-snr_n_exc__mean,400.0
-snr_n_exc__sd,80.0
-### GPE Proto NOISE PARAMS,
-gpe_proto_n_exc__mean,400.0
-gpe_proto_n_exc__sd,80.0
-### GPE Arky NOISE PARAMS,
-gpe_arky_n_exc__mean,400.0
-gpe_arky_n_exc__sd,80.0
-### GPE Cp NOISE PARAMS,
-gpe_cp_n_exc__mean,400.0
-gpe_cp_n_exc__sd,80.0
-### THALAMUS NOISE PARAMS,
-thal_n_exc__mean,150.0
-thal_n_exc__sd,30.0
-### INTEGRATOR-GO PARAMS,
-integrator_go__tau,200.0
-integrator_go__decision,0.0
-integrator_go__threshold,0.13
-integrator_go__neuron_id,-1.0
-### INTEGRATOR-STOP PARAMS,
-integrator_stop__tau,30.0
-integrator_stop__decision,0.0
-integrator_stop__threshold,0.13
-integrator_stop__neuron_id,-1.0
-### PROJECTION AND SYNAPSE PARAMS,
-### FACTOR SYNAPSE PARAMS,
-FacSyn_maxTrans,14.0
-FacSyn_modFactor,1.0
-### WEIGHTS PARAMS,
-weights_cortexGo_StrD1,0.037
-weights_cortexGo_StrD2,0.035
-weights_cortexGo_StrFSI,0.035
-weights_cortexGo_Thal,0.04
-weights_cortexPause_STN,0.02
-weights_cortexStop_GPeArky,0.15
-weights_cortexStop_GPeCp,0.065
-weights_StrD1E_StrD1,0.7
-weights_StrD2E_StrD2,0.8
-weights_StrFSIE_StrFSI,0.8
-weights_GPeArkyE_GPeArky,0.09
-weights_GPeProtoE_GPeProto,0.1
-weights_SNrE_SNr,0.1
-weights_STNE_STN,0.02
-weights_ThalE_Thal,0.035
-weights_GPeCpE_GPeCp,0.1
-weights_StrD1_StrD1,0.01
-weights_StrD1_StrD2,0.015
-weights_StrD1_SNr,0.06
-weights_StrD1_GPeCp,0.005
-weights_StrD2_StrD2,0.01
-weights_StrD2_StrD1,0.015
-weights_StrD2_GPeArky,0.08
-weights_StrD2_GPeProto,0.04
-weights_StrD2_GPeCp,0.08
-weights_StrFSI_StrFSI,0.01
-weights_StrFSI_StrD1,0.01
-weights_StrFSI_StrD2,0.01
-weights_GPeArky_StrD1,0.065
-weights_GPeArky_StrD2,0.12
-weights_GPeArky_StrFSI,0.08
-weights_GPeArky_GPeProto,0.008
-weights_GPeArky_GPeCp,0.008
-weights_GPeProto_GPeArky,0.025
-weights_GPeProto_StrFSI,0.02
-weights_GPeProto_SNr,0.015
-weights_GPeProto_STN,0.001
-weights_GPeProto_GPeCp,0.025
-weights_STN_SNr,0.04
-weights_STN_GPeProto,0.001
-weights_STN_GPeArky,0.001
-weights_STN_GPeCp,0.001
-weights_SNr_Thal,0.06
-weights_Thal_IntGo,0.00056
-weights_Thal_StrD1,0.14
-weights_Thal_StrD2,0.12
-weights_Thal_StrFSI,0.12
-weights_GPeCp_GPeProto,0.008
-weights_GPeCp_StrD1,0.01
-weights_GPeCp_StrD2,0.01
-weights_GPeCp_StrFSI,0.01
-weights_GPeCp_GPeArky,0.008
-weights_GPeCp_IntStop,0.00095
+### GENERAL PARAMS,,
+general__id,BGM,
+general__overlap_go_stop,1.0,
+general__nr_con_input,1.0,entfernen
+general__nr_con_intrinsic,10.0,entfernen
+general__dt,0.1,
+general__population_size,100.0,
+general__dt,0.1,
+general__threads,1.0,
+general__ms_smooth,20.0,
+### SIMULATION TIME PARAMS,,
+t_init,600.0,
+t_SSD,250.0,
+t_decay,300.0,
+t_cortexPauseDuration,5.0,
+t_delayGo,75.0,
+t_delayGoSD,0.0,
+t_delayStopAfterCue,50.0,
+t_delayStopAfterAction,50.0,
+t_cortexStopDurationAfterCue,5.0,
+t_cortexStopDurationAfterAction,200.0,
+### POPULATIONS AND NEURON PARAMS,,
+### CORTEX-GO PARAMS,,
+cor_go__rates,400.0,
+cor_go__rates_sd,0.0,
+cor_go__tau_up,200.0,
+cor_go__tau_down,10.0,
+### CORTEX-PAUSE PARAMS,,
+cor_pause__rates,500.0,
+cor_pause__rates_second_resp_mod,1.2,
+cor_pause__rates_sd,0.0,
+cor_pause__tau_up,1.0,
+cor_pause__tau_down,150.0,
+### CORTEX-STOP PARAMS,,
+cor_stop__rates_after_cue,400.0,
+cor_stop__rates_after_action,400.0,
+cor_stop__rates_sd,0.0,
+cor_stop__tau_up,1.0,
+cor_stop__tau_down,70.0,
+### STRIATUM D1 PARAMS,,
+str_d1__C,50.0,
+str_d1__k,1.14,
+str_d1__v_r,-80,
+str_d1__v_t,-33.8,
+str_d1__a,0.05,
+str_d1__b,-20.0,
+str_d1__c,-55.0,
+str_d1__d,377.0,
+str_d1__v_peak,40,
+str_d1__tau_ampa,10.0,
+str_d1__tau_gaba,20.0,
+str_d1__E_ampa,0.0,
+srt_d1__E_gaba,-90,
+str_d1__I_add,0.0,
+str_d1__v_init,-80,
+str_d1__u_init,0.0,
+### STRIATUM D2 PARAMS,,
+str_d2__C,50.0,
+str_d2__k,1.14,
+str_d2__v_r,-80,
+str_d2__v_t,-33.8,
+str_d2__a,0.05,
+str_d2__b,-20.0,
+str_d2__C,-55.0,
+str_d2__d,377.0,
+str_d2__v_peak,40,
+str_d2__tau_ampa,10.0,
+str_d2__tau_gaba,20.0,
+str_d2__E_ampa,0.0,
+srt_d2__E_gaba,-90,
+str_d2__I_add,0.0,
+str_d2__v_init,-80,
+str_d2__u_init,0.0,
+### STRIATUM FSI PARAMS,,
+str_fsi__C,80.0,
+str_fsi__k,1.0,
+str_fsi__v_r,-70,
+str_fsi__v_t,-50,
+str_fsi__v_b,-55,
+str_fsi__a,0.2,
+str_fsi__b,0.025,
+str_fsi__c,-60.0,
+str_fsi__d,0.0,
+str_fsi__v_peak,25.0,
+str_fsi__tau_ampa,10.0,
+str_fsi__tau_gaba,20.0,
+str_fsi__E_ampa,0.0,
+srt_fsi__E_gaba,-90,
+str_fsi__I_add,0.0,
+str_fsi__v_init,-70,
+str_fsi__u_init,0.0,
+### STN PARAMS,,
+stn__a,0.005,
+stn__b,0.265   ,
+stn__c,-65.,
+stn__d,2.0     ,
+stn__tau_ampa,10.0,
+stn__tau_gaba,20.0,
+stn__E_ampa,0.0,
+stn__E_gaba,-90,
+stn__I_add,0.0,
+stn__v_init,-69.42,
+stn__u_init,-14.34,
+### SNr PARAMS,,
+snr__a,0.005,
+snr__b,0.585,
+snr__c,-65.,
+snr__d,4.0,
+snr__tau_ampa,10.0,
+snr__tau_gaba,20.0,
+snr__E_ampa,0.0,
+snr__E_gaba,-90,
+snr__I_add,0.0,
+snr__v_init,-69.9,
+snr__u_init,-14.08,
+### GPE-PROTO PARAMS,"optimized fit of Abdi,Mallet et al.",
+gpe_proto__a,0.0058,
+gpe_proto__b,0.56,
+gpe_proto__c,-65,
+gpe_proto__d,3.8,
+gpe_proto__n0,117,
+gpe_proto__n1,4.86,
+gpe_proto__n2,0.043,
+gpe_proto__refractory,5.0,
+gpe_proto__tau_ampa,10.0,
+gpe_proto__tau_gaba,20.0,
+gpe_proto__E_ampa,0.0,
+gpe_proto__E_gaba,-90,
+gpe_proto__I_add,0.0,
+gpe_proto__v_init,-65,
+gpe_proto__u_init,-17.34,
+### GPE-ARKY PARAMS,"optimized fit of Abdi,Mallet et al.",
+gpe_arky__a,0.0054,
+gpe_arky__b,0.34,
+gpe_arky__c,-71,
+gpe_arky__d,9.81,
+gpe_arky__n0,113,
+gpe_arky__n1,4.47,
+gpe_arky__n2,0.04,
+gpe_arky__refractory,5.0,
+gpe_arky__tau_ampa,10.0,
+gpe_arky__tau_gaba,20.0,
+gpe_arky__E_ampa,0.0,
+gpe_arky__E_gaba,-90,
+gpe_arky__I_add,0.0,
+gpe_arky__v_init,-71,
+gpe_arky__u_init,-2.71,
+### GPE-CP PARAMS,just like gpe proto,
+gpe_cp__a,0.0058,
+gpe_cp__b,0.56,
+gpe_cp__c,-65,
+gpe_cp__d,3.8,
+gpe_cp__n0,117,
+gpe_cp__n1,4.86,
+gpe_cp__n2,0.043,
+gpe_cp__refractory,5.0,
+gpe_cp__tau_ampa,10.0,
+gpe_cp__tau_gaba,20.0,
+gpe_cp__E_ampa,0.0,
+gpe_cp__E_gaba,-90,
+gpe_cp__I_add,0.0,
+gpe_cp__v_init,-65,
+gpe_cp__u_init,-17.34,
+### THALAMUS PARAMS,,
+thal__a,0.02,
+thal__b,0.2,
+thal__c,-65,
+thal__d,6,
+thal__tau_ampa,10.0,
+thal__tau_gaba,20.0,
+thal__E_ampa,0.0,
+thal__E_gaba,-90,
+thal__I_add,5.0,
+thal__v_init,-73.89,
+thal__u_init,-6.1,
+### StrD1 NOISE PARAMS,,
+str_d1_n_exc__mean,10.0,
+str_d1_n_exc__sd,2.0,
+### StrD2 NOISE PARAMS,,
+str_d2_n_exc__mean,10.0,
+str_d2_n_exc__sd,2.0,
+### StrFSI NOISE PARAMS,,
+str_fsi_n_exc__mean,10.0,
+str_fsi_n_exc__sd,2.0,
+### STN NOISE PARAMS,,
+stn_n_exc__mean,400.0,
+stn_n_exc__sd,80.0,
+### SNR NOISE PARAMS,,
+snr_n_exc__mean,400.0,
+snr_n_exc__sd,80.0,
+### GPE Proto NOISE PARAMS,,
+gpe_proto_n_exc__mean,400.0,
+gpe_proto_n_exc__sd,80.0,
+### GPE Arky NOISE PARAMS,,
+gpe_arky_n_exc__mean,400.0,
+gpe_arky_n_exc__sd,80.0,
+### GPE Cp NOISE PARAMS,,
+gpe_cp_n_exc__mean,400.0,
+gpe_cp_n_exc__sd,80.0,
+### THALAMUS NOISE PARAMS,,
+thal_n_exc__mean,150.0,
+thal_n_exc__sd,30.0,
+### INTEGRATOR-GO PARAMS,,
+integrator_go__tau,200.0,
+integrator_go__decision,0.0,
+integrator_go__threshold,0.13,
+integrator_go__neuron_id,-1.0,
+### INTEGRATOR-STOP PARAMS,,
+integrator_stop__tau,30.0,
+integrator_stop__decision,0.0,
+integrator_stop__threshold,0.13,
+integrator_stop__neuron_id,-1.0,
+### PROJECTION AND SYNAPSE PARAMS,,
+### CORTEX GO – STR D1 PROJECTION PARAMS,,
+cor_go__str_d1__connectivity,connect_fixed_number_pre,
+cor_go__str_d1__nr_con,1,
+cor_go__str_d1__mod_factor,0.037,
+cor_go__str_d1__max_trans,14.0,
+cor_go__str_d1__weights,1.0,
+cor_go__str_d1__delays,"Uniform(0.0, 10.0)",
+### CORTEX GO – STR D2 PROJECTION PARAMS,,
+cor_go__str_d2__connectivity,connect_fixed_number_pre,
+cor_go__str_d2__nr_con,1,
+cor_go__str_d2__mod_factor,0.035,
+cor_go__str_d2__max_trans,14.0,
+cor_go__str_d2__weights,1.0,
+cor_go__str_d2__delays,"Uniform(0.0, 10.0)",
+### CORTEX GO – STR FSI PROJECTION PARAMS,,
+cor_go__str_fsi__connectivity,connect_fixed_number_pre,
+cor_go__str_fsi__nr_con,1,
+cor_go__str_fsi__mod_factor,0.035,
+cor_go__str_fsi__max_trans,14.0,
+cor_go__str_fsi__weights,1.0,
+cor_go__str_fsi__delays,"Uniform(0.0, 10.0)",
+### CORTEX GO – THAL PROJECTION PARAMS,,
+cor_go__thal__connectivity,connect_fixed_number_pre,
+cor_go__thal__nr_con,1,
+cor_go__thal__mod_factor,0.04,
+cor_go__thal__max_trans,14.0,
+cor_go__thal__weights,1.0,
+cor_go__thal__delays,"Uniform(0.0, 10.0)",
+### CORTEX STOP – GPE ARKY PROJECTION PARAMS,,
+cor_stop__gpe_arky__connectivity,connect_fixed_number_pre,
+cor_stop__gpe_arky__nr_con,1,
+cor_stop__gpe_arky__mod_factor,0.15,
+cor_stop__gpe_arky__max_trans,14.0,
+cor_stop__gpe_arky__weights,1.0,
+cor_stop__gpe_arky__delays,"Uniform(0.0, 10.0)",
+### CORTEX STOP – GPE CP PROJECTION PARAMS,,
+cor_stop__gpe_cp__connectivity,connect_fixed_number_pre,
+cor_stop__gpe_cp__nr_con,1,
+cor_stop__gpe_cp__mod_factor,0.065,
+cor_stop__gpe_cp__max_trans,14.0,
+cor_stop__gpe_cp__weights,1.0,
+cor_stop__gpe_cp__delays,"Uniform(0.0, 10.0)",
+### CORTEX PAUSE – STN PROJECTION PARAMS,,
+cor_stop__gpe_cp__connectivity,connect_fixed_number_pre,
+cor_stop__gpe_cp__nr_con,1,
+cor_stop__gpe_cp__mod_factor,0.02,
+cor_stop__gpe_cp__max_trans,14.0,
+cor_stop__gpe_cp__weights,1.0,
+cor_stop__gpe_cp__delays,0.0,
+,,
+,,
+### FACTOR SYNAPSE PARAMS,,
+FacSyn_maxTrans,14.0,
+FacSyn_modFactor,1.0,
+### WEIGHTS PARAMS,,
+weights_cortexGo_StrD1,0.037,
+weights_cortexGo_StrD2,0.035,
+weights_cortexGo_StrFSI,0.035,
+weights_cortexGo_Thal,0.04,
+weights_cortexPause_STN,0.02,
+weights_cortexStop_GPeArky,0.15,
+weights_cortexStop_GPeCp,0.065,
+weights_StrD1E_StrD1,0.7,
+weights_StrD2E_StrD2,0.8,
+weights_StrFSIE_StrFSI,0.8,
+weights_GPeArkyE_GPeArky,0.09,
+weights_GPeProtoE_GPeProto,0.1,
+weights_SNrE_SNr,0.1,
+weights_STNE_STN,0.02,
+weights_ThalE_Thal,0.035,
+weights_GPeCpE_GPeCp,0.1,
+weights_StrD1_StrD1,0.01,
+weights_StrD1_StrD2,0.015,
+weights_StrD1_SNr,0.06,
+weights_StrD1_GPeCp,0.005,
+weights_StrD2_StrD2,0.01,
+weights_StrD2_StrD1,0.015,
+weights_StrD2_GPeArky,0.08,
+weights_StrD2_GPeProto,0.04,
+weights_StrD2_GPeCp,0.08,
+weights_StrFSI_StrFSI,0.01,
+weights_StrFSI_StrD1,0.01,
+weights_StrFSI_StrD2,0.01,
+weights_GPeArky_StrD1,0.065,
+weights_GPeArky_StrD2,0.12,
+weights_GPeArky_StrFSI,0.08,
+weights_GPeArky_GPeProto,0.008,
+weights_GPeArky_GPeCp,0.008,
+weights_GPeProto_GPeArky,0.025,
+weights_GPeProto_StrFSI,0.02,
+weights_GPeProto_SNr,0.015,
+weights_GPeProto_STN,0.001,
+weights_GPeProto_GPeCp,0.025,
+weights_STN_SNr,0.04,
+weights_STN_GPeProto,0.001,
+weights_STN_GPeArky,0.001,
+weights_STN_GPeCp,0.001,
+weights_SNr_Thal,0.06,
+weights_Thal_IntGo,0.00056,
+weights_Thal_StrD1,0.14,
+weights_Thal_StrD2,0.12,
+weights_Thal_StrFSI,0.12,
+weights_GPeCp_GPeProto,0.008,
+weights_GPeCp_StrD1,0.01,
+weights_GPeCp_StrD2,0.01,
+weights_GPeCp_StrFSI,0.01,
+weights_GPeCp_GPeArky,0.008,
+weights_GPeCp_IntStop,0.00095,

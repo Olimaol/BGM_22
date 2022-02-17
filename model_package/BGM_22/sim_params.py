@@ -12,8 +12,6 @@ def get_params(model_id):
         specifies which column in the csv file is used
     """
     
-    integerParams = ['general_populationSize', 'GPeArkyCopy_On', 'threads']
-    string_params = ['general_id']
 
     csvPath = os.path.dirname(os.path.realpath(__file__))+'/parameters.csv'
     csvfile = open(csvPath, newline='')
@@ -24,24 +22,30 @@ def get_params(model_id):
     idx = -1
     ### check if model_id is in the .csv file
     for row in reader:
+        if row[0]=='': continue
         fileRows.append(row)
-        if 'general_id'==row[0] and True in [model_id == row[i] for i in range(1,len(row))]:
+        if 'general__id'==row[0] and True in [model_id == row[i] for i in range(1,len(row))]:
             idx = [model_id == row[i] for i in range(1,len(row))].index(True)+1
-        elif 'general_id'==row[0]:
+        elif 'general__id'==row[0]:
             print('No Parameters available for given parameter ID '+model_id+'! (file '+csvPath+')')
             quit()
     if idx==-1:
-        print('No general_id in parameter csv file!')
+        print('No general__id in parameter csv file!')
         quit()
     ### read the column corresponding to model_id
     for row in fileRows:
         if '###' in row[0]: continue
-        if row[0] in integerParams:
-            params[row[0]] = int(float(row[idx]))
-        elif row[0] in string_params:
+        
+        value=row[idx]
+        try:
+            ### if float(value) works value is a number --> check if it is int
+            if float(value)-int(float(value))==0:
+                params[row[0]] = int(float(value))
+            else:
+                params[row[0]] = float(value)
+        except:
+            ### value is a string
             params[row[0]] = row[idx]
-        else:
-            params[row[0]] = float(row[idx])
 
     csvfile.close()
     
