@@ -16,6 +16,12 @@ std::vector<std::mt19937> rng;
 
 // Populations
 PopStruct0 pop0;
+PopStruct1 pop1;
+PopStruct2 pop2;
+PopStruct3 pop3;
+PopStruct4 pop4;
+PopStruct5 pop5;
+PopStruct6 pop6;
 
 
 // Projections
@@ -104,6 +110,12 @@ void initialize(double _dt) {
     // Populations
     // Initialize populations
     pop0.init_population();
+    pop1.init_population();
+    pop2.init_population();
+    pop3.init_population();
+    pop4.init_population();
+    pop5.init_population();
+    pop6.init_population();
 
 
     // Projections
@@ -118,6 +130,12 @@ void initialize(double _dt) {
 // Initialize the random distribution objects
 void init_rng_dist() {
 pop0.init_rng_dist();
+pop1.init_rng_dist();
+pop2.init_rng_dist();
+pop3.init_rng_dist();
+pop4.init_rng_dist();
+pop5.init_rng_dist();
+pop6.init_rng_dist();
 
 }
 
@@ -164,6 +182,8 @@ void singleStep()
 #endif
 
     pop0.update_rng();
+    pop1.update_rng();
+    pop2.update_rng();
 
 
 
@@ -175,6 +195,12 @@ void singleStep()
 #endif
 
     pop0.update(); pop0.spike_gather(); 
+    pop1.update(); pop1.spike_gather(); 
+    pop2.update(); pop2.spike_gather(); 
+    pop3.update(); pop3.spike_gather(); 
+    pop4.update(); pop4.spike_gather(); 
+    pop5.update(); pop5.spike_gather(); 
+    pop6.update(); pop6.spike_gather(); 
 
 
 

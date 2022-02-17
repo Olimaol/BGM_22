@@ -15,7 +15,7 @@ def get_params(model_id):
     integerParams = ['general_populationSize', 'GPeArkyCopy_On', 'threads']
     string_params = ['general_id']
 
-    csvPath = os.path.dirname(os.path.realpath(__file__))+'/new_params.csv'
+    csvPath = os.path.dirname(os.path.realpath(__file__))+'/parameters.csv'
     csvfile = open(csvPath, newline='')
 
     params = {}
@@ -28,7 +28,7 @@ def get_params(model_id):
         if 'general_id'==row[0] and True in [model_id == row[i] for i in range(1,len(row))]:
             idx = [model_id == row[i] for i in range(1,len(row))].index(True)+1
         elif 'general_id'==row[0]:
-            print('No Parameters available for given parameter ID! (file '+__file__+')')
+            print('No Parameters available for given parameter ID '+model_id+'! (file '+csvPath+')')
             quit()
     if idx==-1:
         print('No general_id in parameter csv file!')

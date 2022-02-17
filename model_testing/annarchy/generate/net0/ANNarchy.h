@@ -55,6 +55,12 @@ inline double power(double x, unsigned int a){
  *
  */
 #include "pop0.hpp"
+#include "pop1.hpp"
+#include "pop2.hpp"
+#include "pop3.hpp"
+#include "pop4.hpp"
+#include "pop5.hpp"
+#include "pop6.hpp"
 
 /*
  * Structures for the projections
@@ -77,6 +83,12 @@ extern std::vector<std::mt19937> rng;
  *
  */
 extern PopStruct0 pop0;
+extern PopStruct1 pop1;
+extern PopStruct2 pop2;
+extern PopStruct3 pop3;
+extern PopStruct4 pop4;
+extern PopStruct5 pop5;
+extern PopStruct6 pop6;
 
 
 /*

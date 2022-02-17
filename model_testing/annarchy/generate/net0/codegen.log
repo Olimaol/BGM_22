@@ -1,2 +1,8 @@
 Filename, Object Description
 pop0, Population( name = cor_go )
+pop1, Population( name = cor_pause )
+pop2, Population( name = cor_stop )
+pop3, Population( name = str_d1 )
+pop4, Population( name = str_d2 )
+pop5, Population( name = str_fsi )
+pop6, Population( name = stn )
