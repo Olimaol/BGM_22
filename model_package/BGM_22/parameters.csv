@@ -1,10 +1,6 @@
 ### GENERAL PARAMS,
 general_id,BGM
 general_overlapGoStop,1.0
-general_tauAMPA,10.0
-general_tauGABA,20.0
-general_EAMPA,0.0
-general_EGABA,-90.0
 general_NrConInput,1.0
 general_NrConIntrinsic,10.0
 general_dt,0.1
@@ -24,54 +20,24 @@ t_delayStopAfterCue,50.0
 t_delayStopAfterAction,50.0
 t_cortexStopDurationAfterCue,5.0
 t_cortexStopDurationAfterAction,200.0
-### NEURON MODELS STANDARD PARAMS,
-### IZHIKEVICH STANDARD PARAMS,
-IzhikevichNeuron_a,0.0
-IzhikevichNeuron_b,0.0
-IzhikevichNeuron_c,0.0
-IzhikevichNeuron_d,0.0
-IzhikevichNeuron_n0,140.0
-IzhikevichNeuron_n1,5.0
-IzhikevichNeuron_n2,0.04
-IzhikevichNeuron_I,0.0
-### IZHIKEVICH STR PARAMS,
-IzhikevichStrNeuron_a,0.05
-IzhikevichStrNeuron_b,-20.0
-IzhikevichStrNeuron_c,-55.0
-IzhikevichStrNeuron_d,377.0
-IzhikevichStrNeuron_n0,61.65119
-IzhikevichStrNeuron_n1,2.594639
-IzhikevichStrNeuron_n2,0.022799
-IzhikevichStrNeuron_I,0.0
-IzhikevichStrNeuron_Vr,-80.0
-IzhikevichStrNeuron_C,50.0
-### IZHIKEVICH STRFSI PARAMS,
-IzhikevichStrFSINeuron_a,0.2
-IzhikevichStrFSINeuron_b,0.025
-IzhikevichStrFSINeuron_c,-60.0
-IzhikevichStrFSINeuron_d,0.0
-IzhikevichStrFSINeuron_n0,43.75
-IzhikevichStrFSINeuron_n1,1.5
-IzhikevichStrFSINeuron_n2,0.0125
-IzhikevichStrFSINeuron_I,0.0
-IzhikevichStrFSINeuron_Vr,-70.0
-IzhikevichStrFSINeuron_Vb,-55.0
-IzhikevichStrFSINeuron_Vpeak,25.0
-IzhikevichStrFSINeuron_C,80.0
-### INTEGRATOR NEURON PARAMS,
-IntegratorNeuron_decision,0.0
-IntegratorNeuron_tau,100.0
-IntegratorNeuron_threshold,0.13
-IntegratorNeuron_id,-1.0
-### POISSONNEURONUPDOWN PARAMS,
-PoissonNeuronUpDown_rates,0.0
-PoissonNeuronUpDown_tauUP,1.0
-PoissonNeuronUpDown_tauDOWN,1.0
-### SYNAPSE MODELS STANDARD PARAMS,
-### FACTOR SYNAPSE PARAMS,
-FacSyn_maxTrans,14.0
-FacSyn_modFactor,1.0
 ### POPULATIONS AND NEURON PARAMS,
+### CORTEX-GO PARAMS,
+cor_go__rates,400.0
+cor_go__rates_sd,0.0
+cor_go__tau_up,200.0
+cor_go__tau_down,10.0
+### CORTEX-PAUSE PARAMS,
+cor_pause__rates,500.0
+cor_pause__rates_second_resp_mod,1.2
+cor_pause__rates_sd,0.0
+cor_pause__tau_up,1.0
+cor_pause__tau_down,150.0
+### CORTEX-STOP PARAMS,
+cor_stop__rates_after_cue,400.0
+cor_stop__rates_after_action,400.0
+cor_stop__rates_sd,0.0
+cor_stop__tau_up,1.0
+cor_stop__tau_down,70.0
 ### STRIATUM D1 PARAMS,
 str_d1__C,50.0
 str_d1__k,1.14
@@ -124,23 +90,6 @@ srt_fsi__E_gaba,-90
 str_fsi__I_add,0.0
 str_fsi__v_init,-70
 str_fsi__u_init,0.0
-### CORTEX-GO PARAMS,
-cor_go__rates,400.0
-cor_go__rates_sd,0.0
-cor_go__tau_up,200.0
-cor_go__tau_down,10.0
-### CORTEX-STOP PARAMS,
-cor_stop__rates_after_cue,400.0
-cor_stop__rates_after_action,400.0
-cor_stop__rates_sd,0.0
-cor_stop__tau_up,1.0
-cor_stop__tau_down,70.0
-### CORTEX-PAUSE PARAMS,
-cor_pause__rates,500.0
-cor_pause__rates_second_resp_mod,1.2
-cor_pause__rates_sd,0.0
-cor_pause__tau_up,1.0
-cor_pause__tau_down,150.0
 ### STN PARAMS,
 stn__a,0.005
 stn__b,0.265   
@@ -151,14 +100,20 @@ stn__tau_gaba,20.0
 stn__E_ampa,0.0
 stn__E_gaba,-90
 stn__I_add,0.0
-stn__v_init,-69.41572635560657
-stn__u_init,-14.338099488135063
+stn__v_init,-69.42
+stn__u_init,-14.34
 ### SNr PARAMS,
 snr__a,0.005
 snr__b,0.585
 snr__c,-65.
 snr__d,4.0
-snr__I,0.0
+snr__tau_ampa,10.0
+snr__tau_gaba,20.0
+snr__E_ampa,0.0
+snr__E_gaba,-90
+snr__I_add,0.0
+snr__v_init,-69.9
+snr__u_init,-14.08
 ### GPE-PROTO PARAMS,"optimized fit of Abdi,Mallet et al."
 gpe_proto__a,0.0058
 gpe_proto__b,0.56
@@ -168,7 +123,13 @@ gpe_proto__n0,117
 gpe_proto__n1,4.86
 gpe_proto__n2,0.043
 gpe_proto__refractory,5.0
-gpe_proto__I,0.0
+gpe_proto__tau_ampa,10.0
+gpe_proto__tau_gaba,20.0
+gpe_proto__E_ampa,0.0
+gpe_proto__E_gaba,-90
+gpe_proto__I_add,0.0
+gpe_proto__v_init,-65
+gpe_proto__u_init,-17.34
 ### GPE-ARKY PARAMS,"optimized fit of Abdi,Mallet et al."
 gpe_arky__a,0.0054
 gpe_arky__b,0.34
@@ -178,7 +139,13 @@ gpe_arky__n0,113
 gpe_arky__n1,4.47
 gpe_arky__n2,0.04
 gpe_arky__refractory,5.0
-gpe_arky__I,0.0
+gpe_arky__tau_ampa,10.0
+gpe_arky__tau_gaba,20.0
+gpe_arky__E_ampa,0.0
+gpe_arky__E_gaba,-90
+gpe_arky__I_add,0.0
+gpe_arky__v_init,-71
+gpe_arky__u_init,-2.71
 ### GPE-CP PARAMS,just like gpe proto
 gpe_cp__a,0.0058
 gpe_cp__b,0.56
@@ -188,28 +155,52 @@ gpe_cp__n0,117
 gpe_cp__n1,4.86
 gpe_cp__n2,0.043
 gpe_cp__refractory,5.0
-gpe_cp__I,0.0
+gpe_cp__tau_ampa,10.0
+gpe_cp__tau_gaba,20.0
+gpe_cp__E_ampa,0.0
+gpe_cp__E_gaba,-90
+gpe_cp__I_add,0.0
+gpe_cp__v_init,-65
+gpe_cp__u_init,-17.34
 ### THALAMUS PARAMS,
 thal__a,0.02
 thal__b,0.2
 thal__c,-65
 thal__d,6
-thal__I,5.0
-### GPE NOISE PARAMS,
-GPeE_rates,400.0
-GPeE_sd,80.0
-### SNR NOISE PARAMS,
-SNrE_rates,400.0
-SNrE_sd,80.0
+thal__tau_ampa,10.0
+thal__tau_gaba,20.0
+thal__E_ampa,0.0
+thal__E_gaba,-90
+thal__I_add,5.0
+thal__v_init,-73.89
+thal__u_init,-6.1
+### StrD1 NOISE PARAMS,
+str_d1_n_exc__mean,10.0
+str_d1_n_exc__sd,2.0
+### StrD2 NOISE PARAMS,
+str_d2_n_exc__mean,10.0
+str_d2_n_exc__sd,2.0
+### StrFSI NOISE PARAMS,
+str_fsi_n_exc__mean,10.0
+str_fsi_n_exc__sd,2.0
 ### STN NOISE PARAMS,
-STNE_rates,400.0
-STNE_sd,80.0
-### STR NOISE PARAMS,
-StrE_rates,10.0
-StrE_sd,2.0
+stn_n_exc__mean,400.0
+stn_n_exc__sd,80.0
+### SNR NOISE PARAMS,
+snr_n_exc__mean,400.0
+snr_n_exc__sd,80.0
+### GPE Proto NOISE PARAMS,
+gpe_proto_n_exc__mean,400.0
+gpe_proto_n_exc__sd,80.0
+### GPE Arky NOISE PARAMS,
+gpe_arky_n_exc__mean,400.0
+gpe_arky_n_exc__sd,80.0
+### GPE Cp NOISE PARAMS,
+gpe_cp_n_exc__mean,400.0
+gpe_cp_n_exc__sd,80.0
 ### THALAMUS NOISE PARAMS,
-ThalE_rates,150.0
-ThalE_sd,30.0
+thal_n_exc__mean,150.0
+thal_n_exc__sd,30.0
 ### INTEGRATOR-GO PARAMS,
 integrator_go__tau,200.0
 integrator_go__decision,0.0
@@ -220,8 +211,10 @@ integrator_stop__tau,30.0
 integrator_stop__decision,0.0
 integrator_stop__threshold,0.13
 integrator_stop__neuron_id,-1.0
-### GPEARKY COPY PARAMS,
-GPeArkyCopy_On,0.0
+### PROJECTION AND SYNAPSE PARAMS,
+### FACTOR SYNAPSE PARAMS,
+FacSyn_maxTrans,14.0
+FacSyn_modFactor,1.0
 ### WEIGHTS PARAMS,
 weights_cortexGo_StrD1,0.037
 weights_cortexGo_StrD2,0.035
@@ -276,10 +269,3 @@ weights_GPeCp_StrD2,0.01
 weights_GPeCp_StrFSI,0.01
 weights_GPeCp_GPeArky,0.008
 weights_GPeCp_IntStop,0.00095
-### SIGNIFICANCE RATE COMPARISON TEST PARAMS,
-sigTestRateComparisonFailedCorrect_tMin,300.0
-sigTestRateComparisonFailedCorrect_tMax,300.0
-sigTestRateComparisonFailedCorrect_binSize,20.0
-sigTestRateComparisonFailedFast_tMin,50.0
-sigTestRateComparisonFailedFast_tMax,550.0
-sigTestRateComparisonFailedFast_binSize,20.0

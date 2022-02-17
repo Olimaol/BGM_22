@@ -1,6 +1,7 @@
+import numpy as np
 from CompNeuroPy.model_functions import compile_in_folder
 from ANNarchy import Population, Projection, Uniform, populations, projections, get_population, compile
-from BGM_22.neuronmodels import poisson_neuron_up_down, izhikevich2007_standard, izhikevich2007_fsi, izhikevich2003, integrator_neuron
+from BGM_22.neuronmodels import poisson_neuron_up_down, poisson_neuron, izhikevich2007_standard, izhikevich2007_fsi, izhikevich2003, integrator_neuron, izhikevich2003_modified
 from BGM_22.sim_params import get_params
 
 
@@ -29,6 +30,33 @@ def set_params(params):
             if pop_name in population_name_list:
                 setattr(get_population(pop_name), param_name, val)
                 
+def set_noise_values(params):
+    """
+        sets the noise values for all noise populations
+        
+        params: dict with params
+    """
+    
+    population_name_list = [ pop.name for pop in populations() ]
+    
+    ### loop over all populations
+    for pop_name in population_name_list:
+        ### check if its noise population
+        if '_'.join(pop_name.split('_')[-2:])=='n_exc' or '_'.join(pop_name.split('_')[-2:])=='n_inh':
+            ### search both noise params and get population size
+            pop_size=get_population(pop_name).size
+            try:
+                mean=params[pop_name+'__mean']
+                sd=params[pop_name+'__sd']
+            except:
+                print('\nERROR: missing noise parameters for',pop_name)
+                print(pop_name+'__mean', pop_name+'__sd', 'needed!')
+                print('parameters id:', params['general_id'],'\n')
+                quit()
+            print(pop_name, (15-len(pop_name))*' ', pop_size,'\t', mean,'\t', sd)
+            get_population(pop_name).rates = np.random.normal(mean, sd, pop_size)
+                
+                
 
 def BGM(do_compile=False, compile_folder_name='annarchy_BGM'):
     """
@@ -38,7 +66,6 @@ def BGM(do_compile=False, compile_folder_name='annarchy_BGM'):
     """
     
     params = get_params('BGM')
-    
     
     
     ### POPULATIONS
@@ -55,80 +82,38 @@ def BGM(do_compile=False, compile_folder_name='annarchy_BGM'):
     ### BG Populations
     stn       = Population(params['general_population_size'], izhikevich2003, name="stn")
     snr       = Population(params['general_population_size'], izhikevich2003, name="snr")
-    gpe_proto = Population(params['general_population_size'], izhikevich2003, name="gpe_proto")
-    gpe_arky  = Population(params['general_population_size'], izhikevich2003, name="gpe_arky")
-    gpe_cp    = Population(params['general_population_size'], izhikevich2003, name="gpe_cp")
+    gpe_proto = Population(params['general_population_size'], izhikevich2003_modified, name="gpe_proto")
+    gpe_arky  = Population(params['general_population_size'], izhikevich2003_modified, name="gpe_arky")
+    gpe_cp    = Population(params['general_population_size'], izhikevich2003_modified, name="gpe_cp")
     thal      = Population(params['general_population_size'], izhikevich2003, name="thal")
     
     ### integrator Neurons
     integrator_go   = Population(1, integrator_neuron, stop_condition="decision == -1", name="integrator_go")
     integrator_stop = Population(1, integrator_neuron, stop_condition="decision == -1", name="integrator_stop")
-
+    
+    ### Noise
+    str_d1_n_exc    = Population(params['general_population_size'], poisson_neuron, name="str_d1_n_exc")
+    str_d2_n_exc    = Population(params['general_population_size'], poisson_neuron, name="str_d2_n_exc")
+    str_fsi_n_exc   = Population(params['general_population_size'], poisson_neuron, name="str_fsi_n_exc")
+    stn_n_exc       = Population(params['general_population_size'], poisson_neuron, name="stn_n_exc")
+    snr_n_exc       = Population(params['general_population_size'], poisson_neuron, name="snr_n_exc")
+    gpe_proto_n_exc = Population(params['general_population_size'], poisson_neuron, name="gpe_proto_n_exc")
+    gpe_arky_n_exc  = Population(params['general_population_size'], poisson_neuron, name="gpe_arky_n_exc")
+    gpe_cp_n_exc    = Population(params['general_population_size'], poisson_neuron, name="gpe_cp_n_exc")
+    thal_n_exc      = Population(params['general_population_size'], poisson_neuron, name="thal_n_exc")
+    
+    
     set_params(params)
-    quit()
+    set_noise_values(params)
+    
     ####TODO works until here
 
-    ### Noise / Baseline Input populations
-    #GPe noise
-    gpe_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="gpe_n_exc")
-    gpe_n_exc.rates   = 0
-    gpe_n_exc.act     = 0
-    #GPe-Proto noise
-    gpe_proto_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="gpe_proto_n_exc")
-    gpe_proto_n_exc__values = np.random.normal(params['gpe_n_exc__rates'],params['gpe_n_exc__sd'],params['general_population_size'])
-    gpe_proto_n_exc.rates   = gpe_proto_n_exc__values
-    gpe_proto_n_exc.act     = gpe_proto_n_exc__values
-    #GPe-Cp noise
-    gpe_cp_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="gpe_cp_n_exc")
-    gpe_cp_n_exc__values = np.random.normal(params['gpe_n_exc__rates'],params['gpe_n_exc__sd'],params['general_population_size'])
-    gpe_cp_n_exc.rates   = gpe_cp_n_exc__values
-    gpe_cp_n_exc.act     = gpe_cp_n_exc__values
-    #GPe-Arky noise
-    gpe_arky_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="gpe_arky_n_exc")
-    gpe_arky_n_exc__values = np.random.normal(params['gpe_n_exc__rates'],params['gpe_n_exc__sd'],params['general_population_size'])
-    gpe_arky_n_exc.rates   = gpe_arky_n_exc__values
-    gpe_arky_n_exc.act     = gpe_arky_n_exc__values
-    #snr noise
-    snr_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="snr_n_exc")
-    snr_n_exc__values = np.random.normal(params['snr_n_exc__rates'],params['snr_n_exc__sd'],params['general_population_size'])
-    snr_n_exc.rates   = snr_n_exc__values
-    snr_n_exc.act     = snr_n_exc__values
-    #stn noise
-    stn_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="stn_n_exc")
-    stn_n_exc__values = np.random.normal(params['stn_n_exc__rates'],params['stn_n_exc__sd'],params['general_population_size'])
-    stn_n_exc.rates   = stn_n_exc__values
-    stn_n_exc.act     = stn_n_exc__values
-    #Str noise
-    str_n_exc       = Population(params['general_population_size'], poisson_neuron_up_down, name="str_n_exc")
-    str_n_exc.rates = 0
-    str_n_exc.act   = 0
-    #StrD1 noise
-    str_d1_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="str_d1_n_exc")
-    str_d1_n_exc__values = np.random.normal(params['str_d1_n_exc__rates'],params['str_d1_n_exc__sd'],params['general_population_size'])
-    str_d1_n_exc.rates   = str_d1_n_exc__values
-    str_d1_n_exc.act     = str_d1_n_exc__values
-    #StrD2 noise
-    str_d2_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="str_d2_n_exc")
-    str_d2_n_exc__values = np.random.normal(params['str_d2_n_exc__rates'],params['str_d2_n_exc__sd'],params['general_population_size'])
-    str_d2_n_exc.rates   = str_d2_n_exc__values
-    str_d2_n_exc.act     = str_d2_n_exc__values
-    #StrFSI noise
-    str_fsi_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="str_fsi_n_exc")
-    str_fsi_n_exc__values = np.random.normal(params['str_fsi_n_exc__rates'],params['str_fsi_n_exc__sd'],params['general_population_size'])
-    str_fsi_n_exc.rates   = str_fsi_n_exc__values
-    str_fsi_n_exc.act     = str_fsi_n_exc__values
-    #thalamus noise
-    thal_n_exc         = Population(params['general_population_size'], poisson_neuron_up_down, name="thalNoise")
-    thal_n_exc__values = np.random.normal(params['thalE_rates'],params['thalE_sd'],params['general_population_size'])
-    thal_n_exc.rates   = thal_n_exc__values
-    thal_n_exc.act     = thal_n_exc__values
         
         
     ### PROJECTIONS
     ### cor_go outputs
 
     
-    set_params(params)
     
     if do_compile:
         compile_in_folder(compile_folder_name)

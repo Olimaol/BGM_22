@@ -1,13 +1,13 @@
 from ANNarchy import *
 import pylab as plt
-from BGM_22 import izhikevich2003
+from BGM_22 import izhikevich2003_modified
 setup(dt=0.1)
 
 
 """
 README:
 
-1. set a,b,c,d, I
+1. set a,b,c,d, I, n0, n1, n2
 if b < 0.267 and I==0:
 1. calculate v1,v2,u1,u2 = steady-state points
 2. initialize u,v with steady-state points
@@ -23,13 +23,16 @@ else:
 
 """
 
-a=0.02
-b=0.2
-c=-65
-d=6
-v=-73.89
-u=-6.1
-I=5
+a=0.0054
+b=0.34
+c=-71
+d=9.81
+v=-71
+u=-2.71
+I=0
+n0=113
+n1=4.47
+n2=0.04
 stim=0
 
 if b<0.267 and I==0:
@@ -44,12 +47,15 @@ if b<0.267 and I==0:
     print('u2:',u2)
 
 
-pop=Population(1,neuron=izhikevich2003)
+pop=Population(1,neuron=izhikevich2003_modified)
 pop.a=a
 pop.b=b
 pop.c=c
 pop.d=d
 pop.I_add=I
+pop.n0=n0
+pop.n1=n1
+pop.n2=n2
 
 m=Monitor(pop,['v','u'])
 
