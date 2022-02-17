@@ -66,7 +66,7 @@ def BGM(do_compile=False, compile_folder_name='annarchy_BGM'):
 
     set_params(params)
     quit()
-    ###TODO works until here
+    ####TODO works until here
 
     ### Noise / Baseline Input populations
     #GPe noise
