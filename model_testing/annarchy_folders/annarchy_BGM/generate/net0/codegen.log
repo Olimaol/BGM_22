@@ -1,4 +1,0 @@
-Filename, Object Description
-pop0, Population( name = Cortex-Go )
-pop1, Population( name = STR_D1 )
-proj0, Projection( pre = Cortex-Go, post = STR_D1, target = ampa ) using connector: Random Convergent 3 $\rightarrow$ 1 
