@@ -65,6 +65,7 @@ def set_connections(params):
     """
     
     projection_name_list = [ proj.name for proj in projections() ]
+    already_set_params = {}# dict for each projection, which params were already set during connectivity definition
     
     ### set connectivity
     ### loop over all projections
@@ -78,6 +79,11 @@ def set_connections(params):
             
         if connectivity=='connect_fixed_number_pre':
             get_projection(proj_name).connect_fixed_number_pre(number=params[proj_name+'__nr_con'], weights=eval(str(params[proj_name+'__weights'])), delays=eval(str(params[proj_name+'__delays'])))
+            already_set_params[proj_name] = ['connectivity', 'nr_con', 'weights', 'delays']
+        else:
+            print('\nERROR: wrong connectivity parameter for',proj_name+'__connectivity!\n','parameters id:', params['general__id'],'\n')
+            quit()
+            
 
     ### set parameters
     ### loop over all params
@@ -90,7 +96,7 @@ def set_connections(params):
             param_name = key_split[2]
                         
             ### if proj is in network --> set param
-            if proj_name in projection_name_list:
+            if proj_name in projection_name_list and not(param_name in already_set_params[proj_name]):
                 setattr(get_projection(proj_name), param_name, val)
 
 
@@ -164,7 +170,6 @@ def BGM(do_compile=False, compile_folder_name='annarchy_BGM'):
     set_noise_values(params)
     set_connections(params)
     compile()
-    print(cor_stop__gpe_cp.w)
     quit()
     ####TODO works until here
 
