@@ -218,6 +218,9 @@ def BGM(do_compile=False, compile_folder_name='annarchy_BGM'):
     
     ### thal output
     thal__integrator_go = Projection(pre=thal, post=integrator_go, target='ampa', synapse=factor_synapse, name='thal__integrator_go')
+    thal__str_d1        = Projection(pre=thal, post=str_d1,        target='ampa', synapse=factor_synapse, name='thal__str_d1')
+    thal__str_d2        = Projection(pre=thal, post=str_d2,        target='ampa', synapse=factor_synapse, name='thal__str_d2')
+    thal__str_fsi       = Projection(pre=thal, post=str_fsi,       target='ampa', synapse=factor_synapse, name='thal__str_fsi')
     
     
     
@@ -228,29 +231,6 @@ def BGM(do_compile=False, compile_folder_name='annarchy_BGM'):
     print(vars(thal__integrator_go))
     quit()
     ####TODO works until here
-    ThalSD1 = Projection (
-        pre = Thal,
-        post = STR_D1,
-        target = 'ampa',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    ThalSD1.mod_factor = params['weights_Thal_StrD1']
-
-    ThalSD2 = Projection (
-        pre = Thal,
-        post = STR_D2,
-        target = 'ampa',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    ThalSD2.mod_factor = params['weights_Thal_StrD2']
-
-    ThalFSI = Projection (
-        pre = Thal,
-        post = STR_FSI,
-        target = 'ampa',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    ThalFSI.mod_factor = params['weights_Thal_StrFSI']
 
     ### Noise/Baseline inputs
     GPeEGPe_Proto = Projection(
