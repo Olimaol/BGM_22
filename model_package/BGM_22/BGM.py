@@ -80,6 +80,9 @@ def set_connections(params):
         if connectivity=='connect_fixed_number_pre':
             get_projection(proj_name).connect_fixed_number_pre(number=params[proj_name+'__nr_con'], weights=eval(str(params[proj_name+'__weights'])), delays=eval(str(params[proj_name+'__delays'])))
             already_set_params[proj_name] = ['connectivity', 'nr_con', 'weights', 'delays']
+        elif connectivity=='connect_all_to_all':
+            get_projection(proj_name).connect_all_to_all(weights=eval(str(params[proj_name+'__weights'])), delays=eval(str(params[proj_name+'__delays'])))
+            already_set_params[proj_name] = ['connectivity', 'weights', 'delays']
         else:
             print('\nERROR: wrong connectivity parameter for',proj_name+'__connectivity!\n','parameters id:', params['general__id'],'\n')
             quit()
@@ -164,364 +167,67 @@ def BGM(do_compile=False, compile_folder_name='annarchy_BGM'):
     ### cortex pause output
     cor_pause__stn = Projection(pre=cor_pause, post=stn, target='ampa', synapse=factor_synapse, name='cor_pause__stn')
     
+    ### str d1 output
+    str_d1__snr    = Projection(pre=str_d1, post=snr,    target='gaba', synapse=factor_synapse, name='str_d1__snr')
+    str_d1__gpe_cp = Projection(pre=str_d1, post=gpe_cp, target='gaba', synapse=factor_synapse, name='str_d1__gpe_cp')
+    str_d1__str_d1 = Projection(pre=str_d1, post=str_d1, target='gaba', synapse=factor_synapse, name='str_d1__str_d1')
+    str_d1__str_d2 = Projection(pre=str_d1, post=str_d2, target='gaba', synapse=factor_synapse, name='str_d1__str_d2')
+    
+    ### str d2 output
+    str_d2__gpe_proto = Projection(pre=str_d2, post=gpe_proto, target='gaba', synapse=factor_synapse, name='str_d2__gpe_proto')
+    str_d2__gpe_arky  = Projection(pre=str_d2, post=gpe_arky,  target='gaba', synapse=factor_synapse, name='str_d2__gpe_arky')
+    str_d2__gpe_cp    = Projection(pre=str_d2, post=gpe_cp,    target='gaba', synapse=factor_synapse, name='str_d2__gpe_cp')
+    str_d2__str_d1    = Projection(pre=str_d2, post=str_d1,    target='gaba', synapse=factor_synapse, name='str_d2__str_d1')
+    str_d2__str_d2    = Projection(pre=str_d2, post=str_d2,    target='gaba', synapse=factor_synapse, name='str_d2__str_d2')
+    
+    ### str fsi output
+    str_fsi__str_d1  = Projection(pre=str_fsi, post=str_d1,  target='gaba', synapse=factor_synapse, name='str_fsi__str_d1')
+    str_fsi__str_d2  = Projection(pre=str_fsi, post=str_d2,  target='gaba', synapse=factor_synapse, name='str_fsi__str_d2')
+    str_fsi__str_fsi = Projection(pre=str_fsi, post=str_fsi, target='gaba', synapse=factor_synapse, name='str_fsi__str_fsi')
+    
+    ### stn output
+    stn__snr       = Projection(pre=stn, post=snr,       target='ampa', synapse=factor_synapse, name='stn__snr')
+    stn__gpe_proto = Projection(pre=stn, post=gpe_proto, target='ampa', synapse=factor_synapse, name='stn__gpe_proto')
+    stn__gpe_arky  = Projection(pre=stn, post=gpe_arky,  target='ampa', synapse=factor_synapse, name='stn__gpe_arky')
+    stn__gpe_cp    = Projection(pre=stn, post=gpe_cp,    target='ampa', synapse=factor_synapse, name='stn__gpe_cp')
+    
+    ### gpe proto output
+    gpe_proto__stn      = Projection(pre=gpe_proto, post=stn,      target='gaba', synapse=factor_synapse, name='gpe_proto__stn')
+    gpe_proto__snr      = Projection(pre=gpe_proto, post=snr,      target='gaba', synapse=factor_synapse, name='gpe_proto__snr')
+    gpe_proto__gpe_arky = Projection(pre=gpe_proto, post=gpe_arky, target='gaba', synapse=factor_synapse, name='gpe_proto__gpe_arky')
+    gpe_proto__str_fsi  = Projection(pre=gpe_proto, post=str_fsi,  target='gaba', synapse=factor_synapse, name='gpe_proto__str_fsi')
+    gpe_proto__gpe_cp   = Projection(pre=gpe_proto, post=gpe_cp,   target='gaba', synapse=factor_synapse, name='gpe_proto__gpe_cp')
+    
+    ### gpe arky output
+    gpe_arky__str_d1    = Projection(pre=gpe_arky, post=str_d1,    target='gaba', synapse=factor_synapse, name='gpe_arky__str_d1')
+    gpe_arky__str_d2    = Projection(pre=gpe_arky, post=str_d2,    target='gaba', synapse=factor_synapse, name='gpe_arky__str_d2')
+    gpe_arky__gpe_proto = Projection(pre=gpe_arky, post=gpe_proto, target='gaba', synapse=factor_synapse, name='gpe_arky__gpe_proto')
+    gpe_arky__str_fsi   = Projection(pre=gpe_arky, post=str_fsi,   target='gaba', synapse=factor_synapse, name='gpe_arky__str_fsi')
+    gpe_arky__gpe_cp    = Projection(pre=gpe_arky, post=gpe_cp,    target='gaba', synapse=factor_synapse, name='gpe_arky__gpe_cp')
+    
+    ### gpe cp output
+    gpe_cp__gpe_proto       = Projection(pre=gpe_cp, post=gpe_proto, target='gaba', synapse=factor_synapse, name='gpe_cp__gpe_proto')
+    gpe_cp__str_d1          = Projection(pre=gpe_cp, post=str_d1,    target='gaba', synapse=factor_synapse, name='gpe_cp__str_d1')
+    gpe_cp__str_d2          = Projection(pre=gpe_cp, post=str_d2,    target='gaba', synapse=factor_synapse, name='gpe_cp__str_d2')
+    gpe_cp__str_fsi         = Projection(pre=gpe_cp, post=str_fsi,   target='gaba', synapse=factor_synapse, name='gpe_cp__str_fsi')
+    gpe_cp__gpe_arky        = Projection(pre=gpe_cp, post=gpe_arky,  target='gaba', synapse=factor_synapse, name='gpe_cp__gpe_arky')
+    gpe_cp__integrator_stop = Projection(pre=gpe_cp, post=gpe_arky,  target='ampa', synapse=factor_synapse, name='gpe_cp__integrator_stop')
+    
+    ### snr output
+    snr__thal = Projection(pre=snr, post=thal, target='gaba', synapse=factor_synapse, name='snr__thal')
+    
+    ### thal output
+    thal__integrator_go = Projection(pre=thal, post=integrator_go, target='ampa', synapse=factor_synapse, name='thal__integrator_go')
+    
     
     
     set_params(params)
     set_noise_values(params)
     set_connections(params)
     compile()
+    print(vars(thal__integrator_go))
     quit()
     ####TODO works until here
-
-    
-
-    ### CortexPause outputs
-    Stoppinput1STN = Projection (
-        pre = Stoppinput1,
-        post = STN,
-        target = 'ampa',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConInput'], weights = 1, delays = 0)
-    Stoppinput1STN.mod_factor = params['weights_cortexPause_STN']
-
-    ### StrD1 outputs
-    STR_D1SNr = Projection (
-        pre = STR_D1,
-        post = SNr,
-        target = 'gaba',
-        synapse = FactorSynapse 
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D1SNr.mod_factor = params['weights_StrD1_SNr']
-
-    STR_D1GPe_Proto2 = Projection (
-        pre = STR_D1,
-        post = GPe_Proto2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D1GPe_Proto2.mod_factor = params['weights_StrD1_GPeCp']
-
-    STR_D1STR_D1 = Projection(
-        pre  = STR_D1,
-        post = STR_D1,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D1STR_D1.mod_factor = params['weights_StrD1_StrD1']
-
-    STR_D1STR_D2 = Projection(
-        pre  = STR_D1,
-        post = STR_D2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D1STR_D2.mod_factor = params['weights_StrD1_StrD2']
-
-    ### StrD2 outputs
-    STR_D2GPe_Proto = Projection (
-        pre = STR_D2,
-        post = GPe_Proto,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D2GPe_Proto.mod_factor = params['weights_StrD2_GPeProto']
-
-    STR_D2GPe_Arky = Projection (
-        pre = STR_D2,
-        post = GPe_Arky,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D2GPe_Arky.mod_factor = params['weights_StrD2_GPeArky']
-
-    STR_D2STR_D1 = Projection(
-        pre  = STR_D2,
-        post = STR_D1,
-        target = 'gaba',
-        synapse = FactorSynapse 
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D2STR_D1.mod_factor = params['weights_StrD2_StrD1']
-
-    STR_D2STR_D2 = Projection(
-        pre  = STR_D2,
-        post = STR_D2,
-        target = 'gaba',
-        synapse = FactorSynapse 
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D2STR_D2.mod_factor = params['weights_StrD2_StrD2']
-
-    STR_D2GPe_Proto2 = Projection (
-        pre = STR_D2,
-        post = GPe_Proto2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D2GPe_Proto2.mod_factor = params['weights_StrD2_GPeCp']
-
-    STR_D2GPe_Arky2 = Projection (
-        pre = STR_D2,
-        post = GPe_Arky2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_D2GPe_Arky2.mod_factor = params['weights_StrD2_GPeArky']*params['GPeArkyCopy_On']
-
-    ### StrFSI outputs
-    STR_FSISTR_D1 = Projection(
-        pre  = STR_FSI,
-        post = STR_D1,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_FSISTR_D1.mod_factor = params['weights_StrFSI_StrD1']
-
-    STR_FSISTR_D2 = Projection(
-        pre  = STR_FSI,
-        post = STR_D2,
-        target = 'gaba',
-        synapse = FactorSynapse 
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_FSISTR_D2.mod_factor = params['weights_StrFSI_StrD2']
-
-    STR_FSISTR_FSI = Projection(
-        pre  = STR_FSI,
-        post = STR_FSI,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STR_FSISTR_FSI.mod_factor = params['weights_StrFSI_StrFSI']
-
-    ### STN outputs
-    STNSNr = Projection (
-        pre = STN,
-        post = SNr,
-        target = 'ampa',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = 10)
-    STNSNr.mod_factor = params['weights_STN_SNr']
-
-    STNGPe_Proto = Projection (
-        pre = STN,
-        post = GPe_Proto,
-        target = 'ampa',
-        synapse = FactorSynapse 
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STNGPe_Proto.mod_factor = params['weights_STN_GPeProto']
-
-    STNGPe_Arky = Projection (
-        pre = STN,
-        post = GPe_Arky,
-        target = 'ampa',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STNGPe_Arky.mod_factor = params['weights_STN_GPeArky']
-
-    STNGPe_Proto2 = Projection (
-        pre = STN,
-        post = GPe_Proto2,
-        target = 'ampa',
-        synapse = FactorSynapse 
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STNGPe_Proto2.mod_factor = params['weights_STN_GPeCp']
-
-    STNGPe_Arky2 = Projection (
-        pre = STN,
-        post = GPe_Arky2,
-        target = 'ampa',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    STNGPe_Arky2.mod_factor = params['weights_STN_GPeArky']*params['GPeArkyCopy_On']
-
-    ### GPeProto outputs
-    GPe_ProtoSTN = Projection (
-        pre = GPe_Proto,
-        post = STN,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ProtoSTN.mod_factor = params['weights_GPeProto_STN']
-
-    GPe_ProtoSNr = Projection (
-        pre = GPe_Proto,
-        post = SNr,
-        target = 'gaba',
-        synapse = FactorSynapse 
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ProtoSNr.mod_factor = params['weights_GPeProto_SNr']
-
-    GPe_ProtoGPe_Arky = Projection (
-        pre = GPe_Proto,
-        post = GPe_Arky,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ProtoGPe_Arky.mod_factor = params['weights_GPeProto_GPeArky']
-
-    GPe_ProtoSTR_FSI = Projection (
-        pre = GPe_Proto,
-        post = STR_FSI,
-        target = 'gaba',
-        synapse = FactorSynapse 
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ProtoSTR_FSI.mod_factor = params['weights_GPeProto_StrFSI']
-
-    GPe_ProtoGPe_Proto2 = Projection (
-        pre = GPe_Proto,
-        post = GPe_Proto2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ProtoGPe_Proto2.mod_factor = params['weights_GPeProto_GPeCp']
-
-    GPe_ProtoGPe_Arky2 = Projection (
-        pre = GPe_Proto,
-        post = GPe_Arky2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ProtoGPe_Arky2.mod_factor = params['weights_GPeProto_GPeArky']*params['GPeArkyCopy_On']
-
-    ### GPeArky outputs
-    GPe_ArkySTR_D1 = Projection (
-        pre = GPe_Arky,
-        post = STR_D1,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ArkySTR_D1.mod_factor = params['weights_GPeArky_StrD1']
-
-    GPe_ArkySTR_D2 = Projection (
-        pre = GPe_Arky,
-        post = STR_D2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays'])) 
-    GPe_ArkySTR_D2.mod_factor = params['weights_GPeArky_StrD2']
-
-    GPe_ArkyGPe_Proto = Projection (
-        pre = GPe_Arky,
-        post = GPe_Proto,
-        target = 'gaba',
-        synapse = FactorSynapse  
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ArkyGPe_Proto.mod_factor = params['weights_GPeArky_GPeProto']
-
-    GPe_ArkySTR_FSI = Projection (
-        pre = GPe_Arky,
-        post = STR_FSI,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ArkySTR_FSI.mod_factor = params['weights_GPeArky_StrFSI']
-
-    GPe_ArkyGPe_Proto2 = Projection (
-        pre = GPe_Arky,
-        post = GPe_Proto2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_ArkyGPe_Proto2.mod_factor = params['weights_GPeArky_GPeCp']
-
-    ### GPeArkyCopy outputs
-    GPe_Arky2STR_D1 = Projection (
-        pre = GPe_Arky2,
-        post = STR_D1,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_Arky2STR_D1.mod_factor = params['weights_GPeArky_StrD1']*params['GPeArkyCopy_On']
-
-    GPe_Arky2STR_D2 = Projection (
-        pre = GPe_Arky2,
-        post = STR_D2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays'])) 
-    GPe_Arky2STR_D2.mod_factor = params['weights_GPeArky_StrD2']*params['GPeArkyCopy_On']
-
-    GPe_Arky2STR_FSI = Projection (
-        pre = GPe_Arky2,
-        post = STR_FSI,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_Arky2STR_FSI.mod_factor = params['weights_GPeArky_StrFSI']*params['GPeArkyCopy_On']
-
-    ### GPeCp outputs
-    GPe_Proto2GPe_Proto = Projection (
-        pre = GPe_Proto2,
-        post = GPe_Proto,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_Proto2GPe_Proto.mod_factor = params['weights_GPeCp_GPeProto']
-
-    GPe_Proto2STR_D1 = Projection (
-        pre = GPe_Proto2,
-        post = STR_D1,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_Proto2STR_D1.mod_factor = params['weights_GPeCp_StrD1']
-
-    GPe_Proto2STR_D2 = Projection (
-        pre = GPe_Proto2,
-        post = STR_D2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_Proto2STR_D2.mod_factor = params['weights_GPeCp_StrD2']
-
-    GPe_Proto2STR_FSI = Projection (
-        pre = GPe_Proto2,
-        post = STR_FSI,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_Proto2STR_FSI.mod_factor = params['weights_GPeCp_StrFSI']
-
-    GPe_Proto2GPe_Arky = Projection (
-        pre = GPe_Proto2,
-        post = GPe_Arky,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_Proto2GPe_Arky.mod_factor = params['weights_GPeCp_GPeArky']
-
-    GPe_Proto2IntegratorStop = Projection (
-        pre = GPe_Proto2,
-        post = IntegratorStop,
-        target = 'ampa',
-        synapse = FactorSynapse
-    ).connect_all_to_all(weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_Proto2IntegratorStop.mod_factor = params['weights_GPeCp_IntStop']
-
-    GPe_Proto2GPe_Arky2 = Projection (
-        pre = GPe_Proto2,
-        post = GPe_Arky2,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    GPe_Proto2GPe_Arky2.mod_factor = params['weights_GPeCp_GPeArky']*params['GPeArkyCopy_On']
-
-    ### SNr outputs
-    SNrThal = Projection (
-        pre = SNr,
-        post = Thal,
-        target = 'gaba',
-        synapse = FactorSynapse
-    ).connect_fixed_number_pre(number = params['general__NrConIntrinsic'], weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    SNrThal.mod_factor = params['weights_SNr_Thal']
-
-    ### Thal outputs
-    ThalIntegrator = Projection (
-        pre = Thal,
-        post = Integrator,
-        target = 'ampa',
-        synapse = FactorSynapse
-    ).connect_all_to_all(weights = 1, delays = Uniform(0.0, params['general__synDelays']))
-    ThalIntegrator.mod_factor = params['weights_Thal_IntGo']
-
     ThalSD1 = Projection (
         pre = Thal,
         post = STR_D1,
