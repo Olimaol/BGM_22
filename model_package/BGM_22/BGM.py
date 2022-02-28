@@ -222,4 +222,4 @@ def BGM(do_compile=False, compile_folder_name='annarchy_BGM'):
     if do_compile:
         compile_in_folder(compile_folder_name)
     
-    return {'populations':[ pop.name for pop in populations() ], 'projections':[ proj.name for proj in projections() ]}
+    return [{'populations':[ pop.name for pop in populations() ], 'projections':[ proj.name for proj in projections() ]}, params]
