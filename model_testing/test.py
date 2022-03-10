@@ -1,5 +1,5 @@
 from ANNarchy import *
-from BGM_22 import BGM, old_str
+from BGM_22 import BGM
 from CompNeuroPy import Monitors
 import CompNeuroPy.analysis_functions as af
 import pylab as plt
