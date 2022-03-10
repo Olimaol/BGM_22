@@ -21,10 +21,7 @@ izhikevich2007_standard = Neuron(
     equations="""
         dg_ampa/dt = -g_ampa/tau_ampa
         dg_gaba/dt = -g_gaba/tau_gaba
-        I_ampa     = -g_ampa*(v - E_ampa)
-        I_gaba     = -g_gaba*(v - E_gaba)
-        I          = I_add + I_ampa + I_gaba
-        C * dv/dt  = k*(v - v_r)*(v - v_t) - u + I
+        C * dv/dt  = k*(v - v_r)*(v - v_t) - u + I_add - g_ampa*(v - E_ampa) - g_gaba*(v - E_gaba)
         du/dt      = a*(b*(v - v_r) - u)
     """,
     spike = "v >= v_peak",
@@ -32,7 +29,7 @@ izhikevich2007_standard = Neuron(
         v = c
         u = u + d
     """,
-    name = "izhikevich2007_rs",
+    name = "izhikevich2007_standard",
     description = "Standard neuron model from Izhikevich (2007) with additional conductance based synapses for AMPA and GABA currents."
 )
 
@@ -58,12 +55,8 @@ izhikevich2007_fsi = Neuron(
     equations="""
         dg_ampa/dt = -g_ampa/tau_ampa
         dg_gaba/dt = -g_gaba/tau_gaba
-        I_ampa     = -g_ampa*(v - E_ampa)
-        I_gaba     = -g_gaba*(v - E_gaba)
-        I          = I_add + I_ampa + I_gaba
-        C * dv/dt  = k*(v - v_r)*(v - v_t) - u + I
-        U_v        = if v<v_b: 0 else: b*(v - v_b)**3
-        du/dt      = a*(U_v - u)
+        C * dv/dt  = k*(v - v_r)*(v - v_t) - u + I_add - g_ampa*(v - E_ampa) - g_gaba*(v - E_gaba)
+        du/dt      = if v<v_b: -a * u else: a * (b * (v - v_b)**3 - u)
     """,
     spike = "v >= v_peak",
     reset = """
@@ -144,6 +137,79 @@ izhikevich2003_modified = Neuron(
 )
 
 
+izhikevich_str_old = Neuron(         
+    parameters ="""
+        a        = 0  : population
+        b        = 0  : population
+        c        = 0  : population
+        d        = 0  : population
+        n0       = 0 : population
+        n1       = 0 : population
+        n2       = 0 : population
+        I        = 0  : population
+        tau_ampa = 1        : population
+        tau_gaba = 1        : population
+        E_ampa   = 0          : population
+        E_gaba   = 0          : population
+        Vr       = 0 : population
+        C        = 1  : population
+    """,
+    equations ="""
+        dg_ampa/dt = -g_ampa / tau_ampa                                                                       : init = 0
+        dg_gaba/dt = -g_gaba / tau_gaba                                                                       : init = 0
+        dv/dt      = n2 * v * v + n1 * v + n0 - u / C + I / C - g_ampa * (v - E_ampa) - g_gaba * (v - E_gaba) : init = -70
+        du/dt      = a *(b*(v-Vr)-u)                                                                          : init = -18.55
+    """,
+    spike ="""    
+        v >= 40
+    """,
+    reset ="""
+        v = c
+        u = u + d
+    """,
+    name = "izhikevich_str_old",
+    description = "Izhikevich Neuron with conductance based synapses for Str neurons.")
+
+
+izhikevich_str_fsi_old = Neuron(
+    parameters="""
+        a        = 0     : population
+        b        = 0     : population
+        c        = 0     : population
+        d        = 0     : population
+        n0       = 0    : population
+        n1       = 0    : population
+        n2       = 0    : population
+        I        = 0     : population
+        tau_ampa = 1              : population
+        tau_gaba = 1              : population
+        E_ampa   = 0                : population
+        E_gaba   = 0                : population
+        Vr       = 0    : population
+        Vb       = 0    : population
+        Vpeak    = 0 : population
+        C        = 1     : population
+    """,
+    equations="""
+        dg_ampa/dt = -g_ampa / tau_ampa                                                                       : init = 0
+        dg_gaba/dt = -g_gaba / tau_gaba                                                                       : init = 0
+        dv/dt      = n2 * v * v + n1 * v + n0 - u / C + I / C - g_ampa * (v - E_ampa) - g_gaba * (v - E_gaba) : init = -70.
+        du/dt      = if v < Vb:
+                         - a * u
+                     else:
+                         a*(b*(v-Vb)**3-u)                                                                    : init = -18.55
+    """, 
+    spike = """
+        v >= Vpeak
+    """,
+    reset = """
+        v = c
+        u = u + d
+    """,
+    name = "izhikevich_str_fsi_old",
+    description = "Izhikevich Neuron with conductance based synapses for StrFSI neurons.")
+
+
 poisson_neuron_up_down = Neuron(        
     parameters ="""
         rates   = 0
@@ -187,13 +253,13 @@ poisson_neuron = Neuron(
 
 integrator_neuron = Neuron(        
     parameters = """
-        decision  = 0
         tau       = 1 : population
         threshold = 0 : population
-        neuron_id        = 0
+        neuron_id = 0
     """,
     equations = """
         dg_ampa/dt = - g_ampa / tau
+        ddecision/dt = 0
     """,
     spike = """
         g_ampa >= threshold        

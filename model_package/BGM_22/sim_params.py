@@ -35,6 +35,7 @@ def get_params(model_id):
     ### read the column corresponding to model_id
     for row in fileRows:
         if '###' in row[0]: continue
+        if row[idx]=='': continue
         
         value=row[idx]
         try:
@@ -45,7 +46,12 @@ def get_params(model_id):
                 params[row[0]] = float(value)
         except:
             ### value is a string
-            params[row[0]] = row[idx]
+            if value[0]=='$' and value[-1]=='$':
+                ### value is a formula
+                params[row[0]] = float(eval(value[1:-1]))
+            else:
+                ### value is some other string
+                params[row[0]] = value
 
     csvfile.close()
     
