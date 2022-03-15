@@ -34,6 +34,47 @@ izhikevich2007_standard = Neuron(
 )
 
 
+izhikevich2007_standard_new_noise = Neuron(
+    parameters="""
+        C              = 0 : population
+        k              = 0 : population
+        v_r            = 0 : population
+        v_t            = 0 : population
+        a              = 0 : population
+        b              = 0 : population
+        c              = 0 : population
+        d              = 0 : population
+        v_peak         = 0 : population
+        tau_ampa       = 1 : population
+        tau_gaba       = 1 : population
+        tau_noise      = 0 : population
+        E_ampa         = 0 : population
+        E_gaba         = 0 : population
+        E_noise        = 0 : population
+        I_add          = 0
+        prob_noise_event     = 0 : population
+        increase_noise = 0 : population
+        isi_variations = 0
+    """,
+    equations="""
+        dg_ampa/dt = -g_ampa/tau_ampa
+        dg_gaba/dt = -g_gaba/tau_gaba
+        dg_noise/dt = ite(next_noise_event > t, -g_noise/tau_noise, -g_noise/tau_noise + increase_noise/dt)
+        C * dv/dt  = k*(v - v_r)*(v - v_t) - u + I_add - g_ampa*(v - E_ampa) - g_gaba*(v - E_gaba) - g_noise*(v - E_noise)
+        du/dt      = a*(b*(v - v_r) - u)
+        
+        next_noise_event = ite(next_noise_event > t, next_noise_event, next_noise_event + NegBinomial(1,prob_noise_event)*dt + isi_variations) : min=t+dt
+    """,
+    spike = "v >= v_peak",
+    reset = """
+        v = c
+        u = u + d
+    """,
+    name = "izhikevich2007_standard",
+    description = "Standard neuron model from Izhikevich (2007) with additional conductance based synapses for AMPA and GABA currents."
+)
+
+
 izhikevich2007_fsi = Neuron(
     parameters="""
         C        = 0 : population
