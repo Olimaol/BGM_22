@@ -1,17 +1,17 @@
 from ANNarchy import *
-from BGM_22 import BGM, BGM_new_noise
+from BGM_22 import BGM
 from CompNeuroPy import Monitors
 import CompNeuroPy.analysis_functions as af
 import pylab as plt
 import time
 
 setup(dt=0.1, seed=1)
-model, params = BGM_new_noise(do_compile=True)
-start=time.time()
+model, params = BGM(do_compile=True)
+
 
 
 mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
-                'pop;str_d1':['spike','g_ampa','g_gaba', 'g_noise'],
+                'pop;str_d1':['spike','g_ampa','g_gaba'],
                 'pop;str_d2':['spike','g_ampa','g_gaba'],
                 'pop;stn':['spike','g_ampa','g_gaba'],
                 'pop;cor_go':['spike'],
@@ -27,7 +27,7 @@ mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
 
 
 paramsS = {}
-paramsS['trials'] = 1
+paramsS['trials'] = 2
 
 
 ### GO TRIALS ###
@@ -35,9 +35,10 @@ print('\n\nSTART GO TRIALS')
 mode='GO'
 zaehler_go = 0
 for i in range(0,paramsS['trials']):
+    start=time.time()
     ### RESET MODEL ###
-    print('\nreset before trial...')
-    reset(populations=True, projections=True, synapses=False, net_id=0)
+    
+    if i!=0: print('\nreset before trial...'); mon.reset(populations=True, projections=True, synapses=False, net_id=0)
     mon.start()
 
     ### TRIAL START
@@ -149,20 +150,20 @@ for i in range(0,paramsS['trials']):
     ### TRIAL END
     print('Integrator decision:',get_population('integrator_go').decision[0])
     print('TRIAL END')
+    if i==1: simulate(50)
 
     if get_population('integrator_go').decision[0] == -1 :
         t= get_current_step()
         zaehler_go = zaehler_go + 1
         
     mon.pause()
-
+    print('time:',time.time()-start)
 ### END GO TRIALS ###
 print('\nGO TRIALS FINISHED\nzaehler_go:',zaehler_go)
       
       
-      
 recordings=mon.get_recordings()
-recording_times=mon.get_times()
+recording_times=mon.get_recording_times()
 
 
 plot_list = ['1;gpe_arky;spike;hybrid',
@@ -177,35 +178,20 @@ plot_list = ['1;gpe_arky;spike;hybrid',
              '10;cor_stop;spike;hybrid',
              '11;str_fsi;spike;hybrid',
              '12;integrator_go;g_ampa;line']
-af.plot_recordings('overview.png', recordings, recording_times['start'][0], recording_times['stop'][0], (2,6), plot_list)
+chunk=0 # chunks are separated by resets --> different recording/recording_times, here each trial is an own chunk
+compartment='gpe_arky' # here all compartments have the same timings... doesn't matter
+period=0 # separated by pauses, one period = [start,stop], here one trial is one period... only one available
+time_lims = recording_times.time_lims(chunk=chunk, compartment=compartment, period=period)
+idx_lims  = recording_times.idx_lims(chunk=chunk, compartment=compartment, period=period)
+af.plot_recordings('overview1.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
 
-plot_list = ['1;gpe_arky;g_ampa;line',
-             '2;str_d1;g_ampa;line',
-             '3;str_d2;g_ampa;line',
-             '4;stn;g_ampa;line',
-             '6;gpe_cp;g_ampa;line',
-             '7;gpe_proto;g_ampa;line',
-             '8;snr;g_ampa;line',
-             '9;thal;g_ampa;line',
-             '11;str_fsi;g_ampa;line',
-             '12;integrator_go;g_ampa;line']
-af.plot_recordings('g_ampa.png', recordings, recording_times['start'][0], recording_times['stop'][0], (2,6), plot_list)
 
-plot_list = ['1;gpe_arky;g_gaba;line',
-             '2;str_d1;g_gaba;line',
-             '3;str_d2;g_gaba;line',
-             '4;stn;g_gaba;line',
-             '6;gpe_cp;g_gaba;line',
-             '7;gpe_proto;g_gaba;line',
-             '8;snr;g_gaba;line',
-             '9;thal;g_gaba;line',
-             '11;str_fsi;g_gaba;line',
-             '12;integrator_go;g_ampa;line']
-af.plot_recordings('g_gaba.png', recordings, recording_times['start'][0], recording_times['stop'][0], (2,6), plot_list)
+chunk=1
+time_lims = recording_times.time_lims(chunk=chunk)
+idx_lims  = recording_times.idx_lims(chunk=chunk)
+af.plot_recordings('overview2.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
 
-plot_list = ['1;str_d1;g_ampa;line',
-             '2;str_d1;g_noise;line']
-af.plot_recordings('strd1.png', recordings, recording_times['start'][0], recording_times['stop'][0], (2,1), plot_list)
+
 quit()
 
 
