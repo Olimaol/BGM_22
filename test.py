@@ -1,13 +1,12 @@
 from ANNarchy import *
-from BGM_22 import BGM
+from CompNeuroPy.models import BGM
 from CompNeuroPy import Monitors
 import CompNeuroPy.analysis_functions as af
 import pylab as plt
 import time
 
 setup(dt=0.1, seed=1)
-model, params = BGM(do_compile=True)
-
+model = BGM()
 
 
 mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
@@ -23,8 +22,7 @@ mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
                 'pop;str_fsi':['spike','g_ampa','g_gaba'],
                 'pop;integrator_go':['g_ampa', 'decision']})
 
-
-
+params = model.params
 
 paramsS = {}
 paramsS['trials'] = 2
@@ -34,12 +32,9 @@ paramsS['trials'] = 2
 print('\n\nSTART GO TRIALS')
 mode='GO'
 zaehler_go = 0
+mon.start()
 for i in range(0,paramsS['trials']):
-    start=time.time()
-    ### RESET MODEL ###
-    
-    if i!=0: print('\nreset before trial...'); mon.reset(populations=True, projections=True, synapses=False, net_id=0)
-    mon.start()
+    start=time.time()    
 
     ### TRIAL START
     print('TRIAL START, trial: '+str(i))
@@ -155,8 +150,9 @@ for i in range(0,paramsS['trials']):
     if get_population('integrator_go').decision[0] == -1 :
         t= get_current_step()
         zaehler_go = zaehler_go + 1
-        
-    mon.pause()
+      
+    ### RESET model/monitors before next trial starts
+    mon.reset(populations=True, projections=True, synapses=False, net_id=0)
     print('time:',time.time()-start)
 ### END GO TRIALS ###
 print('\nGO TRIALS FINISHED\nzaehler_go:',zaehler_go)
@@ -183,13 +179,13 @@ compartment='gpe_arky' # here all compartments have the same timings... doesn't 
 period=0 # separated by pauses, one period = [start,stop], here one trial is one period... only one available
 time_lims = recording_times.time_lims(chunk=chunk, compartment=compartment, period=period)
 idx_lims  = recording_times.idx_lims(chunk=chunk, compartment=compartment, period=period)
-af.plot_recordings('overview1_old.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
+af.plot_recordings('overview1.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
 
 
 chunk=1
 time_lims = recording_times.time_lims(chunk=chunk)
 idx_lims  = recording_times.idx_lims(chunk=chunk)
-af.plot_recordings('overview2_old.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
+af.plot_recordings('overview2.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
 
 
 quit()
