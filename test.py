@@ -183,13 +183,13 @@ compartment='gpe_arky' # here all compartments have the same timings... doesn't 
 period=0 # separated by pauses, one period = [start,stop], here one trial is one period... only one available
 time_lims = recording_times.time_lims(chunk=chunk, compartment=compartment, period=period)
 idx_lims  = recording_times.idx_lims(chunk=chunk, compartment=compartment, period=period)
-af.plot_recordings('overview1.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
+af.plot_recordings('overview1_old.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
 
 
 chunk=1
 time_lims = recording_times.time_lims(chunk=chunk)
 idx_lims  = recording_times.idx_lims(chunk=chunk)
-af.plot_recordings('overview2.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
+af.plot_recordings('overview2_old.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
 
 
 quit()
