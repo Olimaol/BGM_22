@@ -1,13 +1,12 @@
 from ANNarchy import *
-from BGM_22 import BGM
+from CompNeuroPy.models import BGM
 from CompNeuroPy import Monitors
 import CompNeuroPy.analysis_functions as af
 import pylab as plt
 import time
 
 setup(dt=0.1, seed=1)
-model, params = BGM(do_compile=True)
-
+model = BGM(seed=1)
 
 
 mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
@@ -23,8 +22,7 @@ mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
                 'pop;str_fsi':['spike','g_ampa','g_gaba'],
                 'pop;integrator_go':['g_ampa', 'decision']})
 
-
-
+params = model.params
 
 paramsS = {}
 paramsS['trials'] = 2
@@ -34,12 +32,9 @@ paramsS['trials'] = 2
 print('\n\nSTART GO TRIALS')
 mode='GO'
 zaehler_go = 0
+mon.start()
 for i in range(0,paramsS['trials']):
-    start=time.time()
-    ### RESET MODEL ###
-    
-    if i!=0: print('\nreset before trial...'); mon.reset(populations=True, projections=True, synapses=False, net_id=0)
-    mon.start()
+    start=time.time()    
 
     ### TRIAL START
     print('TRIAL START, trial: '+str(i))
@@ -50,7 +45,7 @@ for i in range(0,paramsS['trials']):
     get_population('cor_pause').rates = 0
 
     print('simulate t_init and events...')
-    simulate(params['t_init'])# t_init rest
+    simulate(params['sim.t_init'])# t_init rest
 
     ### Integrator Reset
     get_population('integrator_go').decision = 0
@@ -59,15 +54,15 @@ for i in range(0,paramsS['trials']):
 
     ### calculate all eventTIMES
     GOCUE     = np.round(get_time(),1)
-    STOPCUE   = GOCUE + params['t_SSD']
+    STOPCUE   = GOCUE + params['sim.t_SSD']
     STN1ON    = GOCUE
-    STN1OFF   = STN1ON + params['t_cortexPauseDuration']
-    GOON      = GOCUE + params['t_delayGo'] + int(np.clip(params['t_delayGoSD'] * np.random.randn(),-params['t_delayGo'],None))
+    STN1OFF   = STN1ON + params['sim.t_cortexPauseDuration']
+    GOON      = GOCUE + params['sim.t_delayGo'] + int(np.clip(params['sim.t_delayGoSD'] * np.random.randn(),-params['sim.t_delayGo'],None))
     STN2ON    = STOPCUE
-    STN2OFF   = STN2ON + params['t_cortexPauseDuration']
-    STOPON    = STOPCUE + params['t_delayStopAfterCue']
-    STOPOFF   = STOPON + params['t_cortexStopDurationAfterCue']
-    ENDTIME   = STOPOFF + params['t_decay']
+    STN2OFF   = STN2ON + params['sim.t_cortexPauseDuration']
+    STOPON    = STOPCUE + params['sim.t_delayStopAfterCue']
+    STOPOFF   = STOPON + params['sim.t_cortexStopDurationAfterCue']
+    ENDTIME   = STOPOFF + params['sim.t_decay']
     GOOFF     = ENDTIME
     motorSTOP = ENDTIME
     motorSTOPOFF = ENDTIME
@@ -86,29 +81,29 @@ for i in range(0,paramsS['trials']):
     tempMode=mode
     while not(end):
         if t == STN1ON:
-            get_population('cor_pause').rates = params['cor_pause__rates'] + params['cor_pause__rates_sd'] * randn_trial_Pause
+            get_population('cor_pause').rates = params['cor_pause.rates'] + params['cor_pause.rates_sd'] * randn_trial_Pause
             #print('STN1ON',STN1ON)
         if t == STN1OFF:
             get_population('cor_pause').rates = 0
             #print('STN1OFF',STN1OFF)
         if t == GOON:
-            get_population('cor_go').rates = params['cor_go__rates'] + params['cor_go__rates_sd'] * randn_trial
+            get_population('cor_go').rates = params['cor_go.rates'] + params['cor_go.rates_sd'] * randn_trial
             #print('GOON',GOON)
         if t == GOOFF:
             get_population('cor_go').rates = 0
             #print('GOOFF',GOOFF)                    
         if t == STN2ON and tempMode=='STOP':
-            get_population('cor_pause').rates = params['cor_pause__rates_second_resp_mod']*params['cor_pause__rates'] + params['cor_pause__rates_sd'] * randn_trial_Pause
+            get_population('cor_pause').rates = params['cor_pause.rates_second_resp_mod']*params['cor_pause.rates'] + params['cor_pause.rates_sd'] * randn_trial_Pause
             #print('STN2ON',STN2ON)
         if t == STN2OFF and tempMode=='STOP':
             get_population('cor_pause').rates = 0
             #print('STN2OFF',STN2OFF)
         if t == STOPON and tempMode=='STOP':
-            get_population('cor_stop').rates = params['cor_stop__rates_after_cue'] + params['cor_stop__rates_sd'] * randn_trial_S * (params['cor_stop__rates_after_cue'] > 0)
+            get_population('cor_stop').rates = params['cor_stop.rates_after_cue'] + params['cor_stop.rates_sd'] * randn_trial_S * (params['cor_stop.rates_after_cue'] > 0)
             #print('STOPON',STOPON)
         if t == motorSTOP:
-            get_population('cor_stop').rates = params['cor_stop__rates_after_action'] + params['cor_stop__rates_sd'] * randn_trial_S * (params['cor_stop__rates_after_action'] > 0)
-            motorSTOPOFF = motorSTOP + params['t_cortexStopDurationAfterAction']
+            get_population('cor_stop').rates = params['cor_stop.rates_after_action'] + params['cor_stop.rates_sd'] * randn_trial_S * (params['cor_stop.rates_after_action'] > 0)
+            motorSTOPOFF = motorSTOP + params['sim.t_cortexStopDurationAfterAction']
             #print('motorSTOP',motorSTOP)
         if t == STOPOFF and tempMode=='STOP' and ((motorSTOPOFF==ENDTIME) or (motorSTOPOFF!=ENDTIME and t>motorSTOPOFF)):
             get_population('cor_stop').rates = 0
@@ -141,7 +136,7 @@ for i in range(0,paramsS['trials']):
             t = np.round(get_time(),1)
             if responseThal == -1 and motorResponse == 0:
                 motorResponse=1
-                motorSTOP = t + params['t_delayStopAfterAction']
+                motorSTOP = t + params['sim.t_delayStopAfterAction']
                 if t<STOPCUE and tempMode=='STOP':
                     tempMode='GO'
             if responseProto2 == -1 and GOOFFResponse == 0 and ((t>STOPON and tempMode=='STOP') or motorResponse==1):
@@ -150,13 +145,13 @@ for i in range(0,paramsS['trials']):
     ### TRIAL END
     print('Integrator decision:',get_population('integrator_go').decision[0])
     print('TRIAL END')
-    if i==1: simulate(50)
 
     if get_population('integrator_go').decision[0] == -1 :
         t= get_current_step()
         zaehler_go = zaehler_go + 1
-        
-    mon.pause()
+      
+    ### RESET model/monitors before next trial starts
+    mon.reset(populations=True, projections=True, synapses=False, net_id=0)
     print('time:',time.time()-start)
 ### END GO TRIALS ###
 print('\nGO TRIALS FINISHED\nzaehler_go:',zaehler_go)
@@ -183,14 +178,13 @@ compartment='gpe_arky' # here all compartments have the same timings... doesn't 
 period=0 # separated by pauses, one period = [start,stop], here one trial is one period... only one available
 time_lims = recording_times.time_lims(chunk=chunk, compartment=compartment, period=period)
 idx_lims  = recording_times.idx_lims(chunk=chunk, compartment=compartment, period=period)
-af.plot_recordings('overview1_old.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
+af.plot_recordings('overview1.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
 
 
 chunk=1
 time_lims = recording_times.time_lims(chunk=chunk)
 idx_lims  = recording_times.idx_lims(chunk=chunk)
-af.plot_recordings('overview2_old.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
-
+af.plot_recordings('overview2.png', recordings[chunk], time_lims, idx_lims, (2,6), plot_list)
 
 quit()
 
