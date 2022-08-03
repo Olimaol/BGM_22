@@ -1,12 +1,18 @@
 from ANNarchy import *
 from CompNeuroPy.models import BGM
-from CompNeuroPy import Monitors
+from CompNeuroPy import Monitors, generate_simulation
 import CompNeuroPy.analysis_functions as af
 import pylab as plt
 import time
+from tqdm import tqdm
 
 setup(dt=0.1, seed=1)
 model = BGM(seed=1)
+
+params = model.params
+
+paramsS = {}
+paramsS['trials'] = 2
 
 
 mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
@@ -22,30 +28,18 @@ mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
                 'pop;str_fsi':['spike','g_ampa','g_gaba'],
                 'pop;integrator_go':['g_ampa', 'decision']})
 
-params = model.params
 
-paramsS = {}
-paramsS['trials'] = 2
-
-
-### GO TRIALS ###
-print('\n\nSTART GO TRIALS')
-mode='GO'
-zaehler_go = 0
-mon.start()
-for i in range(0,paramsS['trials']):
+def SST_trial_function(params, paramsS, mode):
     start=time.time()    
 
     ### TRIAL START
-    print('TRIAL START, trial: '+str(i))
-
     ### trial INITIALIZATION simulation to get stable state
     get_population('cor_go').rates = 0
     get_population('cor_stop').rates = 0
     get_population('cor_pause').rates = 0
 
-    print('simulate t_init and events...')
-    simulate(params['sim.t_init'])# t_init rest
+    ### simulate t_init resting period
+    simulate(params['sim.t_init'])
 
     ### Integrator Reset
     get_population('integrator_go').decision = 0
@@ -143,18 +137,37 @@ for i in range(0,paramsS['trials']):
                 GOOFFResponse=1
                 GOOFF = t
     ### TRIAL END
-    print('Integrator decision:',get_population('integrator_go').decision[0])
-    print('TRIAL END')
-
+    #print('Integrator decision:',get_population('integrator_go').decision[0])
+    
     if get_population('integrator_go').decision[0] == -1 :
         t= get_current_step()
-        zaehler_go = zaehler_go + 1
-      
+        return 1
+    else:
+        return 0
+    
+
+SST_trial = generate_simulation(simulation_function=SST_trial_function,
+                                    simulation_kwargs={'params':params, 'paramsS':paramsS, 'mode':'GO'},
+                                    name='SST_trial',
+                                    description='One trial of SST with cor_go, cor_stop and cor_pause',
+                                    monitor_object = mon)
+
+
+### GO TRIALS ###
+print('\n\nSTART GO TRIALS')
+mon.start()
+### LOOP OVER TRIALS
+for _ in tqdm(range(paramsS['trials'])):
+
+    ### TRIAL RUN
+    SST_trial.run()
+
     ### RESET model/monitors before next trial starts
     mon.reset(populations=True, projections=True, synapses=False, net_id=0)
-    print('time:',time.time()-start)
+
 ### END GO TRIALS ###
-print('\nGO TRIALS FINISHED\nzaehler_go:',zaehler_go)
+counter_go = sum(SST_trial.info)
+print('GO TRIALS FINISHED\ncounter_go:',counter_go,'\n')
       
       
 recordings=mon.get_recordings()
