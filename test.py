@@ -23,6 +23,44 @@ paramsS = {}
 paramsS['trials'] = 1
 
 
+
+###########TEST###############
+### trial INITIALIZATION simulation to get stable state
+get_population('cor_go').rates = 0
+get_population('cor_stop').rates = 0
+get_population('cor_pause').rates = 0
+
+### simulate t_init resting period
+simulate(600)
+
+### Integrator Reset
+get_population('integrator_go').decision = 0
+get_population('integrator_go').g_ampa = 0  
+get_population('integrator_stop').decision = 0 
+
+get_population('cor_go').rates=400
+
+get_population('cor_go').rates=400
+for i in range(150):
+    simulate(10)
+    print(get_population('integrator_go').g_ampa[0], end='\t')
+    print(get_population('integrator_go').decision[0], end='\t')
+    print(get_time())
+quit()
+
+print(get_population('integrator_go').decision[0])
+simulate_until(max_duration=1500, population=get_population('integrator_go'))
+print(get_population('integrator_go').decision[0])
+print(get_time())
+quit()
+
+print(get_population('integrator_go').decision[0])
+simulate_until(max_duration=1500, population=get_population('integrator_go'))
+print(get_population('integrator_go').decision[0])
+print(get_time())
+quit()
+###########TEST###############
+
 ### INIT MONITORS ###
 mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
                 'pop;str_d1':['spike','g_ampa','g_gaba'],
