@@ -44,19 +44,6 @@ def SST_trial_function(params, paramsS, mode='go'):
     start=time.time()    
 
     ### TRIAL START
-    ### trial INITIALIZATION simulation to get stable state
-    get_population('cor_go').rates = 0
-    get_population('cor_stop').rates = 0
-    get_population('cor_pause').rates = 0
-
-    ### simulate t_init resting period
-    simulate(params['sim.t_init'])
-
-    ### Integrator Reset
-    get_population('integrator_go').decision = 0
-    get_population('integrator_go').g_ampa = 0  
-    get_population('integrator_stop').decision = 0 
-    
     
     ### define trial procedure
     trial_procedure = trial_procedure_cl(params, paramsS, mode=mode)

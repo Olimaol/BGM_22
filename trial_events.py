@@ -6,10 +6,20 @@ def add_events(trial_procedure, params):
     ### define effects for all events (with effects)
     def cor_on(self, pop_name, append=''): get_population(pop_name).rates = self.trial_procedure.params[pop_name+'.rates'+append] + self.trial_procedure.params[pop_name+'.rates_sd'] * self.trial_procedure.rand[pop_name] * int(params[pop_name+'.rates'+append] > 0)
     def cor_off(self, pop_name): get_population(pop_name).rates = 0
+    def trial_init(self): get_population('cor_go').rates =0; get_population('cor_stop').rates = 0; get_population('cor_pause').rates = 0
+    def integrator_reset(self): get_population('integrator_go').decision = 0 ; get_population('integrator_go').g_ampa = 0  ; get_population('integrator_stop').decision = 0 
     
     ### add all events
-    trial_procedure.add_event(name='go_cue',
+    trial_procedure.add_event(name='trial_init',
                               onset=get_current_step(),
+                              trigger={'integrator_reset': int(params['sim.t_init']/dt())},
+                              effect=trial_init)
+
+    trial_procedure.add_event(name='integrator_reset',
+                              trigger={'go_cue': 0},
+                              effect= integrator_reset)
+    
+    trial_procedure.add_event(name='go_cue',
                               trigger={'stop_cue': int(params['sim.t_SSD']/dt()),
                                        'cor_pause_on_go': 0,
                                        'cor_go_on': int(np.clip(np.random.normal(params['sim.t_delayGo'],params['sim.t_delayGoSD']), 0, None)/dt()),
