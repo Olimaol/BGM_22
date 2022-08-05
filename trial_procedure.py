@@ -1,12 +1,13 @@
 import numpy as np
-from ANNarchy import simulate, simulate_until, get_population, get_current_step, dt
+from ANNarchy import simulate, simulate_until, get_population, get_current_step, dt, get_time
 from CompNeuroPy.analysis_functions import get_number_of_zero_decimals
 
 class trial_procedure_cl:
     
-        def __init__(self, params, paramsS, mode):
+        def __init__(self, params, paramsS, mode, print_outs=False):
             self.params = params
             self.paramsS = paramsS
+            self.print_outs = print_outs
             self.event_list = []
             self.event_name_list = []
             ### each trial can have random variation in cor activities
@@ -40,7 +41,6 @@ class trial_procedure_cl:
                 self.run_model_trigger_events()
                 ### run the events of the current time, based on mode and happened events
                 self.run_current_events()
-                #print('cor_stop_on_motor onset:',self.event_list[self.event_name_list.index('cor_stop_on_motor')].onset)
                 ### if event triggered end --> end simulation / skip rest
                 if self.end: continue
                 ### check then next events occur
@@ -49,19 +49,17 @@ class trial_procedure_cl:
                 self.model_trigger_list = self.get_model_trigger_list()
                 ### simulate until next event(s) or model triggers
                 step_before=get_current_step()
+                if self.print_outs: print('check_triggers:', self.model_trigger_list)
                 if len(self.model_trigger_list)>1:
                     ### multiple model triggers
                     simulate_until(max_duration=next_events_time, population=[get_population(pop_name) for pop_name in self.model_trigger_list], operator='or')
                 elif len(self.model_trigger_list)>0:
                     ### a single model trigger
-                    print(get_population(self.model_trigger_list[0]).decision[0])
                     simulate_until(max_duration=next_events_time, population=get_population(self.model_trigger_list[0]))
-                    print(get_population(self.model_trigger_list[0]).decision[0])
                 else:
                     ### no model_triggers
                     simulate(next_events_time)
                 step_after=get_current_step()
-                print('target_sim_time =',next_events_time,'actual step diff=',step_after-step_before,'trigger_list:',self.model_trigger_list)
 
         def run_current_events(self):
             """
@@ -73,11 +71,8 @@ class trial_procedure_cl:
             event_run = True
             while event_run:
                 event_run = False
-                
-                #print('cor_go_off onset:',self.event_list[self.event_name_list.index('cor_go_off')].onset)
                 for event in self.event_list:
                     if event.onset == get_current_step() and not(event.name in self.run_event_list) and event.check_requirements():
-                        print('run current event', end=' ')
                         event.run()
                         event_run=True
                         self.run_event_list.append(event.name)
@@ -95,7 +90,6 @@ class trial_procedure_cl:
                     ### find the events triggerd by the model_trigger and run them
                     for event in self.event_list:
                         if event.model_trigger == model_trigger:
-                            print('run model trigger', end=' ')
                             event.run()
                             self.run_event_list.append(event.name)
                     ### prevent that these model_triggers are used again
@@ -153,7 +147,7 @@ class trial_procedure_cl:
                 ### check requirements
                 if self.check_requirements():
                     ### run the event
-                    print('run event:',self.name)
+                    if self.trial_procedure.print_outs:print('run event:',self.name, get_time())
                     ### for events which are triggered by model --> set onset
                     if self.onset==None: self.onset=get_current_step()
                     ### run the effect
@@ -176,7 +170,6 @@ class trial_procedure_cl:
                     return self.eval_requirement_string()
                 else:
                     ### no requirement
-                    print('hey#################')
                     return True
                 
             def eval_requirement_string(self):

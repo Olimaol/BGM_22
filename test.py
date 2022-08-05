@@ -17,49 +17,11 @@ setup(dt=0.1, seed=seed_val)
 
 
 ### COMPILE MODEL & GET PARAMTERS
-model = BGM(seed=seed_val)
+model = BGM(name='BGM_v01_p01', seed=seed_val)
 params = model.params
 paramsS = {}
 paramsS['trials'] = 1
 
-
-
-###########TEST###############
-### trial INITIALIZATION simulation to get stable state
-get_population('cor_go').rates = 0
-get_population('cor_stop').rates = 0
-get_population('cor_pause').rates = 0
-
-### simulate t_init resting period
-simulate(600)
-
-### Integrator Reset
-get_population('integrator_go').decision = 0
-get_population('integrator_go').g_ampa = 0  
-get_population('integrator_stop').decision = 0 
-
-get_population('cor_go').rates=400
-
-get_population('cor_go').rates=400
-for i in range(150):
-    simulate(10)
-    print(get_population('integrator_go').g_ampa[0], end='\t')
-    print(get_population('integrator_go').decision[0], end='\t')
-    print(get_time())
-quit()
-
-print(get_population('integrator_go').decision[0])
-simulate_until(max_duration=1500, population=get_population('integrator_go'))
-print(get_population('integrator_go').decision[0])
-print(get_time())
-quit()
-
-print(get_population('integrator_go').decision[0])
-simulate_until(max_duration=1500, population=get_population('integrator_go'))
-print(get_population('integrator_go').decision[0])
-print(get_time())
-quit()
-###########TEST###############
 
 ### INIT MONITORS ###
 mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
@@ -73,7 +35,8 @@ mon = Monitors({'pop;gpe_arky':['spike','g_ampa','g_gaba'],
                 'pop;thal':['spike','g_ampa','g_gaba'],
                 'pop;cor_stop':['spike'],
                 'pop;str_fsi':['spike','g_ampa','g_gaba'],
-                'pop;integrator_go':['g_ampa', 'decision']})
+                'pop;integrator_go':['g_ampa', 'decision'],
+                'pop;integrator_stop':['g_ampa', 'decision']})
 
 
 ### DEFINE TRIAL FUNCTION ###
@@ -95,21 +58,14 @@ def SST_trial_function(params, paramsS, mode='go'):
     get_population('integrator_stop').decision = 0 
     
     
-    get_population('cor_go').rates=500
-    print(get_population('integrator_go').decision[0])
-    simulate_until(max_duration=1500, population=get_population('integrator_go'))
-    print(get_population('integrator_go').decision[0])
-    print(get_time())
-
-            
-    """### define trial procedure
+    ### define trial procedure
     trial_procedure = trial_procedure_cl(params, paramsS, mode=mode)
     
     ### add events
     add_events(trial_procedure, params)
     
     ### run trial procedure
-    trial_procedure.run()"""
+    trial_procedure.run()
     
     ### return if go decision was made
     if get_population('integrator_go').decision[0] == -1 :
@@ -161,7 +117,7 @@ plot_list = ['1;gpe_arky;spike;hybrid',
              '9;thal;spike;hybrid',
              '10;cor_stop;spike;hybrid',
              '11;str_fsi;spike;hybrid',
-             '12;integrator_go;g_ampa;line']
+             '12;integrator_stop;g_ampa;line']
 
 chunk=0
 time_lims = recording_times.time_lims(chunk=chunk)

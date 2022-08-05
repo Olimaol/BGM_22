@@ -58,5 +58,5 @@ def add_events(trial_procedure, params):
                               
     trial_procedure.add_event(name='gpe_cp_resp',
                               model_trigger='integrator_stop',
-                              requirement_string='happened_event_list==[cor_stop_on_cue] or happened_event_list==[motor_resp]',
+                              requirement_string='happened_event_list==[cor_stop_on_cue] or happened_event_list==[motor_response]',
                               trigger={'cor_go_off': 0})
