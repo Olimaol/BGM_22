@@ -1,12 +1,9 @@
-from ANNarchy import *
+from ANNarchy import setup, get_population, get_time
 from CompNeuroPy.models import BGM
-from CompNeuroPy import Monitors, generate_simulation
-import CompNeuroPy.analysis_functions as af
-from CompNeuroPy.extra_functions import flatten_list
-from CompNeuroPy.analysis_functions import get_number_of_zero_decimals
-import pylab as plt
-import time
+from CompNeuroPy import Monitors, generate_simulation, plot_recordings
 from tqdm import tqdm
+
+### local
 from trial_procedure import trial_procedure_cl
 from trial_events import add_events
 
@@ -45,8 +42,6 @@ mon = Monitors(
 
 ### DEFINE TRIAL FUNCTION ###
 def SST_trial_function(params, paramsS, mode="go"):
-    start = time.time()
-
     ### TRIAL START
 
     ### define trial procedure
@@ -115,15 +110,21 @@ plot_list = [
 ]
 
 chunk = 0
-time_lims = recording_times.time_lims(chunk=chunk)
-idx_lims = recording_times.idx_lims(chunk=chunk)
-af.plot_recordings(
-    "overview1.png", recordings[chunk], time_lims, idx_lims, (2, 6), plot_list
+plot_recordings(
+    figname="overview1.png",
+    recordings=recordings,
+    recording_times=recording_times,
+    chunk=chunk,
+    shape=(2, 6),
+    plan=plot_list,
 )
 
 chunk = 1
-time_lims = recording_times.time_lims(chunk=chunk)
-idx_lims = recording_times.idx_lims(chunk=chunk)
-af.plot_recordings(
-    "overview2.png", recordings[chunk], time_lims, idx_lims, (2, 6), plot_list
+plot_recordings(
+    figname="overview2.png",
+    recordings=recordings,
+    recording_times=recording_times,
+    chunk=chunk,
+    shape=(2, 6),
+    plan=plot_list,
 )
