@@ -2,6 +2,8 @@ from ANNarchy import setup, get_population, get_time
 from CompNeuroPy.models import BGM
 from CompNeuroPy import Monitors, generate_simulation, plot_recordings
 from tqdm import tqdm
+import pylab as plt
+from CompNeuroPy import create_dir
 
 ### local
 from trial_procedure import trial_procedure_cl
@@ -14,10 +16,10 @@ setup(dt=0.1, seed=seed_val)
 
 
 ### COMPILE MODEL & GET PARAMTERS
-model = BGM(name="BGM_v01_p01", seed=seed_val)
+model = BGM(name="BGM_v02_p01", seed=seed_val)
 params = model.params
 paramsS = {}
-paramsS["trials"] = 1
+paramsS["trials"] = 100
 
 
 ### INIT MONITORS ###
@@ -72,7 +74,7 @@ SST_trial = generate_simulation(
 
 ### TRIALS ###
 mon.start()
-for mode in ["go", "stop"]:
+for mode in ["go","stop"]:
     print("\n\nSTART " + mode + " TRIALS")
     ### LOOP OVER TRIALS
     for _ in tqdm(range(paramsS["trials"])):
@@ -109,9 +111,22 @@ plot_list = [
     "12;integrator_stop;g_ampa;line",
 ]
 
+#create_dir('results_parameter_fit')
+
+######  fsi connectivity paramter changes
+
+##                                  100%    - 30%       -50%    -70%    -80%    -90%
+
+# fsi_increase_noise =               64      44.8        32     19.2    12.8    6.4
+# cortex_go -> str_fsi.mod_factor =  2.8     1.96       1.4     0.84    0.56    0.28
+# gpe_proto -> str_fsi.mod_factor =  1.6     1.12       0.8     0.48    0.32    0.16
+# gpe_arky  -> str_fsi.mod_factor =  6.4     4.48       3.2     1.92    1.28    0.64
+# gpe_cp    -> str_fsi.mod_factor =  0.8     0.56       0.4     0.24    0.16    0.08
+# thal      -> str_fsi.mod_factor =  9.6     6.72       4.8     2.88    1.92    0.96
+
 chunk = 0
 plot_recordings(
-    figname="overview1.png",
+    figname='overview1_go_stop_BGM_v02_p01_mod_factor_increase_noise_-90per.png',
     recordings=recordings,
     recording_times=recording_times,
     chunk=chunk,
@@ -121,10 +136,14 @@ plot_recordings(
 
 chunk = 1
 plot_recordings(
-    figname="overview2.png",
+    figname='overview2_go_stop_BGM_v02_p01_mod_factor_increase_noise_-90per.png',
     recordings=recordings,
     recording_times=recording_times,
     chunk=chunk,
     shape=(2, 6),
     plan=plot_list,
 )
+
+#plt.savefig('results_parameter_fit/overview1_v02_go_stop_BGM_v02_p01.svg')
+#plt.savefig('results_parameter_fit/overview2_v02_go_stop_BGM_v02_p01.svg')
+
