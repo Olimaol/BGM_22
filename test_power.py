@@ -95,7 +95,7 @@ if __name__ == "__main__":
         freq, pow = get_population_power_spectrum(
             spikes=recordings[chunk][f"{pop_name};spike"],
             time_step=dt(),
-            t_start=params["sim.t_init"] + params["sim.t_delayGo"],
+            t_start=recording_times.time_lims(chunk=chunk)[0],
             t_end=recording_times.time_lims(chunk=chunk)[1],
             fft_size=None,
         )
