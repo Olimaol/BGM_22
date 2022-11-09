@@ -5,3 +5,4 @@ dist/
 *annarchy*/
 *.svg
 *.png
+*tmp.py

@@ -16,7 +16,7 @@ def SST_trial_function(params, paramsS, mode="go"):
     trial_procedure = trial_procedure_cl(params, paramsS, mode=mode)
 
     ### add events
-    add_events(trial_procedure, params)
+    add_events(trial_procedure)
 
     ### run trial procedure
     trial_procedure.run()
@@ -30,15 +30,31 @@ def SST_trial_function(params, paramsS, mode="go"):
 
 if __name__ == "__main__":
 
+    ### define global simulation paramters
+    paramsS = {}
+    paramsS["timestep"] = 0.1
+    paramsS["seed"] = 1
+    paramsS["trials"] = 1
+    paramsS["t.init"] = 600  # sim.t_init
+    paramsS["t.ssd"] = 250  # sim.t_SSD
+    paramsS["t.decay"] = 300  # sim.t_decay
+    paramsS["t.cor_pause__dur"] = 5  # sim.t_cortexPauseDuration
+    paramsS["t.cor_go__delay"] = 75  # sim.t_delayGo
+    paramsS["t.cor_go__delay_sd"] = 0  # sim.t_delayGoSD
+    paramsS["t.cor_stop__delay_cue"] = 50  # sim.t_delayStopAfterCue
+    paramsS["t.cor_stop__delay_response"] = 50  # sim.t_delayStopAfterAction
+    paramsS["t.cor_stop__dur_cue"] = 5  # sim.t_cortexStopDurationAfterCue
+    paramsS["t.cor_stop__dur_response"] = 200  # sim.t_cortexStopDurationAfterAction
+
     ### SETUP TIMESTEP + SEED
-    seed_val = 1
-    setup(dt=0.1, seed=seed_val)
+    if paramsS["seed"] == None:
+        setup(dt=paramsS["timestep"])
+    else:
+        setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
     ### COMPILE MODEL & GET PARAMTERS
-    model = BGM(name="BGM_v01_p01", seed=seed_val)
+    model = BGM(name="BGM_v01_p01", seed=paramsS["seed"])
     params = model.params
-    paramsS = {}
-    paramsS["trials"] = 1
 
     ### INIT MONITORS ###
     mon = Monitors(
@@ -105,6 +121,7 @@ if __name__ == "__main__":
         "12;integrator_stop;g_ampa;line",
     ]
 
+    ### 1st trial
     chunk = 0
     plot_recordings(
         figname="results/test_trial/overview1.png",
@@ -115,6 +132,7 @@ if __name__ == "__main__":
         plan=plot_list,
     )
 
+    ### 2nd trial
     chunk = 1
     plot_recordings(
         figname="results/test_trial/overview2.png",
