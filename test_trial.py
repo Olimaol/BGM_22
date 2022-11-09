@@ -32,9 +32,11 @@ if __name__ == "__main__":
 
     ### define global simulation paramters
     paramsS = {}
+    ### general
     paramsS["timestep"] = 0.1
     paramsS["seed"] = 1
     paramsS["trials"] = 1
+    ### simulation times
     paramsS["t.init"] = 600  # sim.t_init
     paramsS["t.ssd"] = 250  # sim.t_SSD
     paramsS["t.decay"] = 300  # sim.t_decay
@@ -45,6 +47,23 @@ if __name__ == "__main__":
     paramsS["t.cor_stop__delay_response"] = 50  # sim.t_delayStopAfterAction
     paramsS["t.cor_stop__dur_cue"] = 5  # sim.t_cortexStopDurationAfterCue
     paramsS["t.cor_stop__dur_response"] = 200  # sim.t_cortexStopDurationAfterAction
+    ### cor_go
+    paramsS["cor_go.rates"] = 400
+    paramsS["cor_go.rates_sd"] = 0
+    paramsS["cor_go.tau_up"] = 200
+    paramsS["cor_go.tau_down"] = 10
+    ### cor_pause
+    paramsS["cor_pause.rates_go"] = 500
+    paramsS["cor_pause.rates_stop"] = 600
+    paramsS["cor_pause.rates_sd"] = 0
+    paramsS["cor_pause.tau_up"] = 1
+    paramsS["cor_pause.tau_down"] = 150
+    ### cor_stop
+    paramsS["cor_stop.rates_cue"] = 400
+    paramsS["cor_stop.rates_motor"] = 400
+    paramsS["cor_stop.rates_sd"] = 0
+    paramsS["cor_stop.tau_up"] = 1
+    paramsS["cor_stop.tau_down"] = 70
 
     ### SETUP TIMESTEP + SEED
     if paramsS["seed"] == None:
@@ -52,9 +71,16 @@ if __name__ == "__main__":
     else:
         setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
-    ### COMPILE MODEL & GET PARAMTERS
-    model = BGM(name="BGM_v01_p01", seed=paramsS["seed"])
+    ### CREATE MODEL & GET MODEL PARAMTERS
+    model = BGM(name="BGM_v01_p01", seed=paramsS["seed"], do_compile=False)
     params = model.params
+
+    ### Set the time constants of the cortex populations
+    ### and compile model
+    for pop in ["cor_go", "cor_pause", "cor_stop"]:
+        for var in ["tau_up", "tau_down"]:
+            setattr(get_population(pop), var, paramsS[f"{pop}.{var}"])
+    model.compile()
 
     ### INIT MONITORS ###
     mon = Monitors(

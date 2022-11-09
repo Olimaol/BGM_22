@@ -3,15 +3,14 @@ import numpy as np
 
 
 def add_events(trial_procedure):
-    params = trial_procedure.params
     paramsS = trial_procedure.paramsS
 
     ### define effects for all events (with effects)
     def cor_on(self, pop_name, append=""):
-        cor_rates = params[f"{pop_name}.rates{append}"]
-        cor_rates_sd = params[f"{pop_name}.rates_sd"]
+        cor_rates = paramsS[f"{pop_name}.rates{append}"]
+        cor_rates_sd = paramsS[f"{pop_name}.rates_sd"]
         cor_randn = self.trial_procedure.rand[pop_name]
-        cor_rates_0 = int(params[f"{pop_name}.rates{append}"] > 0)
+        cor_rates_0 = int(paramsS[f"{pop_name}.rates{append}"] > 0)
         get_population(pop_name).rates = (
             cor_rates + cor_rates_sd * cor_randn * cor_rates_0
         )
