@@ -7,19 +7,21 @@ from CompNeuroPy import (
 )
 import matplotlib.pyplot as plt
 
+### local
+from parameters import parameters_test_power as paramsS
+
 
 if __name__ == "__main__":
 
     ### SETUP TIMESTEP + SEED
-    seed_val = 1
-    setup(dt=0.1, seed=seed_val)
+    if paramsS["seed"] == None:
+        setup(dt=paramsS["timestep"])
+    else:
+        setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
-    ### COMPILE MODEL & GET PARAMTERS
-    ### in BGM_vTEST_pTEST cor_go consists of poisson_sin neurons
-    model = BGM(name="BGM_vTEST_pTEST", seed=seed_val)
+    ### COMPILE MODEL & GET MODEL PARAMTERS
+    model = BGM(name="BGM_vTEST_pTEST", seed=paramsS["seed"])
     params = model.params
-    paramsS = {}
-    paramsS["trials"] = 1
 
     ### INIT MONITORS ###
     mon = Monitors(
@@ -37,14 +39,13 @@ if __name__ == "__main__":
     ### SIMULATION ###
     mon.start()
 
-    frequency = 50
-    phase = 0  # (1 / frequency) / 4
-    get_population("cor_go").amplitude = 50
-    get_population("cor_go").frequency = frequency
-    get_population("cor_go").phase = phase
-    get_population("cor_go").base = 50
-
-    simulate(1000)
+    ### define the sinus oscillation of cor_go
+    get_population("cor_go").amplitude = paramsS["cor_go.amplitude"]
+    get_population("cor_go").frequency = paramsS["cor_go.frequency"]
+    get_population("cor_go").phase = paramsS["cor_go.phase"]
+    get_population("cor_go").base = paramsS["cor_go.base"]
+    ### simulate some time
+    simulate(paramsS["t.duration"])
 
     ### GET RECORDINGS ###
     recordings = mon.get_recordings()
@@ -64,7 +65,7 @@ if __name__ == "__main__":
         chunk=chunk,
         shape=(2, 1),
         plan=plot_list,
-        time_lim=[0, (1 / frequency) * 1000],
+        time_lim=[0, (1 / paramsS["cor_go.frequency"]) * 1000],
     )
     ### some populations activity
     plot_list = [
@@ -102,7 +103,7 @@ if __name__ == "__main__":
         plt.subplot(3, 3, int(nr))
         plt.title(pop_name)
         plt.plot(freq, pow, color="k")
-        plt.xlim(0, frequency * 4)
+        plt.xlim(0, paramsS["cor_go.frequency"] * 4)
         # plt.yscale("log")
         plt.xlabel("frequency [Hz]")
         plt.ylabel("power")

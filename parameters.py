@@ -32,3 +32,16 @@ parameters_default["cor_stop.rates_response"] = 400
 parameters_default["cor_stop.rates_sd"] = 0
 parameters_default["cor_stop.tau_up"] = 1
 parameters_default["cor_stop.tau_down"] = 70
+
+
+parameters_test_power = {}
+### general
+parameters_test_power["timestep"] = 0.1
+parameters_test_power["seed"] = 1
+### simulation time
+parameters_test_power["t.duration"] = 1000
+### cor_go
+parameters_test_power["cor_go.amplitude"] = 50
+parameters_test_power["cor_go.frequency"] = 50
+parameters_test_power["cor_go.phase"] = 0
+parameters_test_power["cor_go.base"] = 50

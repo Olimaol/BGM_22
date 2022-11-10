@@ -30,6 +30,7 @@ def SST_trial_function(params, paramsS, mode="go"):
 
 
 if __name__ == "__main__":
+
     ### SETUP TIMESTEP + SEED
     if paramsS["seed"] == None:
         setup(dt=paramsS["timestep"])
