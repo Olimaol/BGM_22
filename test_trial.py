@@ -6,6 +6,7 @@ from tqdm import tqdm
 ### local
 from trial_procedure import trial_procedure_cl
 from trial_events import add_events
+from parameters import parameters_default as paramsS
 
 
 ### DEFINE TRIAL FUNCTION ###
@@ -29,42 +30,6 @@ def SST_trial_function(params, paramsS, mode="go"):
 
 
 if __name__ == "__main__":
-
-    ### define global simulation paramters
-    paramsS = {}
-    ### general
-    paramsS["timestep"] = 0.1
-    paramsS["seed"] = 1
-    paramsS["trials"] = 1
-    ### simulation times
-    paramsS["t.init"] = 600
-    paramsS["t.ssd"] = 250
-    paramsS["t.decay"] = 300
-    paramsS["t.cor_pause__dur"] = 5
-    paramsS["t.cor_go__delay"] = 75
-    paramsS["t.cor_go__delay_sd"] = 0
-    paramsS["t.cor_stop__delay_cue"] = 50
-    paramsS["t.cor_stop__delay_response"] = 50
-    paramsS["t.cor_stop__dur_cue"] = 5
-    paramsS["t.cor_stop__dur_response"] = 200
-    ### cor_go
-    paramsS["cor_go.rates"] = 400
-    paramsS["cor_go.rates_sd"] = 0
-    paramsS["cor_go.tau_up"] = 200
-    paramsS["cor_go.tau_down"] = 10
-    ### cor_pause
-    paramsS["cor_pause.rates_go"] = 500
-    paramsS["cor_pause.rates_stop"] = 600
-    paramsS["cor_pause.rates_sd"] = 0
-    paramsS["cor_pause.tau_up"] = 1
-    paramsS["cor_pause.tau_down"] = 150
-    ### cor_stop
-    paramsS["cor_stop.rates_cue"] = 400
-    paramsS["cor_stop.rates_response"] = 400
-    paramsS["cor_stop.rates_sd"] = 0
-    paramsS["cor_stop.tau_up"] = 1
-    paramsS["cor_stop.tau_down"] = 70
-
     ### SETUP TIMESTEP + SEED
     if paramsS["seed"] == None:
         setup(dt=paramsS["timestep"])
