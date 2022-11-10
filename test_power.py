@@ -27,6 +27,7 @@ if __name__ == "__main__":
     mon = Monitors(
         {
             "pop;cor_go": ["spike", "rates"],
+            "pop;cor_stop": ["spike"],
             "pop;str_d1": ["spike"],
             "pop;str_d2": ["spike"],
             "pop;str_fsi": ["spike"],
@@ -70,7 +71,7 @@ if __name__ == "__main__":
     ### some populations activity
     plot_list = [
         "1;cor_go;spike;hybrid",
-        "2;cor_go;rates;line",
+        "2;cor_stop;spike;hybrid",
         "4;str_d1;spike;hybrid",
         "5;str_d2;spike;hybrid",
         "6;str_fsi;spike;hybrid",
@@ -98,7 +99,7 @@ if __name__ == "__main__":
             time_step=dt(),
             t_start=recording_times.time_lims(chunk=chunk)[0],
             t_end=recording_times.time_lims(chunk=chunk)[1],
-            fft_size=None,
+            fft_size=4096,
         )
         plt.subplot(3, 3, int(nr))
         plt.title(pop_name)
