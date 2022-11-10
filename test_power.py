@@ -7,24 +7,27 @@ from CompNeuroPy import (
 )
 import matplotlib.pyplot as plt
 
+### local
+from parameters import parameters_test_power as paramsS
+
 
 if __name__ == "__main__":
 
     ### SETUP TIMESTEP + SEED
-    seed_val = 1
-    setup(dt=0.1, seed=seed_val)
+    if paramsS["seed"] == None:
+        setup(dt=paramsS["timestep"])
+    else:
+        setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
-    ### COMPILE MODEL & GET PARAMTERS
-    ### in BGM_vTEST_pTEST cor_go consists of poisson_sin neurons
-    model = BGM(name="BGM_vTEST_pTEST", seed=seed_val)
+    ### COMPILE MODEL & GET MODEL PARAMTERS
+    model = BGM(name="BGM_vTEST_pTEST", seed=paramsS["seed"])
     params = model.params
-    paramsS = {}
-    paramsS["trials"] = 1
 
     ### INIT MONITORS ###
     mon = Monitors(
         {
             "pop;cor_go": ["spike", "rates"],
+            "pop;cor_stop": ["spike"],
             "pop;str_d1": ["spike"],
             "pop;str_d2": ["spike"],
             "pop;str_fsi": ["spike"],
@@ -37,14 +40,13 @@ if __name__ == "__main__":
     ### SIMULATION ###
     mon.start()
 
-    frequency = 50
-    phase = 0  # (1 / frequency) / 4
-    get_population("cor_go").amplitude = 50
-    get_population("cor_go").frequency = frequency
-    get_population("cor_go").phase = phase
-    get_population("cor_go").base = 50
-
-    simulate(1000)
+    ### define the sinus oscillation of cor_go
+    get_population("cor_go").amplitude = paramsS["cor_go.amplitude"]
+    get_population("cor_go").frequency = paramsS["cor_go.frequency"]
+    get_population("cor_go").phase = paramsS["cor_go.phase"]
+    get_population("cor_go").base = paramsS["cor_go.base"]
+    ### simulate some time
+    simulate(paramsS["t.duration"])
 
     ### GET RECORDINGS ###
     recordings = mon.get_recordings()
@@ -64,12 +66,12 @@ if __name__ == "__main__":
         chunk=chunk,
         shape=(2, 1),
         plan=plot_list,
-        time_lim=[0, (1 / frequency) * 1000],
+        time_lim=[0, (1 / paramsS["cor_go.frequency"]) * 1000],
     )
     ### some populations activity
     plot_list = [
         "1;cor_go;spike;hybrid",
-        "2;cor_go;rates;line",
+        "2;cor_stop;spike;hybrid",
         "4;str_d1;spike;hybrid",
         "5;str_d2;spike;hybrid",
         "6;str_fsi;spike;hybrid",
@@ -97,12 +99,12 @@ if __name__ == "__main__":
             time_step=dt(),
             t_start=recording_times.time_lims(chunk=chunk)[0],
             t_end=recording_times.time_lims(chunk=chunk)[1],
-            fft_size=None,
+            fft_size=4096,
         )
         plt.subplot(3, 3, int(nr))
         plt.title(pop_name)
         plt.plot(freq, pow, color="k")
-        plt.xlim(0, frequency * 4)
+        plt.xlim(0, paramsS["cor_go.frequency"] * 4)
         # plt.yscale("log")
         plt.xlabel("frequency [Hz]")
         plt.ylabel("power")

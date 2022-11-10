@@ -1,19 +1,18 @@
-from ANNarchy import get_current_step, dt, get_population
+from ANNarchy import get_current_step, get_population
 import numpy as np
 
 
-def add_events(trial_procedure, params):
+def add_events(trial_procedure):
+    paramsS = trial_procedure.paramsS
 
     ### define effects for all events (with effects)
     def cor_on(self, pop_name, append=""):
-        get_population(pop_name).rates = self.trial_procedure.params[
-            pop_name + ".rates" + append
-        ] + self.trial_procedure.params[
-            pop_name + ".rates_sd"
-        ] * self.trial_procedure.rand[
-            pop_name
-        ] * int(
-            params[pop_name + ".rates" + append] > 0
+        cor_rates = paramsS[f"{pop_name}.rates{append}"]
+        cor_rates_sd = paramsS[f"{pop_name}.rates_sd"]
+        cor_randn = self.trial_procedure.rand[pop_name]
+        cor_rates_0 = int(paramsS[f"{pop_name}.rates{append}"] > 0)
+        get_population(pop_name).rates = (
+            cor_rates + cor_rates_sd * cor_randn * cor_rates_0
         )
 
     def cor_off(self, pop_name):
@@ -33,7 +32,7 @@ def add_events(trial_procedure, params):
     trial_procedure.add_event(
         name="trial_init",
         onset=get_current_step(),
-        trigger={"integrator_reset": int(params["sim.t_init"] / dt())},
+        trigger={"integrator_reset": int(paramsS["t.init"] / paramsS["timestep"])},
         effect=trial_init,
     )
 
@@ -44,26 +43,26 @@ def add_events(trial_procedure, params):
     trial_procedure.add_event(
         name="go_cue",
         trigger={
-            "stop_cue": int(params["sim.t_SSD"] / dt()),
+            "stop_cue": int(paramsS["t.ssd"] / paramsS["timestep"]),
             "cor_pause_on_go": 0,
             "cor_go_on": int(
                 np.clip(
-                    np.random.normal(
-                        params["sim.t_delayGo"], params["sim.t_delayGoSD"]
+                    trial_procedure.rng.normal(
+                        paramsS["t.cor_go__delay"], paramsS["t.cor_go__delay_sd"]
                     ),
                     0,
                     None,
                 )
-                / dt()
+                / paramsS["timestep"]
             ),
             "end": int(
                 (
-                    params["sim.t_SSD"]
-                    + params["sim.t_delayStopAfterCue"]
-                    + params["sim.t_cortexStopDurationAfterCue"]
-                    + params["sim.t_decay"]
+                    paramsS["t.ssd"]
+                    + paramsS["t.cor_stop__delay_cue"]
+                    + paramsS["t.cor_stop__dur_cue"]
+                    + paramsS["t.decay"]
                 )
-                / dt()
+                / paramsS["timestep"]
             ),
         },
     )
@@ -73,7 +72,9 @@ def add_events(trial_procedure, params):
         requirement_string="mode==stop",
         trigger={
             "cor_pause_on_stop": 0,
-            "cor_stop_on_cue": int(params["sim.t_delayStopAfterCue"] / dt()),
+            "cor_stop_on_cue": int(
+                paramsS["t.cor_stop__delay_cue"] / paramsS["timestep"]
+            ),
         },
     )
 
@@ -88,13 +89,17 @@ def add_events(trial_procedure, params):
     trial_procedure.add_event(
         name="cor_pause_on_go",
         effect=lambda self: cor_on(self, "cor_pause", "_go"),
-        trigger={"cor_pause_off": int(params["sim.t_cortexPauseDuration"] / dt())},
+        trigger={
+            "cor_pause_off": int(paramsS["t.cor_pause__dur"] / paramsS["timestep"])
+        },
     )
 
     trial_procedure.add_event(
         name="cor_pause_on_stop",
         effect=lambda self: cor_on(self, "cor_pause", "_stop"),
-        trigger={"cor_pause_off": int(params["sim.t_cortexPauseDuration"] / dt())},
+        trigger={
+            "cor_pause_off": int(paramsS["t.cor_pause__dur"] / paramsS["timestep"])
+        },
     )
 
     trial_procedure.add_event(
@@ -105,22 +110,24 @@ def add_events(trial_procedure, params):
         name="cor_stop_on_cue",
         effect=lambda self: cor_on(self, "cor_stop", "_cue"),
         trigger={
-            "cor_stop_off": int(params["sim.t_cortexStopDurationAfterCue"] / dt())
+            "cor_stop_off": int(paramsS["t.cor_stop__dur_cue"] / paramsS["timestep"])
         },
     )
 
     trial_procedure.add_event(
-        name="cor_stop_on_motor",
-        effect=lambda self: cor_on(self, "cor_stop", "_motor"),
+        name="cor_stop_on_respose",
+        effect=lambda self: cor_on(self, "cor_stop", "_response"),
         trigger={
-            "cor_stop_off": int(params["sim.t_cortexStopDurationAfterAction"] / dt())
+            "cor_stop_off": int(
+                paramsS["t.cor_stop__dur_response"] / paramsS["timestep"]
+            )
         },
     )
 
     trial_procedure.add_event(
         name="cor_stop_off",
         effect=lambda self: cor_off(self, "cor_stop"),
-        trigger={"end": int(params["sim.t_decay"] / dt())},
+        trigger={"end": int(paramsS["t.decay"] / paramsS["timestep"])},
     )
 
     trial_procedure.add_event(
@@ -130,12 +137,16 @@ def add_events(trial_procedure, params):
     trial_procedure.add_event(
         name="motor_response",
         model_trigger="integrator_go",
-        trigger={"cor_stop_on_motor": int(params["sim.t_delayStopAfterAction"] / dt())},
+        trigger={
+            "cor_stop_on_respose": int(
+                paramsS["t.cor_stop__delay_response"] / paramsS["timestep"]
+            )
+        },
     )
 
     trial_procedure.add_event(
         name="gpe_cp_resp",
         model_trigger="integrator_stop",
-        requirement_string="happened_event_list==[cor_stop_on_cue] or happened_event_list==[motor_response]",
+        requirement_string="happened_event_list==[cor_stop_on_cue] or happened_event_list==[cor_stop_on_respose]",
         trigger={"cor_go_off": 0},
     )

@@ -6,6 +6,7 @@ from tqdm import tqdm
 ### local
 from trial_procedure import trial_procedure_cl
 from trial_events import add_events
+from parameters import parameters_default as paramsS
 
 
 ### DEFINE TRIAL FUNCTION ###
@@ -16,7 +17,7 @@ def SST_trial_function(params, paramsS, mode="go"):
     trial_procedure = trial_procedure_cl(params, paramsS, mode=mode)
 
     ### add events
-    add_events(trial_procedure, params)
+    add_events(trial_procedure)
 
     ### run trial procedure
     trial_procedure.run()
@@ -31,14 +32,21 @@ def SST_trial_function(params, paramsS, mode="go"):
 if __name__ == "__main__":
 
     ### SETUP TIMESTEP + SEED
-    seed_val = 1
-    setup(dt=0.1, seed=seed_val)
+    if paramsS["seed"] == None:
+        setup(dt=paramsS["timestep"])
+    else:
+        setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
-    ### COMPILE MODEL & GET PARAMTERS
-    model = BGM(name="BGM_v01_p01", seed=seed_val)
+    ### CREATE MODEL & GET MODEL PARAMTERS
+    model = BGM(name="BGM_v01_p01", seed=paramsS["seed"], do_compile=False)
     params = model.params
-    paramsS = {}
-    paramsS["trials"] = 1
+
+    ### Set the time constants of the cortex populations
+    ### and compile model
+    for pop in ["cor_go", "cor_pause", "cor_stop"]:
+        for var in ["tau_up", "tau_down"]:
+            setattr(get_population(pop), var, paramsS[f"{pop}.{var}"])
+    model.compile()
 
     ### INIT MONITORS ###
     mon = Monitors(
@@ -105,6 +113,7 @@ if __name__ == "__main__":
         "12;integrator_stop;g_ampa;line",
     ]
 
+    ### 1st trial
     chunk = 0
     plot_recordings(
         figname="results/test_trial/overview1.png",
@@ -115,6 +124,7 @@ if __name__ == "__main__":
         plan=plot_list,
     )
 
+    ### 2nd trial
     chunk = 1
     plot_recordings(
         figname="results/test_trial/overview2.png",
