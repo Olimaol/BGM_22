@@ -1,9 +1,10 @@
-from ANNarchy import setup, get_population, get_time
+from ANNarchy import setup, get_population, get_time,raster_plot
 from CompNeuroPy.models import BGM
 from CompNeuroPy import Monitors, generate_simulation, plot_recordings
 from tqdm import tqdm
 import pylab as plt
 from CompNeuroPy import create_dir
+import numpy as np
 
 ### local
 from trial_procedure import trial_procedure_cl
@@ -12,14 +13,15 @@ from trial_events import add_events
 
 ### SETUP TIMESTEP + SEED
 seed_val = 1
-setup(dt=0.1, seed=seed_val)
+timestep =0.1
+setup(dt=timestep, seed=seed_val)
 
 
 ### COMPILE MODEL & GET PARAMTERS
-model = BGM(name="BGM_v02_p01", seed=seed_val)
+model = BGM(name="BGM_v01_p01", seed=seed_val)
 params = model.params
 paramsS = {}
-paramsS["trials"] = 100
+paramsS["trials"] = 3
 
 
 ### INIT MONITORS ###
@@ -56,10 +58,14 @@ def SST_trial_function(params, paramsS, mode="go"):
     trial_procedure.run()
 
     ### return if go decision was made
-    if get_population("integrator_go").decision[0] == -1:
+    if get_population("integrator_go").decision[0] == -1:     
         return 1
     else:
         return 0
+
+
+   
+ 
 
 
 ### GENERATE TRIAL SIMULATION ###
@@ -89,10 +95,43 @@ for mode in ["go","stop"]:
 counter_go = sum(SST_trial.info)
 print("TRIALS FINISHED\ncounter_go:", counter_go, "\n")
 
+    
+
 
 ### GET RECORDINGS ###
 recordings = mon.get_recordings()
 recording_times = mon.get_recording_times()
+
+
+
+decisiontime_go_array=[]       # array with timesteps of first decision value of -1 = go decision 
+decisiontime_stop_array=[] 
+
+for chunk in range(paramsS["trials"]*2):
+
+    for i in range(int(params['sim.t_init']/timestep),len(recordings[chunk]['integrator_go;g_ampa'])):
+
+        if recordings[chunk]['integrator_go;g_ampa'][i]>= params['integrator_go.threshold']:
+            decisiontime_go_array.append(i)
+            break
+       
+
+for chunk in range(paramsS["trials"]*2):
+    spikedict = recordings[chunk]['cor_stop;spike']
+    timearray,_ = raster_plot(spikedict)
+
+    for i in range(int(timearray.min()/timestep),len(recordings[chunk]['integrator_go;g_ampa'])):
+     
+        if recordings[chunk]['integrator_stop;g_ampa'][i]>= params['integrator_stop.threshold']:
+            decisiontime_stop_array.append(i)
+            break
+      
+
+print('zaehler_go:', decisiontime_go_array)
+print('zaehler_stop:', decisiontime_stop_array)
+#print(recordings[0])
+
+quit()
 
 
 ### QUICK PLOT ###
@@ -126,7 +165,7 @@ plot_list = [
 
 chunk = 0
 plot_recordings(
-    figname='overview1_go_stop_BGM_v02_p01_mod_factor_increase_noise_-90per.png',
+    figname='results/test_iliana/overview1_go_stop_BGM_v02_p01_mod_factor_increase_noise_-90per.png',
     recordings=recordings,
     recording_times=recording_times,
     chunk=chunk,
@@ -136,7 +175,7 @@ plot_recordings(
 
 chunk = 1
 plot_recordings(
-    figname='overview2_go_stop_BGM_v02_p01_mod_factor_increase_noise_-90per.png',
+    figname='results/test_iliana/overview2_go_stop_BGM_v02_p01_mod_factor_increase_noise_-90per.png',
     recordings=recordings,
     recording_times=recording_times,
     chunk=chunk,
