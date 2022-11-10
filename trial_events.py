@@ -115,8 +115,8 @@ def add_events(trial_procedure):
     )
 
     trial_procedure.add_event(
-        name="cor_stop_on_motor",
-        effect=lambda self: cor_on(self, "cor_stop", "_motor"),
+        name="cor_stop_on_respose",
+        effect=lambda self: cor_on(self, "cor_stop", "_response"),
         trigger={
             "cor_stop_off": int(
                 paramsS["t.cor_stop__dur_response"] / paramsS["timestep"]
@@ -138,7 +138,7 @@ def add_events(trial_procedure):
         name="motor_response",
         model_trigger="integrator_go",
         trigger={
-            "cor_stop_on_motor": int(
+            "cor_stop_on_respose": int(
                 paramsS["t.cor_stop__delay_response"] / paramsS["timestep"]
             )
         },
@@ -147,6 +147,6 @@ def add_events(trial_procedure):
     trial_procedure.add_event(
         name="gpe_cp_resp",
         model_trigger="integrator_stop",
-        requirement_string="happened_event_list==[cor_stop_on_cue] or happened_event_list==[motor_response]",
+        requirement_string="happened_event_list==[cor_stop_on_cue] or happened_event_list==[cor_stop_on_respose]",
         trigger={"cor_go_off": 0},
     )
