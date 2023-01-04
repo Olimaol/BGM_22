@@ -1,6 +1,6 @@
 from ANNarchy import setup, get_population
 from CompNeuroPy.models import BGM
-from CompNeuroPy import Monitors, generate_simulation, plot_recordings
+from CompNeuroPy import Monitors, generate_simulation, plot_recordings, print_df
 from tqdm import tqdm
 
 ### local
@@ -45,8 +45,15 @@ if __name__ == "__main__":
     ### and compile model
     for pop in ["cor_go", "cor_pause", "cor_stop"]:
         for var in ["tau_up", "tau_down"]:
-            setattr(get_population(pop), var, paramsS[f"{pop}.{var}"])
+            model.set_param(
+                compartment=pop,
+                parameter_name=var,
+                parameter_value=paramsS[f"{pop}.{var}"],
+            )
     model.compile()
+
+    print("model paramters:")
+    print_df(model.attribute_df)
 
     ### INIT MONITORS ###
     mon = Monitors(
