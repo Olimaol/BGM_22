@@ -6,3 +6,5 @@ dist/
 *.svg
 *.png
 *tmp.py
+numpy_results/
+output_file.txt
