@@ -20,7 +20,8 @@ if __name__ == "__main__":
         setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
     ### COMPILE MODEL & GET MODEL PARAMTERS
-    model = BGM(name="BGM_vTEST_pTEST", seed=paramsS["seed"])
+   # model = BGM(name="BGM_vTEST_pTEST", seed=paramsS["seed"])
+    model = BGM(name="BGM_v01_p01", seed=paramsS["seed"])
     params = model.params
 
     ### INIT MONITORS ###
@@ -60,7 +61,7 @@ if __name__ == "__main__":
     ]
     chunk = 0
     plot_recordings(
-        figname="results/test_power/overview1.png",
+        figname="results/test_power/overview1_BGM_v02_p01.png",
         recordings=recordings,
         recording_times=recording_times,
         chunk=chunk,
@@ -81,7 +82,7 @@ if __name__ == "__main__":
     ]
     chunk = 0
     plot_recordings(
-        figname="results/test_power/overview2.png",
+        figname="results/test_power/overview2_BGM_v02_p01.png",
         recordings=recordings,
         recording_times=recording_times,
         chunk=chunk,
@@ -109,4 +110,4 @@ if __name__ == "__main__":
         plt.xlabel("frequency [Hz]")
         plt.ylabel("power")
     plt.tight_layout()
-    plt.savefig("results/test_power/freq.png")
+    plt.savefig("results/test_power/freq_BGM_v02_p01.png")

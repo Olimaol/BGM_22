@@ -45,3 +45,7 @@ parameters_test_power["cor_go.amplitude"] = 50
 parameters_test_power["cor_go.frequency"] = 50
 parameters_test_power["cor_go.phase"] = 0
 parameters_test_power["cor_go.base"] = 50
+
+### parameters for test_iliana
+parameters_test_iliana = parameters_default
+parameters_test_iliana["trials"]=1
