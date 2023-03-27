@@ -16,19 +16,19 @@ parameters_default["t.cor_stop__delay_response"] = 50
 parameters_default["t.cor_stop__dur_cue"] = 5
 parameters_default["t.cor_stop__dur_response"] = 200
 ### cor_go
-parameters_default["cor_go.rates"] = 400
+parameters_default["cor_go.rates"] = 0  # 400
 parameters_default["cor_go.rates_sd"] = 0
 parameters_default["cor_go.tau_up"] = 200
 parameters_default["cor_go.tau_down"] = 10
 ### cor_pause
-parameters_default["cor_pause.rates_go"] = 500
-parameters_default["cor_pause.rates_stop"] = 600
+parameters_default["cor_pause.rates_go"] = 0  # 500
+parameters_default["cor_pause.rates_stop"] = 0  # 600
 parameters_default["cor_pause.rates_sd"] = 0
 parameters_default["cor_pause.tau_up"] = 1
 parameters_default["cor_pause.tau_down"] = 150
 ### cor_stop
-parameters_default["cor_stop.rates_cue"] = 400
-parameters_default["cor_stop.rates_response"] = 400
+parameters_default["cor_stop.rates_cue"] = 0  # 400
+parameters_default["cor_stop.rates_response"] = 0  # 400
 parameters_default["cor_stop.rates_sd"] = 0
 parameters_default["cor_stop.tau_up"] = 1
 parameters_default["cor_stop.tau_down"] = 70
@@ -48,4 +48,4 @@ parameters_test_power["cor_go.base"] = 50
 
 ### parameters for test_iliana
 parameters_test_iliana = parameters_default
-parameters_test_iliana["trials"]=1
+parameters_test_iliana["trials"] = 1
