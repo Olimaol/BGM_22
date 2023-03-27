@@ -38,7 +38,7 @@ if __name__ == "__main__":
         setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
     ### CREATE MODEL & GET MODEL PARAMTERS
-    model = BGM(name="BGM_v01_p01", seed=paramsS["seed"], do_compile=False)
+    model = BGM(name="BGM_v03_p01", seed=paramsS["seed"], do_compile=False)
     params = model.params
 
     ### Set the time constants of the cortex populations
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     ### 1st trial
     chunk = 0
     plot_recordings(
-        figname="results/test_trial/overview1.png",
+        figname=f"results/test_trial/{model.name}/overview1.png",
         recordings=recordings,
         recording_times=recording_times,
         chunk=chunk,
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     ### 2nd trial
     chunk = 1
     plot_recordings(
-        figname="results/test_trial/overview2.png",
+        figname=f"results/test_trial/{model.name}/overview2.png",
         recordings=recordings,
         recording_times=recording_times,
         chunk=chunk,
