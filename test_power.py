@@ -19,10 +19,24 @@ if __name__ == "__main__":
     else:
         setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
+    
+
     ### COMPILE MODEL & GET MODEL PARAMTERS
-    model_name = "BGM_v02_p02"
-    model = BGM(name="BGM_v02_p02", seed=paramsS["seed"])
+    model_name = "BGM_v03_p02"                      
+    # BGM v02_p03 : BGM version with fitted FSI Neuron based on Corbit et al (2016) and synaptic delays based on Kumarave et al(2015)
+    # BGM_04 BGM version with H and H Corbit FSI Neuron
+
+    # BGM_v02_p01 = v01_p01 + Corbit FSI Fit, 
+    # BGM_v02_p02 = Corbit FSI Fit with Baseline,
+    # BGM_v02_p03 = Corbit FSI FIt with synaptic delays based on Kumavarelu et al (2015)
+    # BGM_v02_p04 = Corit FSI Fit model with noise off 
+    # BGM_v03_p01 = Corbit DD Version
+    # BGM_v03_p02 = BGM_01_p01 DD Version
+    model = BGM(model_name, seed=paramsS["seed"],do_compile=False)
     params = model.params
+
+ 
+    model.compile()
 
     ### INIT MONITORS ###
     mon = Monitors(
@@ -41,6 +55,7 @@ if __name__ == "__main__":
 
     ### SIMULATION ###
     mon.start()
+  
 
     ### simulate some time
     simulate(paramsS["t.duration"])
@@ -65,7 +80,7 @@ if __name__ == "__main__":
     ]
     chunk = 0
     plot_recordings(
-        figname=f"results/test_power/overview2_{model_name}.png",
+        figname=f"results/test_power/overview2_{model_name}_freq_factor_20000.png",
         recordings=recordings,
         recording_times=recording_times,
         chunk=chunk,
@@ -83,14 +98,16 @@ if __name__ == "__main__":
             time_step=dt(),
             t_start=recording_times.time_lims(chunk=chunk)[0],
             t_end=recording_times.time_lims(chunk=chunk)[1],
-            fft_size=4096,
+            fft_size= 4096, #8192,     # 4096,
         )
         plt.subplot(3, 3, int(nr))
         plt.title(pop_name)
         plt.plot(freq, pow, color="k")
-        plt.xlim(0, paramsS["cor_go.frequency"] * 4)
+        plt.xlim(0,100) 
         # plt.yscale("log")
         plt.xlabel("frequency [Hz]")
         plt.ylabel("power")
     plt.tight_layout()
-    plt.savefig(f"results/test_power/freq_{model_name}.png")
+    plt.savefig(f"results/test_power/freq_{model_name}_freq_factor_20000.png")
+
+

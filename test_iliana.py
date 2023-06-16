@@ -22,19 +22,32 @@ if paramsS["seed"] == None:
 else:
     setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
-### COMPILE MODEL & GET PARAMTERS
-#modelname = "BGM_v02_p01"
-model = BGM(name="BGM_v01_p01", seed=paramsS["seed"],do_compile=False)
+### COMPILE MODEL & GET PARAMTERS   
+# BGM_v02_p01 = v01_p01 + Corbit FSI Fit, 
+# BGM_v02_p02 = Corbit FSI Fit with Baseline,
+# BGM_v02_p03 = Corbit FSI FIt with synaptic delays based on Kumavarelu et al (2015)
+# BGM_v02_p04 = Corit FSI Fit model with noise off 
+# BGM_v03_p01 = Corbit DD Version
+# BGM_v03_p02 = BGM_01_p01 DD Version
+modelname = "BGM_v02_p02" 
+model = BGM(name=modelname, seed=paramsS["seed"],do_compile=False)
 params = model.params
 
 
-
-
-### Set the time constants of the cortex populations
+### Set the time constants of the cortex populations                                #### Achtung : hier ueberschriebene Parameterwerte uebergeben um mit neuen Werten zu simulieren !
     ### and compile model
 for pop in ["cor_go", "cor_pause", "cor_stop"]:
     for var in ["tau_up", "tau_down"]:
-        setattr(get_population(pop), var, paramsS[f"{pop}.{var}"])
+        model.set_param(
+            compartment=pop,
+            parameter_name=var,
+            parameter_value=paramsS[f"{pop}.{var}"])
+
+#for pop in ["str_fsi"]:
+#    for var in ["increase_noise"]:
+#        setattr(get_population(pop), var, paramsS[f"{pop}.{var}"])
+
+       
 model.compile()
 
 
@@ -57,7 +70,6 @@ mon = Monitors(
     }
 )
 
- 
 
 
 ### GENERATE TRIAL SIMULATION ###
@@ -107,25 +119,25 @@ bool_go_array = np.zeros(paramsS["trials"]*2)
 
 
 for chunk in range(paramsS["trials"]*2):
-    print(chunk)
-    print(int(paramsS['t.init']/paramsS['timestep']))
-    print(len(recordings[chunk]['integrator_go;g_ampa']))
+  #  print(chunk)
+  #  print(int(paramsS['t.init']/paramsS['timestep']))
+  #  print(len(recordings[chunk]['integrator_go;g_ampa']))
 
     
     for i in range(int(paramsS['t.init']/paramsS['timestep']),len(recordings[chunk]['integrator_go;g_ampa'])):
-        print(i,end=" ")
+       # print(i,end=" ")
 
        # print('zweite for schleife wird ausgeuehrt')
         if recordings[chunk]['integrator_go;g_ampa'][i]>= params['integrator_go.threshold']:
-            print("oke")
+        #    print("oke")
             index_go.append(chunk)                        # speichert indices der erfolgreichen go versuche 
        
             if chunk < paramsS['trials']:
                 decisiontime_go_array.append(i)
             break    
             #else: 
-            #    decisiontime_stop_array.append(i)           ### Achtung : das sing gerade failed stop trails !!!!
-        print(" ")      
+            #    decisiontime_stop_array.append(i)           ### Achtung : das sind gerade failed stop trails !!!!
+    #    print(" ")      
          
            
            # break
@@ -136,12 +148,12 @@ for i in index_go:
 
   
 
-print('go trails of all trails:', index_go)
+#print('go trails of all trails:', bool_go_array)
+#print(decisiontime_go_array)
 
-print(decisiontime_go_array)
 
-
-saveresults.append(decisiontime_go_array)
+saveresults.append(recordings)
+saveresults.append(recording_times)
 
 go_rt= sum(decisiontime_go_array)/ (paramsS["trials"])
 stop_rt= sum(decisiontime_stop_array)/ (paramsS["trials"])
@@ -173,7 +185,7 @@ print('average RT:', go_rt)
 
 ### QUICK PLOT ###
 plot_list = [
-    "1;gpe_arky;spike;hybrid",
+    "1;gpe_arky;spike;hybrid", # von hybrid auf raster wechseln wenn inputs vom cortex ausgeschaltet sind 
     "2;str_d1;spike;hybrid",
     "3;str_d2;spike;hybrid",
     "4;stn;spike;hybrid",
@@ -185,9 +197,11 @@ plot_list = [
     "10;cor_stop;spike;hybrid",
     "11;str_fsi;spike;hybrid",
     "12;integrator_stop;g_ampa;line",
+    "13;str_fsi;g_ampa;line",
+    "14;str_fsi;g_gaba;line",
 ]
 
-#create_dir('results_parameter_fit')
+create_dir('results_parameter_fit')
 
 ######  fsi connectivity paramter changes
 
@@ -202,32 +216,31 @@ plot_list = [
 # thal      -> str_fsi.mod_factor =  9.6     6.72       4.8     2.88    1.92    0.96
 
 
+
 chunk = 0
 plot_recordings(
-    figname='results/test_iliana/overview1_BGM_v01_p01.png',
-    #figname='results/test_iliana/overview1_BGM_v02_p01_correct_modulation_'+str(modulation)+'_input_mod_exc_'+str(input_mod_exc)+'_input_mod_inh_'+str(input_mod_inh)+'_200trials.png',
-    #figname='results/test_iliana/overview1_BGM_v02_p02_DD.png',
+    figname='results/test_iliana/overview1_'+str(modelname)+'_inputs_off.png',
+    #figname='results/test_iliana/overview1'+str(modelname)+'_ssd320_1000trials.png',
+    #figname='results/test_iliana/overview1_str_fsi.increase_noise'+str(modelname)+'_'+str(paramsS["str_fsi.increase_noise"])+'_str_fsi.mean_rate_noise_'+str(paramsS["str_fsi.mean_rate_noise"])+'_fsi_inh_mod_factor_modulation_0_6.png',
     recordings=recordings,
     recording_times=recording_times,
     chunk=chunk,
-    shape=(2, 6),
+    shape=(2, 7),
     plan=plot_list,
 )
 
 chunk = 1
 plot_recordings(
-    figname='results/test_iliana/overview2_v01_p01.png',
-    #figname='results/test_iliana/overview2_BGM_v02_p01_correct_modulation_'+str(modulation)+'_input_mod_exc_'+str(input_mod_exc)+'_input_mod_inh_'+str(input_mod_inh)+'_200trials.png',
-    #figname='results/test_iliana/overview2_BGM_v02_p02_DD.png',
+    figname='results/test_iliana/overview2_'+str(modelname)+'_inputs_off.png',
+    #figname='results/test_iliana/overview2'+str(modelname)+'_ssd320_1000trials.png'
+    #figname='results/test_iliana/overview2_str_fsi.increase_noise'+str(modelname)+'_'+str(paramsS["str_fsi.increase_noise"])+'_str_fsi.mean_rate_noise_'+str(paramsS["str_fsi.mean_rate_noise"])+'_fsi_inh_mod_factor_modulation_0_6.png',
     recordings=recordings,
     recording_times=recording_times,
     chunk=chunk,
-    shape=(2, 6),
+    shape=(2, 7),
     plan=plot_list,
 )
 
-#plt.savefig('results_parameter_fit/overview1_v02_go_stop_BGM_v02_p01_.svg')
-#plt.savefig('results_parameter_fit/overview2_v02_go_stop_BGM_v02_p01.svg')
 
-#np.save('./numpy_results/results_decisiontime_go_array_'+modelname,saveresults)
+#np.save('./numpy_results/recordings_'+modelname+'_',saveresults)
 

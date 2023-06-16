@@ -7,6 +7,7 @@ parameters_default["trials"] = 1
 ### simulation times
 parameters_default["t.init"] = 600
 parameters_default["t.ssd"] = 250
+
 parameters_default["t.decay"] = 300
 parameters_default["t.cor_pause__dur"] = 5
 parameters_default["t.cor_go__delay"] = 75
@@ -21,8 +22,8 @@ parameters_default["cor_go.rates_sd"] = 0
 parameters_default["cor_go.tau_up"] = 200
 parameters_default["cor_go.tau_down"] = 10
 ### cor_pause
-parameters_default["cor_pause.rates_go"] = 500
-parameters_default["cor_pause.rates_stop"] = 600
+parameters_default["cor_pause.rates_go"] = 400
+parameters_default["cor_pause.rates_stop"] = 400
 parameters_default["cor_pause.rates_sd"] = 0
 parameters_default["cor_pause.tau_up"] = 1
 parameters_default["cor_pause.tau_down"] = 150
@@ -38,14 +39,25 @@ parameters_test_power = {}
 ### general
 parameters_test_power["timestep"] = 0.1
 parameters_test_power["seed"] = 1
-### simulation time
-parameters_test_power["t.duration"] = 1000
-### cor_go
-parameters_test_power["cor_go.amplitude"] = 50
-parameters_test_power["cor_go.frequency"] = 50
-parameters_test_power["cor_go.phase"] = 0
-parameters_test_power["cor_go.base"] = 50
+parameters_test_power["t.ssd"] = 320
+### simulation time5
+parameters_test_power["t.duration"] = 20000
+parameters_test_power["cor_go.rates"] = 0
+parameters_test_power["cor_stop.rates"] = 0
+parameters_test_power["cor__pause.rates_go"] = 0
+parameters_test_power["cor__pause.rates_stop"] = 0
+#parameters_test_power["cor_go.rates_sd"] = 0
+#parameters_test_power["cor_go.tau_up"] = 200
+#parameters_test_power["cor_go.tau_down"] = 10
+
 
 ### parameters for test_iliana
-parameters_test_iliana = parameters_default
+
+parameters_test_iliana = parameters_default.copy()
 parameters_test_iliana["trials"]=1
+parameters_test_iliana["t.ssd"] = 320
+#parameters_test_iliana["str_d2.increase_noise"]= 20
+#parameters_test_iliana["cor_go.rates"] = 0
+#parameters_test_iliana["cor_stop.rates"] = 0
+#parameters_test_iliana["cor_pause.rates_go"] = 0
+#parameters_test_iliana["cor_pause.rates_stop"] = 0

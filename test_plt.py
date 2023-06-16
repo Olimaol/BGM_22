@@ -44,10 +44,33 @@ recordings_opt = results_opt['recordings']
 recording_times_opt = results_opt['data']['recording_times']
 
 
-#print(recordings_target[0])
-### combine data
+### combine data target
 times, data_arr_target = recording_times_target.combine_chunks(recordings_target, sp_target.kwargs[0]['pop']+';v', mode='consecutive')
-_    , data_arr_opt    = recording_times_opt.combine_chunks(recordings_opt, sp_opt.kwargs[0]['pop']+';v', mode='consecutive')
+#_    , data_arr_opt    = recording_times_opt.combine_chunks(recordings_opt, sp_opt.kwargs[0]['pop']+';v', mode='consecutive')
+# data_arr_opt = np.concatenate(recordings_opt, sp_opt.kwargs[0]['pop']+';v')
+
+#print(len(recordings_opt))  # result = 4 
+#print(sp_opt.kwargs[0])   # ergebnis : {'pop': 'Iz_neuron', 't1': 500, 't2': 500, 'a1': 0, 'a2': 10}
+#print(recordings_opt)      # ergebnis : dict aus Iz_neuron,v ; Iz_neuron,spike fuer jeden chunk [0-3]
+
+
+#### combinte data fitted 
+for chunk in range(len(recordings_opt)):
+        #one_recordings_opt_array = sum(recordings_opt[chunk]['Iz_neuron;v'], [])
+        one_recordings_opt_array = np.concatenate(recordings_opt[chunk]['Iz_neuron;v'])
+   
+#print(results_opt['sim'][0])                # result : <CompNeuroPy.generate_simulation.generate_simulation object at 0x7f5fd0374550>
+#print(results_opt.keys())                   # result : dict_keys(['recordings', 'monDict', 'sim', 'data'])
+#print(type(results_opt['sim']))             # result : list
+#print(results_opt['sim'][0].info)           # result : [{'duration': 1000}, {'duration': 500}, {'duration': 1000}, {'duration': 1700}, {'duration': 1300}]    
+
+#print(sp_opt.kwargs[0])                      # result : {'pop': 'Iz_neuron', 't1': 500, 't2': 500, 'a1': 0, 'a2': 10}
+#print(sp_opt.kwargs[0]['pop'].info)          # result : 'str' object has no attribute 'info'
+#print(sp_opt.kwargs[0]['pop']+';v')          # result : Iz_neuron;v = str -> STRING NICHT KOMBINIERBAR  mit np.concatenate !
+
+
+data_arr_opt = np.concatenate(one_recordings_opt_array, sp_opt.kwargs[0]['pop']+';v')# WARUM KOMBINIEREN MIT EINFACHEM STR " Iz_neuron;v"  -> NOETIG FUER PLOTS ! LIMITS FUER AXEN ?! Z. 107ff.
+#print(data_arr_opt)
 
 
 ### obtain simulation times and stimulation current from simulation protocol
