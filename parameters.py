@@ -49,3 +49,11 @@ parameters_test_power["cor_go.base"] = 50
 ### parameters for test_iliana
 parameters_test_iliana = parameters_default
 parameters_test_iliana["trials"] = 1
+
+
+parameters_test_resting = {}
+### general
+parameters_test_resting["timestep"] = 0.1
+parameters_test_resting["seed"] = 1
+### simulation time
+parameters_test_resting["t.duration"] = 1000
