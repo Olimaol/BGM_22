@@ -56,4 +56,4 @@ parameters_test_resting = {}
 parameters_test_resting["timestep"] = 0.1
 parameters_test_resting["seed"] = 1
 ### simulation time
-parameters_test_resting["t.duration"] = 1000
+parameters_test_resting["t.duration"] = 3000

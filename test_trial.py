@@ -38,7 +38,7 @@ if __name__ == "__main__":
         setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
     ### CREATE MODEL & GET MODEL PARAMTERS
-    model = BGM(name="BGM_v03_p01", seed=paramsS["seed"], do_compile=False)
+    model = BGM(name="BGM_v01_p01", seed=paramsS["seed"], do_compile=False)
     params = model.params
 
     ### Set the time constants of the cortex populations
