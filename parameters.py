@@ -50,10 +50,22 @@ parameters_test_power["cor_go.base"] = 50
 parameters_test_iliana = parameters_default
 parameters_test_iliana["trials"] = 1
 
-
+### parameters for test_resting
 parameters_test_resting = {}
 ### general
 parameters_test_resting["timestep"] = 0.1
 parameters_test_resting["seed"] = 1
 ### simulation time
 parameters_test_resting["t.duration"] = 3000
+
+
+### parameters for fit_pallido_striatal
+parameters_fit_pallido_striatal = {}
+### general
+parameters_fit_pallido_striatal["timestep"] = 0.1
+parameters_fit_pallido_striatal["seed"] = None
+parameters_fit_pallido_striatal["num_threads"] = 1
+parameters_fit_pallido_striatal["nbr_models"] = 9
+parameters_fit_pallido_striatal["nbr_fit_runs"] = 4000
+### simulation time
+parameters_fit_pallido_striatal["t.duration"] = 10000
