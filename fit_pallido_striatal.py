@@ -1,8 +1,10 @@
 from ANNarchy import setup, simulate, reset, raster_plot
+from ANNarchy.core.Global import _network
 from CompNeuroPy.models import BGM
 from CompNeuroPy import Monitors, create_dir
 import numpy as np
 from hyperopt import fmin, tpe, hp, STATUS_OK
+import json
 
 ### local
 from parameters import parameters_fit_pallido_striatal as paramsS
@@ -61,6 +63,8 @@ def set_parameters(parameter_list):
 
 
 def create_and_start_monitors():
+    ### first remove all previous monitors
+    clear_monitors()
     mon_control_list = []
     mon_dd_list = []
     for model_idx in range(paramsS["nbr_models"]):
@@ -183,10 +187,11 @@ def exp_loss(x, mu, sig):
     return 1 - np.exp(-((x - mu) ** 2) / sig**2)
 
 
-def simulate_and_return_loss(parameter_list, return_results=False):
+def simulate_and_return_loss(parameter_list):
     """
     called multiple times during fitting
     """
+    parameter_list = [parameter_list[0], 0, 0, 0, 0, 0, 0, 0, 0]
     ### reset model/paramters
     reset()
     ### set parameters
@@ -200,17 +205,30 @@ def simulate_and_return_loss(parameter_list, return_results=False):
     ### calculate and return loss
     loss = get_loss(results_dict)
     ### store params and loss in txt file
-    with open("results/fit_pallido_striatal/loss_results.txt", "a") as f:
-        print("\t".join(np.array(parameter_list).astype(str)) + f"\t{loss}", file=f)
+    with open("results/fit_pallido_striatal/fit_results.json", "a") as f:
+        json.dump(
+            {
+                "parameter_list": parameter_list,
+                "loss": loss,
+                "results_dict": results_dict,
+            },
+            f,
+        )
+    f.close()
+    return {"status": STATUS_OK, "loss": loss}
 
-    if return_results:
-        return {"status": STATUS_OK, "loss": loss, "results": results_dict}
-    else:
-        return {"status": STATUS_OK, "loss": loss}
+
+def clear_monitors():
+    _network[0]["monitors"] = []
 
 
 if __name__ == "__main__":
     create_dir("results/fit_pallido_striatal/", clear=True)
+
+    ### create file to store results
+    with open("results/fit_pallido_striatal/fit_results.json", "w") as f:
+        pass
+    f.close()
 
     ### SETUP TIMESTEP + SEED
     if paramsS["seed"] == None:
@@ -245,25 +263,14 @@ if __name__ == "__main__":
     model_dd_list[-1].compile()
 
     ### OPTIMIZE ###
-    parameter_bound_dict = {
-        "str_d2.increase_noise": [12, 120],
-        "str_fsi.increase_noise": [0.5, 5],
-        "gpe_arky.increase_noise": [0.13, 1.3],
-        "str_d2__gpe_arky.mod_factor": [0, 1],
-        "str_d2__str_d2.mod_factor": [0, 1],
-        "gpe_arky__str_fsi.mod_factor": [0, 1],
-        "gpe_arky__gpe_arky.mod_factor": [0, 1],
-        "str_fsi__str_d2.mod_factor": [0, 1],
-        "str_fsi__str_fsi.mod_factor": [0, 1],
-    }
-
     fit_space = [
-        hp.uniform(key, parameter_bound_dict[key][0], parameter_bound_dict[key][1])
-        for key in parameter_bound_dict.keys()
+        hp.uniform(
+            key,
+            paramsS["parameter_bound_dict"][key][0],
+            paramsS["parameter_bound_dict"][key][1],
+        )
+        for key in paramsS["parameter_bound_dict"].keys()
     ]
-
-    with open("results/fit_pallido_striatal/loss_results.txt", "w") as f:
-        print("\t".join(list(parameter_bound_dict.keys())) + "\tloss", file=f)
 
     best = fmin(
         fn=simulate_and_return_loss,
