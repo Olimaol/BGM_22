@@ -73,12 +73,12 @@ parameters_fit_pallido_striatal["nbr_fit_runs"] = 10
 parameters_fit_pallido_striatal["parameter_bound_dict"] = {
     "str_d2.increase_noise": [8, 14],
     "str_fsi.increase_noise": [0.5, 5],
-    "gpe_arky.increase_noise": 0,  # [0.13, 1.3],
+    "gpe_arky.increase_noise": [0.13, 1.3],
     "str_d2__gpe_arky.mod_factor": 0,  # [0, 1],
     "str_d2__str_d2.mod_factor": 0,  # [0, 1],
     "gpe_arky__str_fsi.mod_factor": 0,  # [0, 1],
     "gpe_arky__gpe_arky.mod_factor": 0,  # [0, 1],
-    "str_fsi__str_d2.mod_factor": [0, 1],
+    "str_fsi__str_d2.mod_factor": 0,  # [0, 1],
     "str_fsi__str_fsi.mod_factor": 0,  # [0, 1],
     "general.str_d2_factor": 1,  # [0, 1],
 }

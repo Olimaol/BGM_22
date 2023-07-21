@@ -6,7 +6,6 @@ from ANNarchy import (
     set_seed,
     get_population,
 )
-from ANNarchy.core.Global import _network
 from CompNeuroPy.models import BGM
 from CompNeuroPy import Monitors, create_dir
 import numpy as np
@@ -17,7 +16,7 @@ import json
 from parameters import parameters_fit_pallido_striatal as paramsS
 
 
-def set_parameters(parameter_dict):
+def set_parameters(parameter_dict, model_dd_list):
     for param_key, param_val in parameter_dict.items():
         compartment, param_name = param_key.split(".")
         if compartment == "general":
@@ -43,9 +42,7 @@ def set_parameters(parameter_dict):
                 )
 
 
-def create_and_start_monitors():
-    ### first remove all previous monitors
-    clear_monitors()
+def create_monitors(model_dd_list):
     dd_name_appendix_list = []
     for model_idx in range(paramsS["nbr_models"]):
         dd_name_appendix_list.append(model_dd_list[model_idx].name_appendix)
@@ -56,12 +53,12 @@ def create_and_start_monitors():
         for dd_name_appendix in dd_name_appendix_list
     }
     mon = Monitors(mon_dict)
-    mon.start()
+
     return mon
 
 
-def get_results(mon):
-    recordings = mon.get_recordings()
+def get_results(mon, model_dd_list):
+    recordings = mon.get_recordings_and_clear()
 
     ### mean firing rates
     firing_rate_dict = {}
@@ -144,7 +141,7 @@ def exp_loss(x, mu, sig):
     return 1 - np.exp(-((x - mu) ** 2) / sig**2)
 
 
-def dd_to_control(a, b):
+def dd_to_control(a, b, model_dd_list):
     """
     cut synapses in str_fsi__str_d2 and decrease str_d2 input
     a: modulation of increase_noise in str_d2
@@ -175,13 +172,14 @@ def dd_to_control(a, b):
             proj[post.astype(tuple)].prune_synapse(pre.astype(tuple))
 
 
-def do_simulation(mon, parameter_dict):
+def do_simulation(mon, parameter_dict, model_dd_list):
+    mon.start()
     ### simulate dd models
     ### reset model/paramters
     set_seed(paramsS["seed"])
     mon.reset(synapses=True, projections=True)
     ### set parameters
-    set_parameters(parameter_dict)
+    set_parameters(parameter_dict, model_dd_list)
     ### simulate
     # print_dendrites()
     simulate(paramsS["t.duration"])
@@ -191,15 +189,23 @@ def do_simulation(mon, parameter_dict):
     set_seed(paramsS["seed"])
     mon.reset(synapses=True, projections=True)
     ### set parameters
-    set_parameters(parameter_dict)
+    set_parameters(parameter_dict, model_dd_list)
     ### transform dd models into control models
-    dd_to_control(a=parameter_dict["general.str_d2_factor"], b=1)
+    dd_to_control(
+        a=parameter_dict["general.str_d2_factor"], b=0.5, model_dd_list=model_dd_list
+    )
     ### simulate
     # print_dendrites()
     simulate(paramsS["t.duration"])
 
 
 def get_parameter_dict(parameter_list):
+    if isinstance(parameter_list, list):
+        parameter_list = np.array(parameter_list).astype(float)
+    elif isinstance(parameter_list, tuple):
+        pass
+    else:
+        parameter_list = parameter_list.astype(float)
     parameter_dict = {}
     parameter_list_idx = 0
     for key in paramsS["parameter_bound_dict"].keys():
@@ -211,18 +217,18 @@ def get_parameter_dict(parameter_list):
     return parameter_dict
 
 
-def simulate_and_return_loss(parameter_list, return_results=False):
+def simulate_and_return_loss(
+    parameter_list, return_results=False, mon=None, model_dd_list=None
+):
     """
     called multiple times during fitting
     """
     ### get parameter dict
     parameter_dict = get_parameter_dict(parameter_list)
-    ### create and start monitors
-    mon = create_and_start_monitors()
     ### do simulateion
-    do_simulation(mon, parameter_dict)
+    do_simulation(mon, parameter_dict, model_dd_list)
     ### get results
-    results_dict = get_results(mon)
+    results_dict = get_results(mon, model_dd_list)
     ### calculate and return loss
     loss = get_loss(results_dict)
     ### store params and loss in txt file
@@ -250,11 +256,7 @@ def simulate_and_return_loss(parameter_list, return_results=False):
         }
 
 
-def clear_monitors():
-    _network[0]["monitors"] = []
-
-
-def print_dendrites():
+def print_dendrites(model_dd_list):
     ### TEST: PRINT DENDRITE SIZES
     for model_idx in range(paramsS["nbr_models"]):
         n1 = 0
@@ -292,15 +294,7 @@ def get_fit_space():
     return fit_space
 
 
-if __name__ == "__main__":
-    create_dir("results/fit_pallido_striatal/", clear=True)
-
-    ### create file to store results
-    with open("results/fit_pallido_striatal/fit_results.json", "w") as f:
-        pass
-    f.close()
-
-    ### SETUP TIMESTEP + SEED
+def setup_ANNarchy():
     if paramsS["seed"] == None:
         setup(
             dt=paramsS["timestep"],
@@ -315,8 +309,8 @@ if __name__ == "__main__":
             structural_plasticity=True,
         )
 
-    ### COMPILE MODELS
-    model_control_list = []
+
+def compile_models():
     model_dd_list = []
     for model_idx in range(paramsS["nbr_models"]):
         model_dd_list.append(
@@ -329,29 +323,32 @@ if __name__ == "__main__":
         )
     model_dd_list[-1].compile()
 
-    ### OPTIMIZE ###
-    # fit_space = get_fit_space()
+    return model_dd_list
 
-    # best = fmin(
-    #     fn=simulate_and_return_loss,
-    #     space=fit_space,
-    #     algo=tpe.suggest,
-    #     max_evals=paramsS["nbr_fit_runs"],
-    # )
 
-    param_list = [13, 0, 0]
-    result = simulate_and_return_loss(param_list, return_results=True)
-    print("only str_d2 active")
-    print(result["parameter_dict"])
-    print(result["results_dict"], "\n")
-    param_list = [13, 1.5, 0]
-    result = simulate_and_return_loss(param_list, return_results=True)
-    print("also str_fsi active, weight is zero")
-    print(result["parameter_dict"])
-    print(result["results_dict"], "\n")
-    param_list = [13, 1.5, 1]
-    result = simulate_and_return_loss(param_list, return_results=True)
-    print("now also with weight >0 --> str_fsi inhibits str_d2")
-    print("in control all synapses are pruned --> there should be no input to str_d2")
-    print(result["parameter_dict"])
-    print(result["results_dict"], "\n")
+if __name__ == "__main__":
+    create_dir("results/fit_pallido_striatal/", clear=True)
+
+    ### create file to store results
+    with open("results/fit_pallido_striatal/fit_results.json", "w") as f:
+        pass
+    f.close()
+
+    ### SETUP TIMESTEP + SEED
+    setup_ANNarchy()
+
+    ### COMPILE MODELS
+    model_dd_list = compile_models()
+
+    ### create monitors
+    mon = create_monitors(model_dd_list)
+
+    ## OPTIMIZE ###
+    fit_space = get_fit_space()
+
+    best = fmin(
+        fn=lambda x: simulate_and_return_loss(x, mon=mon, model_dd_list=model_dd_list),
+        space=fit_space,
+        algo=tpe.suggest,
+        max_evals=paramsS["nbr_fit_runs"],
+    )
