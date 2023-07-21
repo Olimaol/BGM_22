@@ -156,12 +156,13 @@ def dd_to_control(a, b, model_dd_list):
         ### prune synapses
         rng = np.random.default_rng(paramsS["seed"])
         proj = get_projection(f"str_fsi__str_d2{name_appendix}")
-        synapses_ranks_list = []
+
+        weights = proj.w
         ### get ranks of all synapses
-        for post in proj.post_ranks:
-            pre_rank_list = proj[post].pre_ranks
-            for pre in pre_rank_list:
-                synapses_ranks_list.append([post, pre])
+        synapses_ranks_list = []
+        for post_idx, post in enumerate(weights):
+            for pre_idx, pre in enumerate(post):
+                synapses_ranks_list.append([post_idx, pre_idx])
         ### create a mask which only contains a subset of the synapses which should be pruned
         nbr_synapses_to_prune = np.round(len(synapses_ranks_list) * b).astype(int)
         mask_to_prune = np.zeros(len(synapses_ranks_list))
@@ -169,7 +170,8 @@ def dd_to_control(a, b, model_dd_list):
         rng.shuffle(mask_to_prune)
         ### prune the subset of synapses
         for post, pre in np.array(synapses_ranks_list)[mask_to_prune.astype(bool)]:
-            proj[post.astype(tuple)].prune_synapse(pre.astype(tuple))
+            weights[post][pre] = 0.0
+        proj.w = weights
 
 
 def do_simulation(mon, parameter_dict, model_dd_list):
