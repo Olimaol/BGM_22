@@ -10,3 +10,5 @@ numpy_results/
 output_file.txt
 loss_results.txt
 *.json
+*dataRaw/
+*.~lock*

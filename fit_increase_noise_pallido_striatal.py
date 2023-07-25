@@ -1,95 +1,26 @@
-from ANNarchy import (
-    setup,
-    simulate,
-    raster_plot,
-    get_projection,
-    set_seed,
-    get_population,
-)
-from ANNarchy.core.Global import _network
-from CompNeuroPy.models import BGM
-from CompNeuroPy import Monitors, create_dir
+from CompNeuroPy import create_dir
 import numpy as np
-from hyperopt import fmin, tpe, hp, STATUS_OK
+from tqdm import tqdm
 import json
+import matplotlib.pyplot as plt
 
 ### local
-from parameters import parameters_fit_pallido_striatal as paramsS
+from fit_hyperopt_pallido_striatal import (
+    create_monitors,
+    simulate_and_return_loss,
+    setup_ANNarchy,
+    compile_models,
+    paramsS,
+)
 
 
-def set_parameters(parameter_dict):
-    for param_key, param_val in parameter_dict.items():
-        compartment, param_name = param_key.split(".")
-        if compartment == "general":
-            continue
-        population_list = compartment.split("__")
-        if len(population_list) == 1:
-            ### compartment only population
-            for model_idx in range(paramsS["nbr_models"]):
-                model_dd_list[model_idx].set_param(
-                    compartment=population_list[0]
-                    + model_dd_list[model_idx].name_appendix,
-                    parameter_name=param_name,
-                    parameter_value=param_val,
-                )
-        else:
-            ### compartment is a projection
-            for model_idx in range(paramsS["nbr_models"]):
-                model_dd_list[model_idx].set_param(
-                    compartment=f"{population_list[0]}__{population_list[1]}"
-                    + model_dd_list[model_idx].name_appendix,
-                    parameter_name=param_name,
-                    parameter_value=param_val,
-                )
-
-
-def create_and_start_monitors():
-    ### first remove all previous monitors
-    clear_monitors()
-    dd_name_appendix_list = []
-    for model_idx in range(paramsS["nbr_models"]):
-        dd_name_appendix_list.append(model_dd_list[model_idx].name_appendix)
-
-    mon_dict = {
-        f"pop;{pop_name}{dd_name_appendix}": ["spike"]
-        for pop_name in ["str_d2", "str_fsi", "gpe_arky"]
-        for dd_name_appendix in dd_name_appendix_list
-    }
-    mon = Monitors(mon_dict)
-    mon.start()
-    return mon
-
-
-def get_results(mon):
-    recordings = mon.get_recordings()
-
-    ### mean firing rates
-    firing_rate_dict = {}
-    for pop_name in ["str_d2", "str_fsi", "gpe_arky"]:
-        for model_version_idx, model_version in enumerate(["dd", "control"]):
-            firing_rate_dict[f"{pop_name}__{model_version}"] = []
-            for model_idx in range(paramsS["nbr_models"]):
-                # get spike dict
-                spike_dict = recordings[model_version_idx][
-                    f"{pop_name}{model_dd_list[model_idx].name_appendix};spike"
-                ]
-                t, _ = raster_plot(spike_dict)
-                # calculate firing rate
-                nbr_of_spikes = len(t)
-                nbr_of_neurons = len(spike_dict)
-                firing_rate_dict[f"{pop_name}__{model_version}"].append(
-                    nbr_of_spikes / (nbr_of_neurons * (paramsS["t.duration"] / 1000))
-                )  # in Hz
-    mean_firing_rate_dict = {
-        key: np.mean(firing_rate_dict[key]) for key in firing_rate_dict.keys()
-    }
-
-    return {"mean_firing_rate_dict": mean_firing_rate_dict}
-
-
-def get_loss(results_dict):
-    ### target:
-    ### firing rates
+def get_I_0(mode):
+    ### parameters
+    pop_list = ["str_d2", "str_fsi", "gpe_arky"]
+    alpha_0 = 0.1
+    tolerance = 0.02
+    momentum = 0
+    n_iter_max = 60
     mean_firing_rate_dict_target = {
         "str_d2__control": 2,  # [2, 0.24],
         "str_d2__dd": 5,  # [5, 0.63],
@@ -98,198 +29,310 @@ def get_loss(results_dict):
         "str_fsi__control": 21.4,  # [21.4, 0.75],
         "str_fsi__dd": 23.7,  # [23.7, 0.69],
     }
-    ### differences
-    diff_dict_target = {
-        pop: mean_firing_rate_dict_target[f"{pop}__dd"]
-        - mean_firing_rate_dict_target[f"{pop}__control"]
-        for pop in ["str_d2", "gpe_arky", "str_fsi"]
-    }
-    ### is:
-    ### firing rates
-    mean_firing_rate_dict = results_dict["mean_firing_rate_dict"]
-    ### differences
-    diff_dict = {
-        pop: mean_firing_rate_dict[f"{pop}__dd"]
-        - mean_firing_rate_dict[f"{pop}__control"]
-        for pop in ["str_d2", "gpe_arky", "str_fsi"]
-    }
-    ### loss calculation
-    ### firing rates control loss
-    loss_firing_rates_control = np.mean(
-        [
-            exp_loss(
-                mean_firing_rate_dict[key],
-                mean_firing_rate_dict_target[key],
-                mean_firing_rate_dict_target[key],
-            )
-            for key in ["str_d2__control", "gpe_arky__control", "str_fsi__control"]
-        ]
+
+    pbar = tqdm(range(n_iter_max))
+    param_arr = np.array([1, 1, 1])
+    alpha = np.ones(len(param_arr)) * alpha_0
+    alpha_0 = alpha.copy()
+
+    target = np.array(
+        [mean_firing_rate_dict_target[f"{pop}__{mode}"] for pop in pop_list]
     )
-    ### differences loss
-    loss_firing_rate_diffs = np.mean(
-        [
-            exp_loss(
-                diff_dict[key],
-                diff_dict_target[key],
-                np.abs(diff_dict_target[key]),
+    ### iteration loop to find paramters with target firing rates
+    diff = 0
+    error = np.zeros(len(param_arr))
+    print(target)
+    optimization_values_param_list = []
+    optimization_values_ist_list = []
+    for _ in pbar:
+        result = simulate_and_return_loss(
+            [param_arr[0], param_arr[1], param_arr[2], 0, 0, 0, 0, 0, 0, 1],
+            return_results=True,
+            mon=mon,
+            model_dd_list=model_dd_list,
+            only_simulate=mode,
+            dump=False,
+        )
+
+        ist = np.array(
+            [
+                result["results_dict"]["mean_firing_rate_dict"][f"{pop}__{mode}"][0]
+                for pop in pop_list
+            ]
+        )
+
+        optimization_values_param_list.append(param_arr)
+        optimization_values_ist_list.append(ist)
+        ### if sign of error changed --> went over the target --> reduce alpha
+        new_error = target - ist
+        decrease_alpha_mask_0 = (error * new_error < 0).astype(bool)
+        alpha[decrease_alpha_mask_0] = alpha[decrease_alpha_mask_0] / 2
+        ### also decrease alpha if relative change of error ist too large or even positive
+        sign_error = np.sign(error)
+        sign_error[sign_error == 0] = 1
+        sign_error = sign_error * 1e-20
+        error = error + sign_error
+        d_error_rel = (new_error - error) / error
+        decrease_alpha_mask_1 = (
+            (d_error_rel < -0.1).astype(int) + (d_error_rel > 0).astype(int)
+        ) > 0
+        alpha[decrease_alpha_mask_1] = alpha[decrease_alpha_mask_1] / 2
+        alpha_0[decrease_alpha_mask_1] = alpha_0[decrease_alpha_mask_1] / 2
+        alpha[np.logical_not(decrease_alpha_mask_1)] = (
+            alpha[np.logical_not(decrease_alpha_mask_1)] * 2
+        )
+        alpha_0[np.logical_not(decrease_alpha_mask_1)] = (
+            alpha_0[np.logical_not(decrease_alpha_mask_1)] * 2
+        )
+        ### increase learning speed if correct direction but very small
+        too_small_change = tolerance * target / 2
+        mask_faster = (
+            (np.abs(new_error - error) < too_small_change).astype(int)
+            * (d_error_rel < 0).astype(int)
+        ).astype(bool)
+        alpha_0[mask_faster] = alpha_0[mask_faster] * 1.5
+        alpha[mask_faster] = alpha[mask_faster] * 1.5
+        ### all alphas not decerased --> go to alpha_0
+        all_decrease_alpha_mask = (
+            decrease_alpha_mask_0.astype(int) + decrease_alpha_mask_1.astype(int)
+        ) > 0
+        alpha[np.logical_not(all_decrease_alpha_mask)] = (
+            alpha[np.logical_not(all_decrease_alpha_mask)]
+            + (
+                alpha_0[np.logical_not(all_decrease_alpha_mask)]
+                - alpha[np.logical_not(all_decrease_alpha_mask)]
             )
-            for key in diff_dict.keys()
-        ]
-    )
-
-    return loss_firing_rates_control + loss_firing_rate_diffs
-
-
-def exp_loss(x, mu, sig):
-    return 1 - np.exp(-((x - mu) ** 2) / sig**2)
-
-
-def dd_to_control(a, b):
-    """
-    cut synapses in str_fsi__str_d2 and decrease str_d2 input
-    a: modulation of increase_noise in str_d2
-    b: prune probability (zero means no synapses are pruned, 1 means all synapses are pruned)
-    """
-    for model_idx in range(paramsS["nbr_models"]):
-        name_appendix = model_dd_list[model_idx].name_appendix
-        ### decrease str_d2 input
-        get_population(f"str_d2{name_appendix}").increase_noise = (
-            a * get_population(f"str_d2{name_appendix}").increase_noise
+            * 0.1
         )
-        ### prune synapses
-        rng = np.random.default_rng(paramsS["seed"])
-        proj = get_projection(f"str_fsi__str_d2{name_appendix}")
-        synapses_ranks_list = []
-        ### get ranks of all synapses
-        for post in proj.post_ranks:
-            pre_rank_list = proj[post].pre_ranks
-            for pre in pre_rank_list:
-                synapses_ranks_list.append([post, pre])
-        ### create a mask which only contains a subset of the synapses which should be pruned
-        nbr_synapses_to_prune = np.round(len(synapses_ranks_list) * b).astype(int)
-        mask_to_prune = np.zeros(len(synapses_ranks_list))
-        mask_to_prune[:nbr_synapses_to_prune] = 1
-        rng.shuffle(mask_to_prune)
-        ### prune the subset of synapses
-        for post, pre in np.array(synapses_ranks_list)[mask_to_prune.astype(bool)]:
-            proj[post.astype(tuple)].prune_synapse(pre.astype(tuple))
 
+        # print("DO RUN")
+        # print(f"{'param_arr':<15}: {np.round(param_arr,2)}")
+        # print(f"{'ist':<15}: {np.round(ist,2)}")
+        # print(f"{'target':<15}: {np.round(target,2)}")
+        # print(f"{'alpha:':<15}: {np.round(alpha,2)}")
+        ### update params depending on error
+        error = target - ist
+        # print(f"{'error':15}: {np.round(error,2)}")
+        # print(f"{'d_error_rel':<15}: {np.round(d_error_rel,2)}")
+        diff = momentum * diff + alpha * error
+        # print(f"{'diff':<15}: {np.round(diff,2)}")
+        param_arr_prev = param_arr.copy()
+        # print(f"{'param_arr_prev':<15}: {np.round(param_arr_prev,2)}")
+        param_arr = np.clip(param_arr + diff, 0, None)
+        diff = param_arr - param_arr_prev
+        # print(f"{'param_arr':<15}: {np.round(param_arr,2)}")
+        # print(f"{'diff':<15}: {np.round(param_arr,2)}")
+        # print("FIN")
+        ### if error is very small --> break
+        if (np.absolute(error) / target < tolerance).all():
+            break
+        ### progress bar info
+        pbar.set_description(f"{ist}")
+    ### plot of fitting rung
+    plt.figure(dpi=300)
+    plt.subplot(211)
+    plt.plot(np.array(optimization_values_ist_list))
+    plt.subplot(212)
+    plt.plot(np.array(optimization_values_param_list))
+    plt.tight_layout()
+    plt.savefig(f"results/fit_pallido_striatal/opt_run_{mode}.png")
 
-def do_simulation(mon, parameter_dict):
-    ### simulate dd models
-    ### reset model/paramters
-    set_seed(paramsS["seed"])
-    mon.reset(synapses=True, projections=True)
-    ### set parameters
-    set_parameters(parameter_dict)
-    ### simulate
-    # print_dendrites()
-    simulate(paramsS["t.duration"])
+    I_0 = {pop_list[idx]: param_arr[idx] for idx in range(len(param_arr))}
 
-    ### simulate control models
-    ### reset model/paramters
-    set_seed(paramsS["seed"])
-    mon.reset(synapses=True, projections=True)
-    ### set parameters
-    set_parameters(parameter_dict)
-    ### transform dd models into control models
-    dd_to_control(a=parameter_dict["general.str_d2_factor"], b=1)
-    ### simulate
-    # print_dendrites()
-    simulate(paramsS["t.duration"])
-
-
-def get_parameter_dict(parameter_list):
-    parameter_dict = {}
-    parameter_list_idx = 0
-    for key in paramsS["parameter_bound_dict"].keys():
-        if isinstance(paramsS["parameter_bound_dict"][key], list):
-            parameter_dict[key] = parameter_list[parameter_list_idx]
-            parameter_list_idx += 1
-        else:
-            parameter_dict[key] = paramsS["parameter_bound_dict"][key]
-    return parameter_dict
-
-
-def simulate_and_return_loss(parameter_list, return_results=False):
-    """
-    called multiple times during fitting
-    """
-    ### get parameter dict
-    parameter_dict = get_parameter_dict(parameter_list)
-    ### create and start monitors
-    mon = create_and_start_monitors()
-    ### do simulateion
-    do_simulation(mon, parameter_dict)
-    ### get results
-    results_dict = get_results(mon)
-    ### calculate and return loss
-    loss = get_loss(results_dict)
-    ### store params and loss in txt file
-    with open("results/fit_pallido_striatal/fit_results.json", "a") as f:
-        json.dump(
-            {
-                "parameter_dict": parameter_dict,
-                "loss": loss,
-                "results_dict": results_dict,
-            },
-            f,
-        )
+    with open(f"results/fit_pallido_striatal/I_0_{mode}.json", "w") as f:
+        json.dump(I_0, f)
     f.close()
-    if return_results:
-        return {
-            "status": STATUS_OK,
-            "loss": loss,
-            "parameter_dict": parameter_dict,
-            "results_dict": results_dict,
-        }
-    else:
-        return {
-            "status": STATUS_OK,
-            "loss": loss,
-        }
+
+    return I_0
 
 
-def clear_monitors():
-    _network[0]["monitors"] = []
+def get_I_lat_inp(mode, I_0):
+    ### parameters
+    alpha_0 = 0.1
+    tolerance = 0.02
+    momentum = 0
+    n_iter_max = 60
+    mean_firing_rate_dict_target = {
+        "str_d2__control": 2,  # [2, 0.24],
+        "str_d2__dd": 5,  # [5, 0.63],
+        "gpe_arky__control": 24.5,  # [24.5, 1.14],
+        "gpe_arky__dd": 18.9,  # [18.9, 0.87],
+        "str_fsi__control": 21.4,  # [21.4, 0.75],
+        "str_fsi__dd": 23.7,  # [23.7, 0.69],
+    }
 
+    pop_list = ["gpe_arky"]  # ["str_d2", "str_fsi", "gpe_arky"]
+    ### list with lateral mod_factors
+    lat_list = [
+        0.1,
+        2,
+    ]  # np.array([(idx_lat_list + 1) * 0.1 for idx_lat_list in range(31)])
+    ### list with input mod_factors
+    inp_list = [
+        0.1,
+        2,
+    ]  # np.array([(idx_inp_list + 1) * 0.1 for idx_inp_list in range(31)])
+    I = {}
+    global_idx = 0
+    for pop in pop_list:
+        I[pop] = []
+        I[pop].append([0, 0, I_0[mode][pop]])
+        for lat in lat_list:
+            for inp in inp_list:
+                pbar = tqdm(range(n_iter_max))
+                ### get start value
+                I_entry_loss = np.zeros(len(I[pop]))
+                I_entry_arr = np.zeros(len(I[pop]))
+                for I_entry_idx, I_entry in enumerate(I[pop]):
+                    I_entry_loss[I_entry_idx] = abs(I_entry[0] - lat) + abs(
+                        I_entry[1] - inp
+                    )
+                    I_entry_arr[I_entry_idx] = I_entry[2]
+                param_start_value = I_entry_arr[np.argmin(I_entry_loss)]
+                param_arr = np.array([param_start_value])
+                alpha = np.ones(len(param_arr)) * alpha_0
 
-def print_dendrites():
-    ### TEST: PRINT DENDRITE SIZES
-    for model_idx in range(paramsS["nbr_models"]):
-        n1 = 0
-        n2 = 0
-        n3 = 0
-        for n_post in get_projection(
-            f"str_fsi__str_d2{model_dd_list[model_idx].name_appendix}"
-        ):
-            n1 += len(n_post.pre_ranks)
-        for n_post in get_projection(
-            f"str_d2__gpe_arky{model_dd_list[model_idx].name_appendix}"
-        ):
-            n2 += len(n_post.pre_ranks)
-        for n_post in get_projection(
-            f"gpe_arky__str_fsi{model_dd_list[model_idx].name_appendix}"
-        ):
-            n3 += len(n_post.pre_ranks)
+                target = np.array([mean_firing_rate_dict_target[f"{pop}__{mode}"]])
+                ### iteration loop to find paramter with target firing rate
+                diff = 0
+                error = np.zeros(len(param_arr))
+                print(target)
+                optimization_values_param_list = []
+                optimization_values_ist_list = []
+                for opt_run in pbar:
+                    parameter_dict = {}
+                    for key in paramsS["parameter_bound_dict"]:
+                        compartment, param_name = key.split(".")
+                        if pop == compartment:
+                            ### parameter of population varied
+                            parameter_dict[key] = param_arr[0]
+                        elif (
+                            "str_d2" == compartment
+                            or "str_fsi" == compartment
+                            or "gpe_arky" == compartment
+                        ):
+                            ### parameter of other populations
+                            parameter_dict[key] = I_0[mode][compartment]
+                        elif compartment == "general":
+                            parameter_dict[key] = 1
+                        elif len(compartment.split("__")) > 0:
+                            if compartment.split("__")[1] == pop:
+                                ### input projections of population varied
+                                if compartment.split("__")[0] == pop:
+                                    ### lateral projection
+                                    parameter_dict[key] = lat
+                                else:
+                                    ### input projection
+                                    parameter_dict[key] = inp
+                            else:
+                                ### other projections
+                                parameter_dict[key] = 0
+                        else:
+                            parameter_dict[key] = 0
 
-        print(
-            f"model {model_idx}:\t str_fsi__str_d2 = {n1},\t str_d2__gpe_arky = {n2},\t gpe_arky__str_fsi = {n3}"
-        )
+                    result = simulate_and_return_loss(
+                        list(parameter_dict.values()),
+                        return_results=True,
+                        mon=mon,
+                        model_dd_list=model_dd_list,
+                        only_simulate=mode,
+                        dump=False,
+                    )
 
+                    ist = np.array(
+                        [
+                            result["results_dict"]["mean_firing_rate_dict"][
+                                f"{pop}__{mode}"
+                            ][0]
+                        ]
+                    )
 
-def get_fit_space():
-    fit_space = []
-    for key in paramsS["parameter_bound_dict"].keys():
-        if isinstance(paramsS["parameter_bound_dict"][key], list):
-            fit_space.append(
-                hp.uniform(
-                    key,
-                    paramsS["parameter_bound_dict"][key][0],
-                    paramsS["parameter_bound_dict"][key][1],
+                    optimization_values_param_list.append(param_arr)
+                    optimization_values_ist_list.append(ist)
+                    ### if sign of error changed --> went over the target --> reduce alpha
+                    new_error = target - ist
+                    decrease_alpha_mask_0 = (error * new_error < 0).astype(bool)
+                    if decrease_alpha_mask_0[0]:
+                        alpha = alpha / 2
+                    ### also decrease alpha if relative change of error ist too large or even positive
+                    sign_error = np.sign(error)
+                    sign_error[sign_error == 0] = 1
+                    sign_error = sign_error * 1e-20
+                    error = error + sign_error
+                    d_error_rel = (new_error - error) / error
+                    decrease_alpha_mask_1 = (
+                        (d_error_rel < -0.1).astype(int) + (d_error_rel > 0).astype(int)
+                    ) > 0
+                    if decrease_alpha_mask_1[0]:
+                        alpha = alpha / 2
+                        alpha_0 = alpha_0 / 2
+                    else:
+                        alpha = alpha * 2
+                        alpha_0 = alpha_0 * 2
+                    ### increase learning speed if correct direction but very small
+                    too_small_change = tolerance * target / 2
+                    mask_faster = (
+                        (np.abs(new_error - error) < too_small_change).astype(int)
+                        * (d_error_rel < 0).astype(int)
+                    ).astype(bool)
+                    if mask_faster[0]:
+                        alpha_0 = alpha_0 * 1.5
+                        alpha = alpha * 1.5
+                    ### all alphas not decerased --> go to alpha_0
+                    all_decrease_alpha_mask = (
+                        decrease_alpha_mask_0.astype(int)
+                        + decrease_alpha_mask_1.astype(int)
+                    ) > 0
+                    if not (all_decrease_alpha_mask):
+                        alpha = alpha + (alpha_0 - alpha) * 0.1
+
+                    # print("DO RUN")
+                    # print(f"{'param_arr':<15}: {np.round(param_arr,2)}")
+                    # print(f"{'ist':<15}: {np.round(ist,2)}")
+                    # print(f"{'target':<15}: {np.round(target,2)}")
+                    # print(f"{'alpha:':<15}: {np.round(alpha,2)}")
+                    ### update params depending on error
+                    error = target - ist
+                    # print(f"{'error':15}: {np.round(error,2)}")
+                    # print(f"{'d_error_rel':<15}: {np.round(d_error_rel,2)}")
+                    diff = momentum * diff + alpha * error
+                    # print(f"{'diff':<15}: {np.round(diff,2)}")
+                    param_arr_prev = param_arr.copy()
+                    # print(f"{'param_arr_prev':<15}: {np.round(param_arr_prev,2)}")
+                    param_arr = np.clip(param_arr + diff, 0, None)
+                    diff = param_arr - param_arr_prev
+                    # print(f"{'param_arr':<15}: {np.round(param_arr,2)}")
+                    # print(f"{'diff':<15}: {np.round(param_arr,2)}")
+                    # print("FIN")
+                    ### if error is very small --> break
+                    if (np.absolute(error) / target < tolerance).all():
+                        break
+                    ### progress bar info
+                    pbar.set_description(f"{ist}")
+                ### plot of fitting rung
+                plt.figure(dpi=300)
+                plt.subplot(211)
+                plt.plot(np.array(optimization_values_ist_list))
+                plt.subplot(212)
+                plt.plot(np.array(optimization_values_param_list))
+                plt.tight_layout()
+                plt.savefig(
+                    f"results/fit_pallido_striatal/opt_run_{mode}_{pop}_{lat}_{inp}.png"
                 )
-            )
-    return fit_space
+
+                I[pop].append([lat, inp, param_arr[0]])
+
+                with open(
+                    f"results/fit_pallido_striatal/I_lat_inp_{mode}.json", "w"
+                ) as f:
+                    json.dump(I, f)
+                f.close()
+
+                print(
+                    f"{global_idx}/{len(pop_list)*len(lat_list)*len(inp_list)} with {opt_run} runs"
+                )
+                global_idx += 1
+    return I
 
 
 if __name__ == "__main__":
@@ -301,57 +344,27 @@ if __name__ == "__main__":
     f.close()
 
     ### SETUP TIMESTEP + SEED
-    if paramsS["seed"] == None:
-        setup(
-            dt=paramsS["timestep"],
-            num_threads=paramsS["num_threads"],
-            structural_plasticity=True,
-        )
-    else:
-        setup(
-            dt=paramsS["timestep"],
-            seed=paramsS["seed"],
-            num_threads=paramsS["num_threads"],
-            structural_plasticity=True,
-        )
+    setup_ANNarchy()
 
     ### COMPILE MODELS
-    model_control_list = []
-    model_dd_list = []
-    for model_idx in range(paramsS["nbr_models"]):
-        model_dd_list.append(
-            BGM(
-                name="BGM_v04oliver_p03",
-                seed=paramsS["seed"],
-                do_compile=False,
-                name_appendix=f"dd_{model_idx}",
-            )
-        )
-    model_dd_list[-1].compile()
+    model_dd_list = compile_models()
 
-    ### OPTIMIZE ###
-    # fit_space = get_fit_space()
+    ### create monitors
+    mon = create_monitors(model_dd_list)
 
-    # best = fmin(
-    #     fn=simulate_and_return_loss,
-    #     space=fit_space,
-    #     algo=tpe.suggest,
-    #     max_evals=paramsS["nbr_fit_runs"],
-    # )
+    ## OPTIMIZE ###
+    ### get increase_noise values for lateral and input mod_factors = 0
+    I_0 = {
+        "control": get_I_0("control"),
+        "dd": get_I_0("dd"),
+    }
+    quit()
+    ### get increase_noise values for different lateral and input mod_factors
+    I_lat_inp = {
+        "control": get_I_lat_inp(mode="control", I_0=I_0),
+        "dd": get_I_lat_inp(mode="dd", I_0=I_0),
+    }
 
-    param_list = [13, 0, 0]
-    result = simulate_and_return_loss(param_list, return_results=True)
-    print("only str_d2 active")
-    print(result["parameter_dict"])
-    print(result["results_dict"], "\n")
-    param_list = [13, 1.5, 0]
-    result = simulate_and_return_loss(param_list, return_results=True)
-    print("also str_fsi active, weight is zero")
-    print(result["parameter_dict"])
-    print(result["results_dict"], "\n")
-    param_list = [13, 1.5, 1]
-    result = simulate_and_return_loss(param_list, return_results=True)
-    print("now also with weight >0 --> str_fsi inhibits str_d2")
-    print("in control all synapses are pruned --> there should be no input to str_d2")
-    print(result["parameter_dict"])
-    print(result["results_dict"], "\n")
+    with open("results/fit_pallido_striatal/I_lat_inp.json", "a") as f:
+        json.dump(I_lat_inp, f)
+    f.close()

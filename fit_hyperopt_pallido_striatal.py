@@ -6,7 +6,6 @@ from ANNarchy import (
     set_seed,
     get_population,
 )
-from ANNarchy.core.Global import _network
 from CompNeuroPy.models import BGM
 from CompNeuroPy import Monitors, create_dir
 import numpy as np
@@ -17,7 +16,7 @@ import json
 from parameters import parameters_fit_pallido_striatal as paramsS
 
 
-def set_parameters(parameter_dict):
+def set_parameters(parameter_dict, model_dd_list):
     for param_key, param_val in parameter_dict.items():
         compartment, param_name = param_key.split(".")
         if compartment == "general":
@@ -43,51 +42,88 @@ def set_parameters(parameter_dict):
                 )
 
 
-def create_and_start_monitors():
-    ### first remove all previous monitors
-    clear_monitors()
+def create_monitors(model_dd_list, analyze=False):
     dd_name_appendix_list = []
     for model_idx in range(paramsS["nbr_models"]):
         dd_name_appendix_list.append(model_dd_list[model_idx].name_appendix)
 
-    mon_dict = {
-        f"pop;{pop_name}{dd_name_appendix}": ["spike"]
-        for pop_name in ["str_d2", "str_fsi", "gpe_arky"]
-        for dd_name_appendix in dd_name_appendix_list
-    }
+    if analyze:
+        mon_dict = {
+            f"pop;{pop_name}{dd_name_appendix}": ["spike", "v", "u", "g_ampa", "g_gaba"]
+            for pop_name in ["str_d2", "str_fsi", "gpe_arky"]
+            for dd_name_appendix in dd_name_appendix_list
+        }
+    else:
+        mon_dict = {
+            f"pop;{pop_name}{dd_name_appendix}": ["spike"]
+            for pop_name in ["str_d2", "str_fsi", "gpe_arky"]
+            for dd_name_appendix in dd_name_appendix_list
+        }
     mon = Monitors(mon_dict)
-    mon.start()
+
     return mon
 
 
-def get_results(mon):
-    recordings = mon.get_recordings()
+def get_results(mon, model_dd_list, only_simulate, analyze):
+    recordings, recording_times = mon.get_recordings_and_clear()
 
     ### mean firing rates
     firing_rate_dict = {}
     for pop_name in ["str_d2", "str_fsi", "gpe_arky"]:
-        for model_version_idx, model_version in enumerate(["dd", "control"]):
-            firing_rate_dict[f"{pop_name}__{model_version}"] = []
+        if isinstance(only_simulate, str):
+            model_version_list = [only_simulate]
+        else:
+            model_version_list = ["dd", "control"]
+        for model_version_idx, model_version in enumerate(model_version_list):
+
+            firing_rate_dict[f"{pop_name}__{model_version}"] = np.zeros(
+                (
+                    paramsS["nbr_models"],
+                    recording_times.nr_periods(chunk=model_version_idx),
+                )
+            )
             for model_idx in range(paramsS["nbr_models"]):
                 # get spike dict
                 spike_dict = recordings[model_version_idx][
                     f"{pop_name}{model_dd_list[model_idx].name_appendix};spike"
                 ]
                 t, _ = raster_plot(spike_dict)
-                # calculate firing rate
-                nbr_of_spikes = len(t)
                 nbr_of_neurons = len(spike_dict)
-                firing_rate_dict[f"{pop_name}__{model_version}"].append(
-                    nbr_of_spikes / (nbr_of_neurons * (paramsS["t.duration"] / 1000))
-                )  # in Hz
+                ### calculate for each preiod in chunk the firing rate
+                for rec_period in range(
+                    recording_times.nr_periods(chunk=model_version_idx)
+                ):
+                    start_time, end_time = recording_times.time_lims(
+                        chunk=model_version_idx, period=rec_period
+                    )
+                    nbr_of_spikes = np.sum(
+                        (t > start_time).astype(int) * (t < end_time).astype(int)
+                    )
+                    firing_rate_dict[f"{pop_name}__{model_version}"][
+                        model_idx, rec_period
+                    ] = nbr_of_spikes / (
+                        nbr_of_neurons * ((end_time - start_time) / 1000)
+                    )  # in Hz
+    ### average over the models
+    ### what remains is an array with firing rates for each recording preiod
     mean_firing_rate_dict = {
-        key: np.mean(firing_rate_dict[key]) for key in firing_rate_dict.keys()
+        key: np.mean(firing_rate_dict[key], axis=0).tolist()
+        for key in firing_rate_dict.keys()
     }
 
-    return {"mean_firing_rate_dict": mean_firing_rate_dict}
+    if analyze:
+        return {
+            "mean_firing_rate_dict": mean_firing_rate_dict,
+            "recordings": recordings,
+            "recording_times": recording_times,
+        }
+    else:
+        return {"mean_firing_rate_dict": mean_firing_rate_dict}
 
 
-def get_loss(results_dict):
+def get_loss(results_dict, only_simulate):
+    if isinstance(only_simulate, str) or paramsS["simulation_protocol"] == "increase":
+        return 0
     ### target:
     ### firing rates
     mean_firing_rate_dict_target = {
@@ -109,8 +145,8 @@ def get_loss(results_dict):
     mean_firing_rate_dict = results_dict["mean_firing_rate_dict"]
     ### differences
     diff_dict = {
-        pop: mean_firing_rate_dict[f"{pop}__dd"]
-        - mean_firing_rate_dict[f"{pop}__control"]
+        pop: mean_firing_rate_dict[f"{pop}__dd"][0]
+        - mean_firing_rate_dict[f"{pop}__control"][0]
         for pop in ["str_d2", "gpe_arky", "str_fsi"]
     }
     ### loss calculation
@@ -118,7 +154,7 @@ def get_loss(results_dict):
     loss_firing_rates_control = np.mean(
         [
             exp_loss(
-                mean_firing_rate_dict[key],
+                mean_firing_rate_dict[key][0],
                 mean_firing_rate_dict_target[key],
                 mean_firing_rate_dict_target[key],
             )
@@ -144,7 +180,7 @@ def exp_loss(x, mu, sig):
     return 1 - np.exp(-((x - mu) ** 2) / sig**2)
 
 
-def dd_to_control(a, b):
+def dd_to_control(a, b, model_dd_list):
     """
     cut synapses in str_fsi__str_d2 and decrease str_d2 input
     a: modulation of increase_noise in str_d2
@@ -159,12 +195,13 @@ def dd_to_control(a, b):
         ### prune synapses
         rng = np.random.default_rng(paramsS["seed"])
         proj = get_projection(f"str_fsi__str_d2{name_appendix}")
-        synapses_ranks_list = []
+
+        weights = proj.w
         ### get ranks of all synapses
-        for post in proj.post_ranks:
-            pre_rank_list = proj[post].pre_ranks
-            for pre in pre_rank_list:
-                synapses_ranks_list.append([post, pre])
+        synapses_ranks_list = []
+        for post_idx, post in enumerate(weights):
+            for pre_idx, pre in enumerate(post):
+                synapses_ranks_list.append([post_idx, pre_idx])
         ### create a mask which only contains a subset of the synapses which should be pruned
         nbr_synapses_to_prune = np.round(len(synapses_ranks_list) * b).astype(int)
         mask_to_prune = np.zeros(len(synapses_ranks_list))
@@ -172,34 +209,92 @@ def dd_to_control(a, b):
         rng.shuffle(mask_to_prune)
         ### prune the subset of synapses
         for post, pre in np.array(synapses_ranks_list)[mask_to_prune.astype(bool)]:
-            proj[post.astype(tuple)].prune_synapse(pre.astype(tuple))
+            weights[post][pre] = 0.0
+        proj.w = weights
 
 
-def do_simulation(mon, parameter_dict):
-    ### simulate dd models
-    ### reset model/paramters
-    set_seed(paramsS["seed"])
-    mon.reset(synapses=True, projections=True)
-    ### set parameters
-    set_parameters(parameter_dict)
-    ### simulate
-    # print_dendrites()
-    simulate(paramsS["t.duration"])
+def which_simulation(model_dd_list, mon):
+    if paramsS["simulation_protocol"] == "resting":
+        simulate(paramsS["t.duration"])
 
-    ### simulate control models
-    ### reset model/paramters
-    set_seed(paramsS["seed"])
-    mon.reset(synapses=True, projections=True)
-    ### set parameters
-    set_parameters(parameter_dict)
-    ### transform dd models into control models
-    dd_to_control(a=parameter_dict["general.str_d2_factor"], b=1)
-    ### simulate
-    # print_dendrites()
-    simulate(paramsS["t.duration"])
+    if paramsS["simulation_protocol"] == "increase":
+        for n_it in range(paramsS["increase_iterations"]):
+            mon.start()
+            for model_idx in range(len(model_dd_list)):
+                for pop_name in ["gpe_arky"]:
+                    name_appendix = model_dd_list[model_idx].name_appendix
+                    get_population(f"{pop_name}{name_appendix}").increase_noise = (
+                        paramsS["increase_step"] * n_it
+                    )
+            simulate(paramsS["t.duration"])
+            mon.pause()
+
+
+def do_simulation(mon, parameter_dict, model_dd_list, only_simulate):
+    if not (isinstance(only_simulate, str)):
+        mon.start()
+        ### simulate dd models
+        ### reset model/paramters
+        set_seed(paramsS["seed"])
+        mon.reset(synapses=True, projections=True)
+        ### set parameters
+        set_parameters(parameter_dict, model_dd_list)
+        ### simulate
+        # print_dendrites()
+        which_simulation(model_dd_list, mon)
+
+        ### simulate control models
+        ### reset model/paramters
+        set_seed(paramsS["seed"])
+        mon.reset(synapses=True, projections=True)
+        ### set parameters
+        set_parameters(parameter_dict, model_dd_list)
+        ### transform dd models into control models
+        dd_to_control(
+            a=parameter_dict["general.str_d2_factor"],
+            b=0.5,
+            model_dd_list=model_dd_list,
+        )
+        ### simulate
+        # print_dendrites()
+        which_simulation(model_dd_list, mon)
+    elif only_simulate == "control":
+        mon.start()
+        ### simulate control models
+        ### reset model/paramters
+        set_seed(paramsS["seed"])
+        mon.reset(synapses=True, projections=True)
+        ### set parameters
+        set_parameters(parameter_dict, model_dd_list)
+        ### transform dd models into control models
+        dd_to_control(
+            a=parameter_dict["general.str_d2_factor"],
+            b=0.5,
+            model_dd_list=model_dd_list,
+        )
+        ### simulate
+        # print_dendrites()
+        which_simulation(model_dd_list, mon)
+    elif only_simulate == "dd":
+        mon.start()
+        ### simulate dd models
+        ### reset model/paramters
+        set_seed(paramsS["seed"])
+        mon.reset(synapses=True, projections=True)
+        ### set parameters
+        set_parameters(parameter_dict, model_dd_list)
+        ### simulate
+        # print_dendrites()
+        which_simulation(model_dd_list, mon)
 
 
 def get_parameter_dict(parameter_list):
+    if isinstance(parameter_list, list):
+        parameter_list = np.array(parameter_list).astype(float)
+    elif isinstance(parameter_list, tuple):
+        pass
+    else:
+        parameter_list = parameter_list.astype(float)
     parameter_dict = {}
     parameter_list_idx = 0
     for key in paramsS["parameter_bound_dict"].keys():
@@ -211,31 +306,38 @@ def get_parameter_dict(parameter_list):
     return parameter_dict
 
 
-def simulate_and_return_loss(parameter_list, return_results=False):
+def simulate_and_return_loss(
+    parameter_list,
+    return_results=False,
+    mon=None,
+    model_dd_list=None,
+    only_simulate=None,
+    dump=True,
+    analyze=False,
+):
     """
     called multiple times during fitting
     """
     ### get parameter dict
     parameter_dict = get_parameter_dict(parameter_list)
-    ### create and start monitors
-    mon = create_and_start_monitors()
     ### do simulateion
-    do_simulation(mon, parameter_dict)
+    do_simulation(mon, parameter_dict, model_dd_list, only_simulate)
     ### get results
-    results_dict = get_results(mon)
+    results_dict = get_results(mon, model_dd_list, only_simulate, analyze)
     ### calculate and return loss
-    loss = get_loss(results_dict)
+    loss = get_loss(results_dict, only_simulate)
     ### store params and loss in txt file
-    with open("results/fit_pallido_striatal/fit_results.json", "a") as f:
-        json.dump(
-            {
-                "parameter_dict": parameter_dict,
-                "loss": loss,
-                "results_dict": results_dict,
-            },
-            f,
-        )
-    f.close()
+    if dump:
+        with open("results/fit_pallido_striatal/fit_results.json", "a") as f:
+            json.dump(
+                {
+                    "parameter_dict": parameter_dict,
+                    "loss": loss,
+                    "mean_firing_rate_dict": results_dict["mean_firing_rate_dict"],
+                },
+                f,
+            )
+        f.close()
     if return_results:
         return {
             "status": STATUS_OK,
@@ -250,11 +352,7 @@ def simulate_and_return_loss(parameter_list, return_results=False):
         }
 
 
-def clear_monitors():
-    _network[0]["monitors"] = []
-
-
-def print_dendrites():
+def print_dendrites(model_dd_list):
     ### TEST: PRINT DENDRITE SIZES
     for model_idx in range(paramsS["nbr_models"]):
         n1 = 0
@@ -292,15 +390,7 @@ def get_fit_space():
     return fit_space
 
 
-if __name__ == "__main__":
-    create_dir("results/fit_pallido_striatal/", clear=True)
-
-    ### create file to store results
-    with open("results/fit_pallido_striatal/fit_results.json", "w") as f:
-        pass
-    f.close()
-
-    ### SETUP TIMESTEP + SEED
+def setup_ANNarchy():
     if paramsS["seed"] == None:
         setup(
             dt=paramsS["timestep"],
@@ -315,8 +405,8 @@ if __name__ == "__main__":
             structural_plasticity=True,
         )
 
-    ### COMPILE MODELS
-    model_control_list = []
+
+def compile_models():
     model_dd_list = []
     for model_idx in range(paramsS["nbr_models"]):
         model_dd_list.append(
@@ -329,29 +419,32 @@ if __name__ == "__main__":
         )
     model_dd_list[-1].compile()
 
-    ### OPTIMIZE ###
-    # fit_space = get_fit_space()
+    return model_dd_list
 
-    # best = fmin(
-    #     fn=simulate_and_return_loss,
-    #     space=fit_space,
-    #     algo=tpe.suggest,
-    #     max_evals=paramsS["nbr_fit_runs"],
-    # )
 
-    param_list = [13, 0, 0]
-    result = simulate_and_return_loss(param_list, return_results=True)
-    print("only str_d2 active")
-    print(result["parameter_dict"])
-    print(result["results_dict"], "\n")
-    param_list = [13, 1.5, 0]
-    result = simulate_and_return_loss(param_list, return_results=True)
-    print("also str_fsi active, weight is zero")
-    print(result["parameter_dict"])
-    print(result["results_dict"], "\n")
-    param_list = [13, 1.5, 1]
-    result = simulate_and_return_loss(param_list, return_results=True)
-    print("now also with weight >0 --> str_fsi inhibits str_d2")
-    print("in control all synapses are pruned --> there should be no input to str_d2")
-    print(result["parameter_dict"])
-    print(result["results_dict"], "\n")
+if __name__ == "__main__":
+    create_dir("results/fit_pallido_striatal/", clear=True)
+
+    ### create file to store results
+    with open("results/fit_pallido_striatal/fit_results.json", "w") as f:
+        pass
+    f.close()
+
+    ### SETUP TIMESTEP + SEED
+    setup_ANNarchy()
+
+    ### COMPILE MODELS
+    model_dd_list = compile_models()
+
+    ### create monitors
+    mon = create_monitors(model_dd_list)
+
+    ## OPTIMIZE ###
+    fit_space = get_fit_space()
+
+    best = fmin(
+        fn=lambda x: simulate_and_return_loss(x, mon=mon, model_dd_list=model_dd_list),
+        space=fit_space,
+        algo=tpe.suggest,
+        max_evals=paramsS["nbr_fit_runs"],
+    )
