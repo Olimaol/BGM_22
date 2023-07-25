@@ -42,49 +42,88 @@ def set_parameters(parameter_dict, model_dd_list):
                 )
 
 
-def create_monitors(model_dd_list):
+def create_monitors(model_dd_list, analyze=False):
     dd_name_appendix_list = []
     for model_idx in range(paramsS["nbr_models"]):
         dd_name_appendix_list.append(model_dd_list[model_idx].name_appendix)
 
-    mon_dict = {
-        f"pop;{pop_name}{dd_name_appendix}": ["spike"]
-        for pop_name in ["str_d2", "str_fsi", "gpe_arky"]
-        for dd_name_appendix in dd_name_appendix_list
-    }
+    if analyze:
+        mon_dict = {
+            f"pop;{pop_name}{dd_name_appendix}": ["spike", "v", "u", "g_ampa", "g_gaba"]
+            for pop_name in ["str_d2", "str_fsi", "gpe_arky"]
+            for dd_name_appendix in dd_name_appendix_list
+        }
+    else:
+        mon_dict = {
+            f"pop;{pop_name}{dd_name_appendix}": ["spike"]
+            for pop_name in ["str_d2", "str_fsi", "gpe_arky"]
+            for dd_name_appendix in dd_name_appendix_list
+        }
     mon = Monitors(mon_dict)
 
     return mon
 
 
-def get_results(mon, model_dd_list):
-    recordings = mon.get_recordings_and_clear()
+def get_results(mon, model_dd_list, only_simulate, analyze):
+    recordings, recording_times = mon.get_recordings_and_clear()
 
     ### mean firing rates
     firing_rate_dict = {}
     for pop_name in ["str_d2", "str_fsi", "gpe_arky"]:
-        for model_version_idx, model_version in enumerate(["dd", "control"]):
-            firing_rate_dict[f"{pop_name}__{model_version}"] = []
+        if isinstance(only_simulate, str):
+            model_version_list = [only_simulate]
+        else:
+            model_version_list = ["dd", "control"]
+        for model_version_idx, model_version in enumerate(model_version_list):
+
+            firing_rate_dict[f"{pop_name}__{model_version}"] = np.zeros(
+                (
+                    paramsS["nbr_models"],
+                    recording_times.nr_periods(chunk=model_version_idx),
+                )
+            )
             for model_idx in range(paramsS["nbr_models"]):
                 # get spike dict
                 spike_dict = recordings[model_version_idx][
                     f"{pop_name}{model_dd_list[model_idx].name_appendix};spike"
                 ]
                 t, _ = raster_plot(spike_dict)
-                # calculate firing rate
-                nbr_of_spikes = len(t)
                 nbr_of_neurons = len(spike_dict)
-                firing_rate_dict[f"{pop_name}__{model_version}"].append(
-                    nbr_of_spikes / (nbr_of_neurons * (paramsS["t.duration"] / 1000))
-                )  # in Hz
+                ### calculate for each preiod in chunk the firing rate
+                for rec_period in range(
+                    recording_times.nr_periods(chunk=model_version_idx)
+                ):
+                    start_time, end_time = recording_times.time_lims(
+                        chunk=model_version_idx, period=rec_period
+                    )
+                    nbr_of_spikes = np.sum(
+                        (t > start_time).astype(int) * (t < end_time).astype(int)
+                    )
+                    firing_rate_dict[f"{pop_name}__{model_version}"][
+                        model_idx, rec_period
+                    ] = nbr_of_spikes / (
+                        nbr_of_neurons * ((end_time - start_time) / 1000)
+                    )  # in Hz
+    ### average over the models
+    ### what remains is an array with firing rates for each recording preiod
     mean_firing_rate_dict = {
-        key: np.mean(firing_rate_dict[key]) for key in firing_rate_dict.keys()
+        key: np.mean(firing_rate_dict[key], axis=0).tolist()
+        for key in firing_rate_dict.keys()
     }
 
-    return {"mean_firing_rate_dict": mean_firing_rate_dict}
+    if analyze:
+        return {
+            "mean_firing_rate_dict": mean_firing_rate_dict,
+            "recordings": recordings,
+            "recording_times": recording_times,
+        }
+    else:
+        return {"mean_firing_rate_dict": mean_firing_rate_dict}
 
 
-def get_loss(results_dict):
+def get_loss(results_dict, only_simulate):
+    if isinstance(only_simulate, str) or paramsS["simulation_protocol"] == "increase":
+        return 0
     ### target:
     ### firing rates
     mean_firing_rate_dict_target = {
@@ -106,8 +145,8 @@ def get_loss(results_dict):
     mean_firing_rate_dict = results_dict["mean_firing_rate_dict"]
     ### differences
     diff_dict = {
-        pop: mean_firing_rate_dict[f"{pop}__dd"]
-        - mean_firing_rate_dict[f"{pop}__control"]
+        pop: mean_firing_rate_dict[f"{pop}__dd"][0]
+        - mean_firing_rate_dict[f"{pop}__control"][0]
         for pop in ["str_d2", "gpe_arky", "str_fsi"]
     }
     ### loss calculation
@@ -115,7 +154,7 @@ def get_loss(results_dict):
     loss_firing_rates_control = np.mean(
         [
             exp_loss(
-                mean_firing_rate_dict[key],
+                mean_firing_rate_dict[key][0],
                 mean_firing_rate_dict_target[key],
                 mean_firing_rate_dict_target[key],
             )
@@ -174,31 +213,79 @@ def dd_to_control(a, b, model_dd_list):
         proj.w = weights
 
 
-def do_simulation(mon, parameter_dict, model_dd_list):
-    mon.start()
-    ### simulate dd models
-    ### reset model/paramters
-    set_seed(paramsS["seed"])
-    mon.reset(synapses=True, projections=True)
-    ### set parameters
-    set_parameters(parameter_dict, model_dd_list)
-    ### simulate
-    # print_dendrites()
-    simulate(paramsS["t.duration"])
+def which_simulation(model_dd_list, mon):
+    if paramsS["simulation_protocol"] == "resting":
+        simulate(paramsS["t.duration"])
 
-    ### simulate control models
-    ### reset model/paramters
-    set_seed(paramsS["seed"])
-    mon.reset(synapses=True, projections=True)
-    ### set parameters
-    set_parameters(parameter_dict, model_dd_list)
-    ### transform dd models into control models
-    dd_to_control(
-        a=parameter_dict["general.str_d2_factor"], b=0.5, model_dd_list=model_dd_list
-    )
-    ### simulate
-    # print_dendrites()
-    simulate(paramsS["t.duration"])
+    if paramsS["simulation_protocol"] == "increase":
+        for n_it in range(paramsS["increase_iterations"]):
+            mon.start()
+            for model_idx in range(len(model_dd_list)):
+                for pop_name in ["gpe_arky"]:
+                    name_appendix = model_dd_list[model_idx].name_appendix
+                    get_population(f"{pop_name}{name_appendix}").increase_noise = (
+                        paramsS["increase_step"] * n_it
+                    )
+            simulate(paramsS["t.duration"])
+            mon.pause()
+
+
+def do_simulation(mon, parameter_dict, model_dd_list, only_simulate):
+    if not (isinstance(only_simulate, str)):
+        mon.start()
+        ### simulate dd models
+        ### reset model/paramters
+        set_seed(paramsS["seed"])
+        mon.reset(synapses=True, projections=True)
+        ### set parameters
+        set_parameters(parameter_dict, model_dd_list)
+        ### simulate
+        # print_dendrites()
+        which_simulation(model_dd_list, mon)
+
+        ### simulate control models
+        ### reset model/paramters
+        set_seed(paramsS["seed"])
+        mon.reset(synapses=True, projections=True)
+        ### set parameters
+        set_parameters(parameter_dict, model_dd_list)
+        ### transform dd models into control models
+        dd_to_control(
+            a=parameter_dict["general.str_d2_factor"],
+            b=0.5,
+            model_dd_list=model_dd_list,
+        )
+        ### simulate
+        # print_dendrites()
+        which_simulation(model_dd_list, mon)
+    elif only_simulate == "control":
+        mon.start()
+        ### simulate control models
+        ### reset model/paramters
+        set_seed(paramsS["seed"])
+        mon.reset(synapses=True, projections=True)
+        ### set parameters
+        set_parameters(parameter_dict, model_dd_list)
+        ### transform dd models into control models
+        dd_to_control(
+            a=parameter_dict["general.str_d2_factor"],
+            b=0.5,
+            model_dd_list=model_dd_list,
+        )
+        ### simulate
+        # print_dendrites()
+        which_simulation(model_dd_list, mon)
+    elif only_simulate == "dd":
+        mon.start()
+        ### simulate dd models
+        ### reset model/paramters
+        set_seed(paramsS["seed"])
+        mon.reset(synapses=True, projections=True)
+        ### set parameters
+        set_parameters(parameter_dict, model_dd_list)
+        ### simulate
+        # print_dendrites()
+        which_simulation(model_dd_list, mon)
 
 
 def get_parameter_dict(parameter_list):
@@ -220,7 +307,13 @@ def get_parameter_dict(parameter_list):
 
 
 def simulate_and_return_loss(
-    parameter_list, return_results=False, mon=None, model_dd_list=None
+    parameter_list,
+    return_results=False,
+    mon=None,
+    model_dd_list=None,
+    only_simulate=None,
+    dump=True,
+    analyze=False,
 ):
     """
     called multiple times during fitting
@@ -228,22 +321,23 @@ def simulate_and_return_loss(
     ### get parameter dict
     parameter_dict = get_parameter_dict(parameter_list)
     ### do simulateion
-    do_simulation(mon, parameter_dict, model_dd_list)
+    do_simulation(mon, parameter_dict, model_dd_list, only_simulate)
     ### get results
-    results_dict = get_results(mon, model_dd_list)
+    results_dict = get_results(mon, model_dd_list, only_simulate, analyze)
     ### calculate and return loss
-    loss = get_loss(results_dict)
+    loss = get_loss(results_dict, only_simulate)
     ### store params and loss in txt file
-    with open("results/fit_pallido_striatal/fit_results.json", "a") as f:
-        json.dump(
-            {
-                "parameter_dict": parameter_dict,
-                "loss": loss,
-                "results_dict": results_dict,
-            },
-            f,
-        )
-    f.close()
+    if dump:
+        with open("results/fit_pallido_striatal/fit_results.json", "a") as f:
+            json.dump(
+                {
+                    "parameter_dict": parameter_dict,
+                    "loss": loss,
+                    "mean_firing_rate_dict": results_dict["mean_firing_rate_dict"],
+                },
+                f,
+            )
+        f.close()
     if return_results:
         return {
             "status": STATUS_OK,
