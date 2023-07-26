@@ -78,6 +78,11 @@ class my_exp(Experiment):
             np.isnan(exp_data[f"{which_neuron}_rate_arr"])
         )
         inj_current_pA_arr = exp_data["inj_current_pA"][rate_arr_target_mask]
+
+        ### injected current Lorenz
+        if replicate_Lorenz:
+            inj_current_pA_arr = inj_current_pA_arr / 1000
+
         t_init = 500
         t_sim = 1000
         self.mon.start()
@@ -96,7 +101,7 @@ class my_exp(Experiment):
         return self.results()
 
 
-def get_loss(results_ist, results_soll, return_ist=False):
+def get_loss(results_ist, results_soll, return_ist=False, which_neuron="proto"):
     """
     results_soll: any
         contains the target data
@@ -115,6 +120,7 @@ def get_loss(results_ist, results_soll, return_ist=False):
     rate_arr_target = results_soll[f"{which_neuron}_rate_arr"]
     rate_arr_target_mask = np.logical_not(np.isnan(rate_arr_target))
     rate_arr_target = rate_arr_target[rate_arr_target_mask]
+    inj_current_pA = results_soll["inj_current_pA"][rate_arr_target_mask]
 
     ### get the important data for calculating the loss from the recordings
     rate_arr_ist = np.ones(len(rate_arr_target)) * np.nan
@@ -133,7 +139,11 @@ def get_loss(results_ist, results_soll, return_ist=False):
 
     ### return the loss
     if return_ist:
-        return {"ist": rate_arr_ist, "target": rate_arr_target}
+        return {
+            "ist": rate_arr_ist,
+            "target": rate_arr_target,
+            "inj_current_pA": inj_current_pA,
+        }
     else:
         return rmse
 
@@ -142,6 +152,38 @@ if __name__ == "__main__":
 
     ### which variables should be optimized and between which bounds (min and max values)
     variation = 0.5
+
+    ### to replicate lorenz fits:
+    replicate_Lorenz = False
+    ### 1. use old paramters
+    ### 2. also use parameter "R_input_megOhm"
+    ### 3. divide input current by 1000
+    ### 4. set refractory to 5
+    ### this is not how the neuron models are used in the BG model!!!
+    old_params_proto = {
+        "a": 0.0058,
+        "b": 0.56,
+        "c": -65,
+        "d": 3.8,
+        "n0": 117,
+        "n1": 4.86,
+        "n2": 0.043,
+        "x": 1,
+        "R_input_megOhm": 450,
+    }
+    old_params_arky = {
+        "a": 0.0054,
+        "b": 0.34,
+        "c": -71,
+        "d": 9.81,
+        "n0": 113,
+        "n1": 4.47,
+        "n2": 0.04,
+        "x": 1,
+        "R_input_megOhm": 560,
+    }
+    old_params = [old_params_proto, old_params_arky][int(sys.argv[1])]
+
     variables_bounds = {
         "a": [0.0054 * (1 - variation), 0.0054 * (1 + variation)],
         "b": [0.34 * (1 - variation), 0.34 * (1 - variation) * (1 + variation)],
@@ -150,14 +192,22 @@ if __name__ == "__main__":
         "n0": [113 * (1 - variation), 113 * (1 + variation)],
         "n1": [4.47 * (1 - variation), 4.47 * (1 + variation)],
         "n2": [0.04 * (1 - variation), 0.04 * (1 + variation)],
-        "x": [1, 3],
+        "R_input_megOhm": 1,
+        "x": [1, 2],
         "tau_ampa": 1,
         "tau_gaba": 1,
         "E_ampa": 0,
         "E_gaba": 0,
         "increase_noise": 0,
         "rates_noise": 0,
+        "r": [0, 1],
     }
+
+    if replicate_Lorenz:
+        for key, val in old_params.items():
+            variables_bounds[key] = val
+        variables_bounds["r"] = [0, 1]
+        neuron_model.refractory = 5
 
     which_neuron = ["proto", "arky"][int(sys.argv[1])]
     sim_id = int(sys.argv[2])
@@ -165,7 +215,7 @@ if __name__ == "__main__":
     ### run optimization
     opt = opt_neuron(
         experiment=my_exp,
-        get_loss_function=get_loss,
+        get_loss_function=lambda a, b: get_loss(a, b, False, which_neuron),
         variables_bounds=variables_bounds,
         results_soll=read_data_Bogacz2016(),
         time_step=0.1,
@@ -176,4 +226,30 @@ if __name__ == "__main__":
     )
 
     ### run the optimization, define how often the experiment should be repeated
-    opt.run(max_evals=30000, results_file_name=f"best_{which_neuron}_{sim_id}.npy")
+    opt.run(max_evals=1, results_file_name=f"best_{which_neuron}_{sim_id}.npy")
+
+    ### f-I curve losses of Lorenz fits: proto=1.4, arky=0.9
+
+    ### our fit:
+    # proto: 0.5176893289799147
+    # params = {
+    #     "a": 0.004894445882993041,
+    #     "b": 0.23006342384188397,
+    #     "c": -67.23776038895387,
+    #     "d": 4.9173032745663745,
+    #     "n0": 63.59418875142282,
+    #     "n1": 3.3423140577041557,
+    #     "n2": 0.05050316999730628,
+    #     "x": 1.2421189138561222,
+    # }
+    # arky=0.5460968621452967
+    # params = {
+    #     "a": 0.007839724855153347,
+    #     "b": 0.24405376283085636,
+    #     "c": -63.44134773165609,
+    #     "d": 11.531786006917402,
+    #     "n0": 56.643875300238896,
+    #     "n1": 3.4175566589342337,
+    #     "n2": 0.045725149196710974,
+    #     "x": 1.2537563498780842,
+    # }
