@@ -5,7 +5,7 @@ import json
 import matplotlib.pyplot as plt
 
 ### local
-from fit_hyperopt_pallido_striatal import (
+from fit_pallido_striatal_hyperopt import (
     create_monitors,
     simulate_and_return_loss,
     setup_ANNarchy,

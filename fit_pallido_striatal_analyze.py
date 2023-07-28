@@ -1,7 +1,7 @@
 from CompNeuroPy import create_dir, plot_recordings
 
 ### local
-from fit_hyperopt_pallido_striatal import (
+from fit_pallido_striatal_hyperopt import (
     create_monitors,
     simulate_and_return_loss,
     setup_ANNarchy,
