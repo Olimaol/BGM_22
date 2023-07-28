@@ -49,7 +49,14 @@ def create_monitors(model_dd_list, analyze=False):
 
     if analyze:
         mon_dict = {
-            f"pop;{pop_name}{dd_name_appendix}": ["spike", "v", "u", "g_ampa", "g_gaba"]
+            f"pop;{pop_name}{dd_name_appendix}": [
+                "spike",
+                "v",
+                "u",
+                "g_ampa",
+                "g_gaba",
+                "I_base",
+            ]
             for pop_name in ["str_d2", "str_fsi", "gpe_proto"]
             for dd_name_appendix in dd_name_appendix_list
         }
@@ -183,14 +190,18 @@ def exp_loss(x, mu, sig):
 def dd_to_control(a, b, model_dd_list):
     """
     cut synapses in str_fsi__str_d2 and decrease str_d2 input
-    a: modulation of increase_noise in str_d2
+    a: modulation of base_mean in str_d2
     b: prune probability (zero means no synapses are pruned, 1 means all synapses are pruned)
     """
     for model_idx in range(paramsS["nbr_models"]):
         name_appendix = model_dd_list[model_idx].name_appendix
         ### decrease str_d2 input
-        get_population(f"str_d2{name_appendix}").increase_noise = (
-            a * get_population(f"str_d2{name_appendix}").increase_noise
+        get_population(f"str_d2{name_appendix}").base_mean = (
+            a * get_population(f"str_d2{name_appendix}").base_mean
+        )
+        ### update str_d2 input noise
+        get_population(f"str_d2{name_appendix}").base_noise = (
+            0.1 * get_population(f"str_d2{name_appendix}").base_mean
         )
         ### prune synapses
         rng = np.random.default_rng(paramsS["seed"])
@@ -218,13 +229,17 @@ def which_simulation(model_dd_list, mon):
         simulate(paramsS["t.duration"])
 
     if paramsS["simulation_protocol"] == "increase":
+        ### increase baseline of gpe_proto
         for n_it in range(paramsS["increase_iterations"]):
             mon.start()
             for model_idx in range(len(model_dd_list)):
                 for pop_name in ["gpe_proto"]:
                     name_appendix = model_dd_list[model_idx].name_appendix
-                    get_population(f"{pop_name}{name_appendix}").increase_noise = (
+                    get_population(f"{pop_name}{name_appendix}").base_mean = (
                         paramsS["increase_step"] * n_it
+                    )
+                    get_population(f"{pop_name}{name_appendix}").base_noise = (
+                        0.1 * get_population(f"{pop_name}{name_appendix}").base_mean
                     )
             simulate(paramsS["t.duration"])
             mon.pause()
@@ -303,6 +318,13 @@ def get_parameter_dict(parameter_list):
             parameter_list_idx += 1
         else:
             parameter_dict[key] = paramsS["parameter_bound_dict"][key]
+
+    key_list = list(parameter_dict.keys())
+    for key in key_list:
+        if key.split(".")[1] == "base_mean":
+            parameter_dict[f"{key.split('.')[0]}.base_noise"] = (
+                0.1 * parameter_dict[key]
+            )
     return parameter_dict
 
 

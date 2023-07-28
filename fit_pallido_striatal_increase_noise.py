@@ -31,7 +31,7 @@ def get_I_0(mode):
     }
 
     pbar = tqdm(range(n_iter_max))
-    param_arr = np.array([1, 1, 1])
+    param_arr = np.array([200, 1, 1])
     alpha = np.ones(len(param_arr)) * alpha_0
     alpha_0 = alpha.copy()
 
@@ -51,7 +51,7 @@ def get_I_0(mode):
             mon=mon,
             model_dd_list=model_dd_list,
             only_simulate=mode,
-            dump=False,
+            dump=True,
         )
 
         ist = np.array(
@@ -60,6 +60,8 @@ def get_I_0(mode):
                 for pop in pop_list
             ]
         )
+        ### TODO use a t_init of 2 sec for firing rate calculation
+        ### TODO seting base_noise = base_mean*0.1 does not work for gpe, because it does not need base_mean to reach firing rate... but what should be noise?
 
         optimization_values_param_list.append(param_arr)
         optimization_values_ist_list.append(ist)
@@ -85,6 +87,7 @@ def get_I_0(mode):
             alpha_0[np.logical_not(decrease_alpha_mask_1)] * 2
         )
         ### increase learning speed if correct direction but very small
+        ### TODO only increase if it is not already in tolerance range
         too_small_change = tolerance * target / 2
         mask_faster = (
             (np.abs(new_error - error) < too_small_change).astype(int)
@@ -358,6 +361,8 @@ if __name__ == "__main__":
 
     ## OPTIMIZE ###
     ### get increase_noise values for lateral and input mod_factors = 0
+    get_I_0("control")
+    quit()
     I_0 = {
         "control": get_I_0("control"),
         "dd": get_I_0("dd"),
@@ -365,7 +370,6 @@ if __name__ == "__main__":
     with open("results/fit_pallido_striatal/I_0.json", "a") as f:
         json.dump(I_0, f)
     f.close()
-    quit()
     ### get increase_noise values for different lateral and input mod_factors
     I_lat_inp = {
         "control": get_I_lat_inp(mode="control", I_0=I_0),

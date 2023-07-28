@@ -30,21 +30,21 @@ if __name__ == "__main__":
     ## ANALYZE ###
     results = simulate_and_return_loss(
         [
-            2.7141971537532985,
-            0.03844303223162199,
-            0.22132777314884586,
-            3,
+            236.84934268263547,
+            1.6754331010055263,
+            2.7021746304066285,
             0,
-            3,
             0,
-            3,
+            0,
+            0,
+            0,
             0,
             1,
         ],
         return_results=True,
         mon=mon,
         model_dd_list=model_dd_list,
-        only_simulate="control",
+        only_simulate="dd",
         dump=True,
         analyze=True,
     )
@@ -61,7 +61,7 @@ if __name__ == "__main__":
             plot_plan_idx += 1
     shape = (paramsS["nbr_models"], 3)
     plot_recordings(
-        "results/fit_pallido_striatal/analyze_spikes_3.png",
+        "results/fit_pallido_striatal/analyze_spikes.png",
         recordings=recordings,
         recording_times=recording_times,
         chunk=0,
@@ -70,16 +70,16 @@ if __name__ == "__main__":
     )
 
     ### plot variables of gpe proto
-    for variable in ["v", "u", "g_ampa", "g_gaba"]:
+    for variable in ["I_base"]:
         plot_plan = []
         plot_plan_idx = 1
         for n_model in range(paramsS["nbr_models"]):
-            for pop_name in ["gpe_proto"]:
+            for pop_name in ["str_d2", "str_fsi", "gpe_proto"]:
                 plot_plan.append(
                     f"{plot_plan_idx};{pop_name}:dd_{n_model};{variable};line"
                 )
                 plot_plan_idx += 1
-        shape = (3, 3)
+        shape = (paramsS["nbr_models"], 3)
         plot_recordings(
             f"results/fit_pallido_striatal/analyze_{variable}.png",
             recordings=recordings,
