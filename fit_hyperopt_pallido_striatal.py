@@ -50,13 +50,13 @@ def create_monitors(model_dd_list, analyze=False):
     if analyze:
         mon_dict = {
             f"pop;{pop_name}{dd_name_appendix}": ["spike", "v", "u", "g_ampa", "g_gaba"]
-            for pop_name in ["str_d2", "str_fsi", "gpe_arky"]
+            for pop_name in ["str_d2", "str_fsi", "gpe_proto"]
             for dd_name_appendix in dd_name_appendix_list
         }
     else:
         mon_dict = {
             f"pop;{pop_name}{dd_name_appendix}": ["spike"]
-            for pop_name in ["str_d2", "str_fsi", "gpe_arky"]
+            for pop_name in ["str_d2", "str_fsi", "gpe_proto"]
             for dd_name_appendix in dd_name_appendix_list
         }
     mon = Monitors(mon_dict)
@@ -69,7 +69,7 @@ def get_results(mon, model_dd_list, only_simulate, analyze):
 
     ### mean firing rates
     firing_rate_dict = {}
-    for pop_name in ["str_d2", "str_fsi", "gpe_arky"]:
+    for pop_name in ["str_d2", "str_fsi", "gpe_proto"]:
         if isinstance(only_simulate, str):
             model_version_list = [only_simulate]
         else:
@@ -129,8 +129,8 @@ def get_loss(results_dict, only_simulate):
     mean_firing_rate_dict_target = {
         "str_d2__control": 2,  # [2, 0.24],
         "str_d2__dd": 5,  # [5, 0.63],
-        "gpe_arky__control": 24.5,  # [24.5, 1.14],
-        "gpe_arky__dd": 18.9,  # [18.9, 0.87],
+        "gpe_proto__control": 24.5,  # [24.5, 1.14],
+        "gpe_proto__dd": 18.9,  # [18.9, 0.87],
         "str_fsi__control": 21.4,  # [21.4, 0.75],
         "str_fsi__dd": 23.7,  # [23.7, 0.69],
     }
@@ -138,7 +138,7 @@ def get_loss(results_dict, only_simulate):
     diff_dict_target = {
         pop: mean_firing_rate_dict_target[f"{pop}__dd"]
         - mean_firing_rate_dict_target[f"{pop}__control"]
-        for pop in ["str_d2", "gpe_arky", "str_fsi"]
+        for pop in ["str_d2", "gpe_proto", "str_fsi"]
     }
     ### is:
     ### firing rates
@@ -147,7 +147,7 @@ def get_loss(results_dict, only_simulate):
     diff_dict = {
         pop: mean_firing_rate_dict[f"{pop}__dd"][0]
         - mean_firing_rate_dict[f"{pop}__control"][0]
-        for pop in ["str_d2", "gpe_arky", "str_fsi"]
+        for pop in ["str_d2", "gpe_proto", "str_fsi"]
     }
     ### loss calculation
     ### firing rates control loss
@@ -158,7 +158,7 @@ def get_loss(results_dict, only_simulate):
                 mean_firing_rate_dict_target[key],
                 mean_firing_rate_dict_target[key],
             )
-            for key in ["str_d2__control", "gpe_arky__control", "str_fsi__control"]
+            for key in ["str_d2__control", "gpe_proto__control", "str_fsi__control"]
         ]
     )
     ### differences loss
@@ -221,7 +221,7 @@ def which_simulation(model_dd_list, mon):
         for n_it in range(paramsS["increase_iterations"]):
             mon.start()
             for model_idx in range(len(model_dd_list)):
-                for pop_name in ["gpe_arky"]:
+                for pop_name in ["gpe_proto"]:
                     name_appendix = model_dd_list[model_idx].name_appendix
                     get_population(f"{pop_name}{name_appendix}").increase_noise = (
                         paramsS["increase_step"] * n_it
@@ -363,16 +363,16 @@ def print_dendrites(model_dd_list):
         ):
             n1 += len(n_post.pre_ranks)
         for n_post in get_projection(
-            f"str_d2__gpe_arky{model_dd_list[model_idx].name_appendix}"
+            f"str_d2__gpe_proto{model_dd_list[model_idx].name_appendix}"
         ):
             n2 += len(n_post.pre_ranks)
         for n_post in get_projection(
-            f"gpe_arky__str_fsi{model_dd_list[model_idx].name_appendix}"
+            f"gpe_proto__str_fsi{model_dd_list[model_idx].name_appendix}"
         ):
             n3 += len(n_post.pre_ranks)
 
         print(
-            f"model {model_idx}:\t str_fsi__str_d2 = {n1},\t str_d2__gpe_arky = {n2},\t gpe_arky__str_fsi = {n3}"
+            f"model {model_idx}:\t str_fsi__str_d2 = {n1},\t str_d2__gpe_proto = {n2},\t gpe_proto__str_fsi = {n3}"
         )
 
 
@@ -411,7 +411,7 @@ def compile_models():
     for model_idx in range(paramsS["nbr_models"]):
         model_dd_list.append(
             BGM(
-                name="BGM_v04oliver_p03",
+                name="BGM_v04newgpe_p01",
                 seed=paramsS["seed"],
                 do_compile=False,
                 name_appendix=f"dd_{model_idx}",
