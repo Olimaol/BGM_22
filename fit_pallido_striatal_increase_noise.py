@@ -297,9 +297,9 @@ def get_I_lat_inp(mode, I_0, mean_firing_rate_dict_target, mon, model_dd_list):
 
     pop_list = ["str_d2", "str_fsi", "gpe_proto"]
     ### list with lateral mod_factors
-    lat_list = [0.1]
+    lat_list = [0, 1]
     ### list with input mod_factors
-    inp_list = [0.1, 0.2]
+    inp_list = [0, 1]
     I = {}
     with tqdm(total=len(pop_list) * len(lat_list) * len(inp_list)) as global_pbar:
         for pop in pop_list:
@@ -307,6 +307,8 @@ def get_I_lat_inp(mode, I_0, mean_firing_rate_dict_target, mon, model_dd_list):
             I[pop].append([0, 0, I_0[mode][pop], True])
             for lat in lat_list:
                 for inp in inp_list:
+                    if lat == 0 and inp == 0:
+                        continue
                     ### parameters for paramter search
                     (
                         alpha_0,
@@ -453,7 +455,6 @@ if __name__ == "__main__":
     with open("results/fit_pallido_striatal/I_0.json", "a") as f:
         json.dump(I_0, f)
     f.close()
-    quit()
     ### get increase_noise values for different lateral and input mod_factors
     I_lat_inp = {
         "control": get_I_lat_inp(
