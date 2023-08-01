@@ -74,6 +74,14 @@ try:
 except:
     warnings.warn("WARNING: parameters: no 'archive/I_0_10Hz_20Hz.json' for base_noise")
     parameters_fit_pallido_striatal["base_noise"] = None
+try:
+    with open("archive/activity_by_mod_f.json") as f:
+        parameters_fit_pallido_striatal["activity_by_mod"] = json.load(f)
+except:
+    warnings.warn(
+        "WARNING: parameters: no 'archive/activity_by_mod_f.json' for fit increase"
+    )
+    parameters_fit_pallido_striatal["activity_by_mod"] = None
 ### simulation, can be resting or increase (see funciton "which_simulation" in fit_hyperopt...)
 parameters_fit_pallido_striatal["simulation_protocol"] = "resting"
 parameters_fit_pallido_striatal["t.duration"] = 3000

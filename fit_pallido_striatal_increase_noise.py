@@ -185,7 +185,7 @@ def get_I_0(mode, mean_firing_rate_dict_target, mon, model_dd_list):
         n_iter_max, alpha_0, param_arr_start=np.ones(len(pop_list))
     )
     ### iteration loop to find paramters with target firing rates
-    print(target, end="\n\n")
+    print(f"\n{target}", end="\n\n")
     for _ in pbar:
 
         result = simulate_and_return_loss(
@@ -240,6 +240,7 @@ def get_I_0(mode, mean_firing_rate_dict_target, mon, model_dd_list):
     plt.plot(np.array(optimization_values_param_list))
     plt.tight_layout()
     plt.savefig(f"results/fit_pallido_striatal/opt_run_figs/{mode}.png")
+    plt.close()
 
     I_0 = {pop_list[idx]: param_arr[idx] for idx in range(len(param_arr))}
 
@@ -293,18 +294,44 @@ def get_parameter_dict_lat_inp(pop, param_arr, lat, inp, mode):
     return parameter_dict
 
 
+def get_lat_inp_list(pop, lat_list_len, inp_list_len, lat_list, inp_list):
+
+    for key, val in paramsS["activity_by_mod"].items():
+        if key.split("__")[1] == pop:
+            if key.split("__")[1] == key.split("__")[0]:
+                lat = val
+            else:
+                inp = val
+
+    max_lat = 1 / lat
+    max_inp = 1 / inp
+    if len(lat_list) == 0:
+        lat_list = np.linspace(0, max_lat, lat_list_len)
+    if len(inp_list) == 0:
+        inp_list = np.linspace(0, max_inp, inp_list_len)
+    return [lat_list, inp_list]
+
+
 def get_I_lat_inp(mode, I_0, mean_firing_rate_dict_target, mon, model_dd_list):
 
     pop_list = ["str_d2", "str_fsi", "gpe_proto"]
     ### list with lateral mod_factors
-    lat_list = [0, 1]
+    ### if empty list: will be generated for each pop
+    lat_list = []
+    lat_list_len = 10
     ### list with input mod_factors
-    inp_list = [0, 1]
+    ### if empty list: will be generated for each pop
+    inp_list = []
+    inp_list_len = 10
     I = {}
-    with tqdm(total=len(pop_list) * len(lat_list) * len(inp_list)) as global_pbar:
+    with tqdm(total=len(pop_list) * lat_list_len * inp_list_len) as global_pbar:
         for pop in pop_list:
             I[pop] = []
             I[pop].append([0, 0, I_0[mode][pop], True])
+            ### create lat_list and inp_list for pop
+            lat_list, inp_list = get_lat_inp_list(
+                pop, lat_list_len, inp_list_len, lat_list, inp_list
+            )
             for lat in lat_list:
                 for inp in inp_list:
                     if lat == 0 and inp == 0:
@@ -341,7 +368,8 @@ def get_I_lat_inp(mode, I_0, mean_firing_rate_dict_target, mon, model_dd_list):
                     )
                     reached_target = False
                     ### iteration loop to find paramter with target firing rate
-                    print(f"\n{target}", end="\n\n")
+                    if use_tqdm:
+                        print(f"\n{target}", end="\n\n")
                     for _ in pbar:
                         parameter_dict = get_parameter_dict_lat_inp(
                             pop, param_arr, lat, inp, mode
@@ -403,6 +431,7 @@ def get_I_lat_inp(mode, I_0, mean_firing_rate_dict_target, mon, model_dd_list):
                     plt.savefig(
                         f"results/fit_pallido_striatal/opt_run_figs/{mode}_{pop}_{lat}_{inp}.png"
                     )
+                    plt.close()
 
                     I[pop].append([lat, inp, param_arr[0], reached_target])
 
