@@ -67,9 +67,11 @@ parameters_fit_pallido_striatal["seed"] = 10
 parameters_fit_pallido_striatal["num_threads"] = 1
 ### simulation, can be resting or increase (see funciton "which_simulation" in fit_hyperopt...)
 parameters_fit_pallido_striatal["simulation_protocol"] = "resting"
+parameters_fit_pallido_striatal["t.duration"] = 3000
+parameters_fit_pallido_striatal["t.init"] = 2000
 parameters_fit_pallido_striatal["increase_iterations"] = 50
 parameters_fit_pallido_striatal["increase_step"] = 0.05
-parameters_fit_pallido_striatal["t.duration"] = 5000
+parameters_fit_pallido_striatal["t.increase_duration"] = 1000
 ### optimization
 parameters_fit_pallido_striatal["nbr_models"] = 9
 parameters_fit_pallido_striatal["nbr_fit_runs"] = 10
@@ -85,3 +87,12 @@ parameters_fit_pallido_striatal["parameter_bound_dict"] = {
     "str_fsi__str_fsi.mod_factor": [0, 1],
     "general.str_d2_factor": [0, 1],
 }
+
+### parameters for get_I_base_noise
+parameters_get_I_base = {}
+### general
+parameters_get_I_base["timestep"] = 0.1
+parameters_get_I_base["seed"] = 10
+parameters_get_I_base["num_threads"] = 1
+### simulation
+parameters_get_I_base["simulation_protocol"] = "resting"

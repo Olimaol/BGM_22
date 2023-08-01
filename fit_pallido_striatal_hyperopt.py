@@ -103,6 +103,7 @@ def get_results(mon, model_dd_list, only_simulate, analyze):
                     start_time, end_time = recording_times.time_lims(
                         chunk=model_version_idx, period=rec_period
                     )
+                    start_time = start_time + paramsS["t.init"]
                     nbr_of_spikes = np.sum(
                         (t > start_time).astype(int) * (t < end_time).astype(int)
                     )
@@ -226,7 +227,7 @@ def dd_to_control(a, b, model_dd_list):
 
 def which_simulation(model_dd_list, mon):
     if paramsS["simulation_protocol"] == "resting":
-        simulate(paramsS["t.duration"])
+        simulate(paramsS["t.init"] + paramsS["t.duration"])
 
     if paramsS["simulation_protocol"] == "increase":
         ### increase baseline of gpe_proto
@@ -241,7 +242,7 @@ def which_simulation(model_dd_list, mon):
                     get_population(f"{pop_name}{name_appendix}").base_noise = (
                         0.1 * get_population(f"{pop_name}{name_appendix}").base_mean
                     )
-            simulate(paramsS["t.duration"])
+            simulate(paramsS["t.increase_duration"])
             mon.pause()
 
 
