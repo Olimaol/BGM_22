@@ -66,22 +66,33 @@ parameters_fit_pallido_striatal["timestep"] = 0.1
 parameters_fit_pallido_striatal["seed"] = 10
 parameters_fit_pallido_striatal["num_threads"] = 1
 ### simulation, can be resting or increase (see funciton "which_simulation" in fit_hyperopt...)
-parameters_fit_pallido_striatal["simulation_protocol"] = "increase"
+parameters_fit_pallido_striatal["simulation_protocol"] = "resting"
+parameters_fit_pallido_striatal["t.duration"] = 3000
+parameters_fit_pallido_striatal["t.init"] = 2000
 parameters_fit_pallido_striatal["increase_iterations"] = 50
-parameters_fit_pallido_striatal["increase_step"] = 0.03
-parameters_fit_pallido_striatal["t.duration"] = 1000
+parameters_fit_pallido_striatal["increase_step"] = 0.05
+parameters_fit_pallido_striatal["t.increase_duration"] = 1000
 ### optimization
 parameters_fit_pallido_striatal["nbr_models"] = 9
 parameters_fit_pallido_striatal["nbr_fit_runs"] = 10
 parameters_fit_pallido_striatal["parameter_bound_dict"] = {
-    "str_d2.increase_noise": [8, 14],
-    "str_fsi.increase_noise": [0.5, 5],
-    "gpe_arky.increase_noise": [0.13, 1.3],
-    "str_d2__gpe_arky.mod_factor": [0, 1],
+    "str_d2.base_mean": [8, 14],
+    "str_fsi.base_mean": [0.5, 5],
+    "gpe_proto.base_mean": [0.13, 1.3],
+    "str_d2__gpe_proto.mod_factor": [0, 1],
     "str_d2__str_d2.mod_factor": [0, 1],
-    "gpe_arky__str_fsi.mod_factor": [0, 1],
-    "gpe_arky__gpe_arky.mod_factor": [0, 1],
+    "gpe_proto__str_fsi.mod_factor": [0, 1],
+    "gpe_proto__gpe_proto.mod_factor": [0, 1],
     "str_fsi__str_d2.mod_factor": [0, 1],
     "str_fsi__str_fsi.mod_factor": [0, 1],
     "general.str_d2_factor": [0, 1],
 }
+
+### parameters for get_I_base_noise
+parameters_get_I_base = {}
+### general
+parameters_get_I_base["timestep"] = 0.1
+parameters_get_I_base["seed"] = 10
+parameters_get_I_base["num_threads"] = 1
+### simulation
+parameters_get_I_base["simulation_protocol"] = "resting"

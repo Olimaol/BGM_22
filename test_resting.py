@@ -19,7 +19,7 @@ if __name__ == "__main__":
         setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
     ### COMPILE MODEL & GET MODEL PARAMTERS
-    model = BGM(name="BGM_v04oliver_p01", seed=paramsS["seed"])
+    model = BGM(name="BGM_v04newgpe_p01", seed=paramsS["seed"])
     params = model.params
 
     print("model paramters:")
@@ -34,8 +34,8 @@ if __name__ == "__main__":
             # "pop;str_d1": ["spike"],
             "pop;str_d2": ["spike"],
             "pop;str_fsi": ["spike"],
-            # "pop;gpe_proto": ["spike"],
-            "pop;gpe_arky": ["spike", "u"],
+            "pop;gpe_proto": ["spike", "I_base"],
+            # "pop;gpe_arky": ["spike", "u"],
             # "pop;gpe_cp": ["spike"],
         }
     )
@@ -60,10 +60,10 @@ if __name__ == "__main__":
         # "4;str_d1;spike;hybrid",
         "1;str_d2;spike;hybrid",
         "2;str_fsi;spike;hybrid",
-        # "7;gpe_proto;spike;hybrid",
-        "3;gpe_arky;spike;hybrid",
+        "3;gpe_proto;spike;hybrid",
+        # "3;gpe_arky;spike;hybrid",
         # "9;gpe_cp;spike;hybrid",
-        "4;gpe_arky;u;line",
+        "4;gpe_proto;I_base;line",
     ]
     chunk = 0
     plot_recordings(
