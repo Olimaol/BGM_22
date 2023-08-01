@@ -200,9 +200,6 @@ def dd_to_control(a, b, model_dd_list):
         get_population(f"str_d2{name_appendix}").base_mean = (
             a * get_population(f"str_d2{name_appendix}").base_mean
         )
-        get_population(f"str_d2{name_appendix}").I_base = (
-            a * get_population(f"str_d2{name_appendix}").I_base
-        )
         if isinstance(paramsS["base_noise"], type(None)):
             ### update str_d2 input noise
             get_population(f"str_d2{name_appendix}").base_noise = (
@@ -241,9 +238,6 @@ def which_simulation(model_dd_list, mon):
                 for pop_name in ["gpe_proto"]:
                     name_appendix = model_dd_list[model_idx].name_appendix
                     get_population(f"{pop_name}{name_appendix}").base_mean = (
-                        paramsS["increase_step"] * n_it
-                    )
-                    get_population(f"{pop_name}{name_appendix}").I_base = (
                         paramsS["increase_step"] * n_it
                     )
                     if isinstance(paramsS["base_noise"], type(None)):
@@ -331,14 +325,13 @@ def get_parameter_dict(parameter_list):
     key_list = list(parameter_dict.keys())
     for key in key_list:
         ### if base_mean is set
-        if key.split(".")[1] == "base_mean":
-            ### also set I_base
-            parameter_dict[f"{key.split('.')[0]}.I_base"] = parameter_dict[key]
-            if isinstance(paramsS["base_noise"], type(None)):
-                ### also set base_noise
-                parameter_dict[f"{key.split('.')[0]}.base_noise"] = (
-                    0.1 * parameter_dict[key]
-                )
+        if key.split(".")[1] == "base_mean" and isinstance(
+            paramsS["base_noise"], type(None)
+        ):
+            ### also set base_noise
+            parameter_dict[f"{key.split('.')[0]}.base_noise"] = (
+                0.1 * parameter_dict[key]
+            )
     return parameter_dict
 
 
