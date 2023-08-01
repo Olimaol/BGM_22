@@ -11,7 +11,7 @@ from fit_pallido_striatal_hyperopt import (
 
 
 if __name__ == "__main__":
-    create_dir("results/fit_pallido_striatal/", clear=True)
+    create_dir("results/fit_pallido_striatal/")
 
     ### create file to store results
     with open("results/fit_pallido_striatal/fit_results.json", "w") as f:
@@ -30,9 +30,9 @@ if __name__ == "__main__":
     ## ANALYZE ###
     results = simulate_and_return_loss(
         [
-            236.84934268263547,
-            1.6754331010055263,
-            2.7021746304066285,
+            245.36431788951705,
+            1.6751924690779205,
+            -9.962678106993046,
             0,
             0,
             0,

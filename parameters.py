@@ -1,3 +1,6 @@
+import json
+import warnings
+
 ### define global simulation paramters
 parameters_default = {}
 ### general
@@ -65,6 +68,12 @@ parameters_fit_pallido_striatal = {}
 parameters_fit_pallido_striatal["timestep"] = 0.1
 parameters_fit_pallido_striatal["seed"] = 10
 parameters_fit_pallido_striatal["num_threads"] = 1
+try:
+    with open("archive/I_0_10Hz_20Hz.json") as f:
+        parameters_fit_pallido_striatal["base_noise"] = json.load(f)["base_noise"]
+except:
+    warnings.warn("WARNING: parameters: no 'archive/I_0_10Hz_20Hz.json' for base_noise")
+    parameters_fit_pallido_striatal["base_noise"] = None
 ### simulation, can be resting or increase (see funciton "which_simulation" in fit_hyperopt...)
 parameters_fit_pallido_striatal["simulation_protocol"] = "resting"
 parameters_fit_pallido_striatal["t.duration"] = 3000

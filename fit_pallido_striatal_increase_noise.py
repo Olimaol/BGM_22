@@ -187,7 +187,7 @@ def get_I_0(mode, mean_firing_rate_dict_target, mon, model_dd_list):
     ### iteration loop to find paramters with target firing rates
     print(target, end="\n\n")
     for _ in pbar:
-        ### TODO seting base_noise = base_mean*0.1 does not work for gpe, because it does not need base_mean to reach firing rate... but what should be noise?
+
         result = simulate_and_return_loss(
             [param_arr[0], param_arr[1], param_arr[2], 0, 0, 0, 0, 0, 0, 1],
             return_results=True,
@@ -453,6 +453,7 @@ if __name__ == "__main__":
     with open("results/fit_pallido_striatal/I_0.json", "a") as f:
         json.dump(I_0, f)
     f.close()
+    quit()
     ### get increase_noise values for different lateral and input mod_factors
     I_lat_inp = {
         "control": get_I_lat_inp(
