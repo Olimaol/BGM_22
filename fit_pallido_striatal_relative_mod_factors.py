@@ -1,4 +1,4 @@
-from CompNeuroPy import create_dir, plot_recordings
+from CompNeuroPy import create_dir
 import numpy as np
 import json
 
@@ -12,70 +12,51 @@ from fit_pallido_striatal_hyperopt import (
 )
 
 
-def calc_rate():
-    pass
+def get_I_gaba_values(I_0, I_lat_inp, proj):
 
+    ### set the standard baselines to the baselines obtained from all mod_f==0
+    baseline_dict = I_0.copy()
 
-def silence_pop(pop):
-    while rate > 0:
-        increase_mod_factor()
+    ### get the dict entry of I_lat_inp for the given projection
+    ### to obtain the baseline of the corresponding post-population
+    post_pop = proj.split("__")[1]
+    proj_is_lat = proj.split("__")[0] == proj.split("__")[1]
 
-        results = simulate_and_return_loss(
-            [
-                2.7141971537532985,
-                0.03844303223162199,
-                0.22132777314884586,
-                3,
-                0,
-                3,
-                0,
-                3,
-                0,
-                1,
-            ],
-            return_results=True,
-            mon=mon,
-            model_dd_list=model_dd_list,
-            only_simulate="control",
-            dump=True,
-            analyze=True,
-        )
+    I_lat_inp = I_lat_inp[post_pop]
+    for lat, inp, base_mean, reached_target in I_lat_inp:
+        if proj_is_lat:
+            ### lat has to be 1 and inp has to be 0
+            if lat == 1 and inp == 0:
+                baseline_dict[post_pop] = base_mean
+        else:
+            ### lat has to be 0 and inp has to be 1
+            if lat == 0 and inp == 1:
+                baseline_dict[post_pop] = base_mean
 
-        recordings = results["results_dict"]["recordings"]
-        recording_times = results["results_dict"]["recording_times"]
+    ### get the projection dict
+    ### set all mod_f to zeros except the mod_f of the projection
+    projection_list = []
+    for key in paramsS["parameter_bound_dict"].keys():
+        if not ("__" in key.split(".")[0]):
+            continue
 
-        rate = calc_rate(recordings, recording_times)
+        if key.split(".")[0] == proj:
+            projection_list.append(1)
+        else:
+            projection_list.append(0)
 
-
-def get_proj_name_list():
-    proj_name_list = []
-    for key in paramsS.keys():
-        compartment = key.split(".")[0]
-        if len(compartment.split("__")):
-            proj_name_list.append(compartment)
-    return proj_name_list
-
-
-def get_proj_mod_factors():
-    proj_name_list = get_proj_name_list()
-    for proj in proj_name_list:
-        corresponding_pop = proj.split("__")[1]
-        silence_pop(corresponding_pop)
-
-
-def get_ampa_values(I_0):
-    ### simulate once with I_0 and record ampa values
+    ### simulate
     results = simulate_and_return_loss(
         [
-            I_0["str_d2"],
-            I_0["str_fsi"],
-            I_0["gpe_proto"],
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
+            baseline_dict["str_d2"],
+            baseline_dict["str_fsi"],
+            baseline_dict["gpe_proto"],
+            projection_list[0],
+            projection_list[1],
+            projection_list[2],
+            projection_list[3],
+            projection_list[4],
+            projection_list[5],
             1,
         ],
         return_results=True,
@@ -86,16 +67,23 @@ def get_ampa_values(I_0):
         analyze=True,
     )
     recordings = results["results_dict"]["recordings"]
+    mean_firing_rates = results["results_dict"]["mean_firing_rate_dict"]
+    print(proj, mean_firing_rates)
     ### calculate mean g_ampa for 3 pops
-    mean_g_ampa = {}
+    mean_I_gaba = {}
     for pop_name in ["str_d2", "str_fsi", "gpe_proto"]:
-        mean_g_ampa[pop_name] = 0
+        mean_I_gaba[pop_name] = 0
         for n_model in range(paramsS["nbr_models"]):
-            mean_g_ampa[pop_name] += (
-                np.mean(recordings[0][f"{pop_name}:dd_{n_model};g_ampa"])
-                / paramsS["nbr_models"]
-            )
-    return mean_g_ampa
+            model_params = model_dd_list[n_model].params
+            model_name_appendix = model_dd_list[n_model].name_appendix
+            ### get values
+            E_gaba = model_params[f"{pop_name}{model_name_appendix}.E_gaba"]
+            g_gaba = recordings[0][f"{pop_name}:dd_{n_model};g_gaba"]
+            v = recordings[0][f"{pop_name}:dd_{n_model};v"]
+            ### calc I_gaba, do not use negative sign to obtain positive values at the end
+            I_gaba = g_gaba * (v - E_gaba)
+            mean_I_gaba[pop_name] += np.mean(I_gaba) / paramsS["nbr_models"]
+    return mean_I_gaba[post_pop]
 
 
 if __name__ == "__main__":
@@ -115,10 +103,50 @@ if __name__ == "__main__":
     ### create monitors
     mon = create_monitors(model_dd_list, analyze=True)
 
-    ### get ampa values from I_0 model
-    with open("results/fit_pallido_striatal/I_0_dd.json") as f:
+    ### load fitted baselines for mod_f==0 for each projection
+    with open("archive/I_0_dd_mod_f_0_1.json") as f:
         I_0 = json.load(f)
-    ampa_values = get_ampa_values(I_0)
-    print(ampa_values)
-    quit()
-    get_proj_mod_factors()
+    ### load fitted baselines for mod_f==1 for each projection
+    with open("archive/I_lat_inp_dd_mod_f_0_1.json") as f:
+        I_lat_inp = json.load(f)
+    ### for each projection get I_gaba of target pop when mod_f==1
+    I_gaba_values_dict = {}
+    for proj in [
+        "str_d2__gpe_proto",
+        "str_d2__str_d2",
+        "gpe_proto__str_fsi",
+        "gpe_proto__gpe_proto",
+        "str_fsi__str_d2",
+        "str_fsi__str_fsi",
+    ]:
+        I_gaba_values_dict[proj] = get_I_gaba_values(I_0, I_lat_inp, proj)
+
+    ### use base noise values to normalize the I_gaba_values
+    ### I_gaba_values = current / mod_f
+    ### base_noise_values = current / activity
+    ### relation activity / mod_f = I_gaba_values / base_noise_values
+    activity_by_mod_f_dict = {}
+    for key, val in I_gaba_values_dict.items():
+        post_pop = key.split("__")[1]
+        base_noise_value = paramsS["base_noise"][post_pop]
+        activity_by_mod_f_dict[key] = I_gaba_values_dict[key] / base_noise_value
+
+    ### activity here referes to the difference between 20Hz and 10Hz --> absolute
+    ### make activity relative (divide by target firing rate in dd)
+    mean_firing_rate_dict_target = {
+        "str_d2__control": 2,  # [2, 0.24],
+        "str_d2__dd": 5,  # [5, 0.63],
+        "gpe_proto__control": 24.5,  # [24.5, 1.14],
+        "gpe_proto__dd": 18.9,  # [18.9, 0.87],
+        "str_fsi__control": 21.4,  # [21.4, 0.75],
+        "str_fsi__dd": 23.7,  # [23.7, 0.69],
+    }
+    for key, val in activity_by_mod_f_dict.items():
+        post_pop = key.split("__")[1]
+        activity_by_mod_f_dict[key] = (
+            activity_by_mod_f_dict[key]
+            / mean_firing_rate_dict_target[f"{post_pop}__dd"]
+        )
+    with open("results/fit_pallido_striatal/activity_by_mod_f.json", "w") as f:
+        json.dump(activity_by_mod_f_dict, f)
+    f.close()

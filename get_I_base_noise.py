@@ -43,10 +43,27 @@ if __name__ == "__main__":
         "str_fsi__dd": 20,
     }
     ### get increase_noise values for lateral and input mod_factors = 0
+    ### for rates 10Hz and 20 Hz
     I_0 = {
-        "10Hz": get_I_0("control", mean_firing_rate_dict_target, mon=mon),
-        "20Hz": get_I_0("dd", mean_firing_rate_dict_target, mon=mon),
+        "10Hz": get_I_0(
+            "control",
+            mean_firing_rate_dict_target,
+            mon=mon,
+            model_dd_list=model_dd_list,
+        ),
+        "20Hz": get_I_0(
+            "dd",
+            mean_firing_rate_dict_target,
+            mon=mon,
+            model_dd_list=model_dd_list,
+        ),
     }
+    ### use difference between 10Hz and 20Hz for noise
+    I_0["base_noise"] = {
+        pop_name: I_0["20Hz"][pop_name] - I_0["10Hz"][pop_name]
+        for pop_name in I_0["20Hz"].keys()
+    }
+
     with open("results/fit_pallido_striatal/I_0_10Hz_20Hz.json", "a") as f:
         json.dump(I_0, f)
     f.close()
