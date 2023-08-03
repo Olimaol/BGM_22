@@ -194,7 +194,7 @@ def get_I_0(mode, mean_firing_rate_dict_target, mon, model_dd_list):
             mon=mon,
             model_dd_list=model_dd_list,
             only_simulate=mode,
-            dump=True,
+            dump=False,
         )
 
         ist = np.array(
@@ -294,8 +294,7 @@ def get_parameter_dict_lat_inp(pop, param_arr, lat, inp, mode):
     return parameter_dict
 
 
-def get_lat_inp_list(pop, lat_list_len, inp_list_len, lat_list, inp_list):
-
+def get_lat_inp_list(pop, lat_list_len, inp_list_len, lat_list_0, inp_list_0):
     for key, val in paramsS["activity_by_mod"].items():
         if key.split("__")[1] == pop:
             if key.split("__")[1] == key.split("__")[0]:
@@ -305,10 +304,14 @@ def get_lat_inp_list(pop, lat_list_len, inp_list_len, lat_list, inp_list):
 
     max_lat = 1 / lat
     max_inp = 1 / inp
-    if len(lat_list) == 0:
+    if len(lat_list_0) == 0:
         lat_list = np.linspace(0, max_lat, lat_list_len)
-    if len(inp_list) == 0:
+    else:
+        lat_list = lat_list_0
+    if len(inp_list_0) == 0:
         inp_list = np.linspace(0, max_inp, inp_list_len)
+    else:
+        inp_list = inp_list_0
     return [lat_list, inp_list]
 
 
@@ -317,12 +320,17 @@ def get_I_lat_inp(mode, I_0, mean_firing_rate_dict_target, mon, model_dd_list):
     pop_list = ["str_d2", "str_fsi", "gpe_proto"]
     ### list with lateral mod_factors
     ### if empty list: will be generated for each pop
-    lat_list = []
+    lat_list_0 = []
     lat_list_len = 10
     ### list with input mod_factors
     ### if empty list: will be generated for each pop
-    inp_list = []
+    inp_list_0 = []
     inp_list_len = 10
+    ### if lat/inp lists are provided, use their len
+    if len(lat_list_0) > 0:
+        lat_list_len = len(lat_list_0)
+    if len(inp_list_0) > 0:
+        inp_list_len = len(inp_list_0)
     I = {}
     with tqdm(total=len(pop_list) * lat_list_len * inp_list_len) as global_pbar:
         for pop in pop_list:
@@ -330,7 +338,7 @@ def get_I_lat_inp(mode, I_0, mean_firing_rate_dict_target, mon, model_dd_list):
             I[pop].append([0, 0, I_0[mode][pop], True])
             ### create lat_list and inp_list for pop
             lat_list, inp_list = get_lat_inp_list(
-                pop, lat_list_len, inp_list_len, lat_list, inp_list
+                pop, lat_list_len, inp_list_len, lat_list_0, inp_list_0
             )
             for lat in lat_list:
                 for inp in inp_list:

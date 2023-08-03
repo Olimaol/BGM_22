@@ -82,12 +82,12 @@ except:
         "WARNING: parameters: no 'archive/activity_by_mod_f.json' for fit increase"
     )
     parameters_fit_pallido_striatal["activity_by_mod"] = None
-### simulation, can be resting or increase (see funciton "which_simulation" in fit_hyperopt...)
+### simulation, can be resting or increase (see function "which_simulation" in fit_hyperopt...)
 parameters_fit_pallido_striatal["simulation_protocol"] = "resting"
 parameters_fit_pallido_striatal["t.duration"] = 3000
 parameters_fit_pallido_striatal["t.init"] = 2000
-parameters_fit_pallido_striatal["increase_iterations"] = 50
-parameters_fit_pallido_striatal["increase_step"] = 0.05
+parameters_fit_pallido_striatal["increase_iterations"] = 15
+parameters_fit_pallido_striatal["increase_step"] = 3
 parameters_fit_pallido_striatal["t.increase_duration"] = 1000
 ### optimization
 parameters_fit_pallido_striatal["nbr_models"] = 9

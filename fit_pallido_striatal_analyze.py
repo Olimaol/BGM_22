@@ -32,11 +32,11 @@ if __name__ == "__main__":
         [
             245.36431788951705,
             1.6751924690779205,
-            -9.962678106993046,
+            36,
+            2.3,
             0,
             0,
-            0,
-            0,
+            7.8,
             0,
             0,
             1,
@@ -88,3 +88,52 @@ if __name__ == "__main__":
             shape=shape,
             plan=plot_plan,
         )
+
+    ### gpe exploded for too high lateral inhibition --> question was why
+    ### answer: I_gaba fluctuated because v fluctuated around E_gaba (-90)
+    ### this section helped finding this error
+    # ### analyze in detail gpe neurons of model 5
+    # plot_plan = [
+    #     "1;gpe_proto:dd_5;g_gaba;line",
+    #     "2;gpe_proto:dd_5;g_ampa;line",
+    #     "3;gpe_proto:dd_5;v;line",
+    #     "4;gpe_proto:dd_5;u;line",
+    # ]
+    # plot_recordings(
+    #     "results/fit_pallido_striatal/analyze_model_5_gpe.png",
+    #     recordings=recordings,
+    #     recording_times=recording_times,
+    #     chunk=0,
+    #     shape=(2, 2),
+    #     plan=plot_plan,
+    #     time_lim=[0, 50],
+    # )
+    # ### even more detailed
+    # for neuron_idx in range(8):
+    #     plt.figure(figsize=(6.4 * 2, 4.8 * 3), dpi=300)
+    #     plt.subplot(311)
+    #     plt.plot(
+    #         recordings[0]["gpe_proto:dd_5;g_gaba"][
+    #             : int(40 / paramsS["timestep"]), neuron_idx
+    #         ]
+    #     )
+
+    #     plt.subplot(312)
+    #     plt.plot(
+    #         recordings[0]["gpe_proto:dd_5;v"][
+    #             : int(40 / paramsS["timestep"]), neuron_idx
+    #         ]
+    #     )
+
+    #     plt.subplot(313)
+    #     plt.plot(
+    #         recordings[0]["gpe_proto:dd_5;u"][
+    #             : int(40 / paramsS["timestep"]), neuron_idx
+    #         ]
+    #     )
+
+    #     plt.tight_layout()
+    #     plt.savefig(
+    #         f"results/fit_pallido_striatal/analyze_model_5_gpe_neuron_{neuron_idx}.png"
+    #     )
+    #     plt.close()
