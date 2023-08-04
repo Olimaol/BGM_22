@@ -12,7 +12,7 @@ from fit_pallido_striatal_hyperopt import (
     compile_models,
     paramsS,
 )
-from fit_pallido_striatal_increase_noise import get_I_0
+from fit_pallido_striatal_base_mean import get_I_0
 
 
 if __name__ == "__main__":
