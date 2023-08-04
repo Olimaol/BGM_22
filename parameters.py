@@ -104,12 +104,3 @@ parameters_fit_pallido_striatal["parameter_bound_dict"] = {
     "str_fsi__str_fsi.mod_factor": [0, 1],
     "general.str_d2_factor": [0, 1],
 }
-
-### parameters for get_I_base_noise
-parameters_get_I_base = {}
-### general
-parameters_get_I_base["timestep"] = 0.1
-parameters_get_I_base["seed"] = 10
-parameters_get_I_base["num_threads"] = 1
-### simulation
-parameters_get_I_base["simulation_protocol"] = "resting"

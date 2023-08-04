@@ -1,3 +1,6 @@
+# runs the function simulate_and_return_loss() one time with hard-coded paramters
+# and analyzes the results in detail
+
 from CompNeuroPy import create_dir, plot_recordings
 
 ### local

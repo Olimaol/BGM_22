@@ -1,3 +1,9 @@
+# In this script, the base_mean values for any lateral and input mod_f are obtained
+# for the defined populations of the striato-pallidal network. This is done with a
+# simple optimization in which the base_mean values are increased if the firing rate
+# is too low and vice versa. During optimization only a single population at a time
+# gets synaptic input. The other populations are set to their target firing rates.
+
 from CompNeuroPy import create_dir
 import numpy as np
 from tqdm import tqdm
