@@ -1,12 +1,16 @@
+# In this script, a base_noise value is obtained for each population of the striato_pallidal network.
+# This represents the baseline current difference necessary to obtain an increase in firing rate from
+# 10 Hz to 20 Hz.
+
 from CompNeuroPy import create_dir
 import json
 
 ### local
-from parameters import parameters_get_I_base as paramsS
 from fit_pallido_striatal_hyperopt import (
     create_monitors,
     setup_ANNarchy,
     compile_models,
+    paramsS,
 )
 from fit_pallido_striatal_increase_noise import get_I_0
 

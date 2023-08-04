@@ -1,3 +1,15 @@
+# In this script the relative impact onto the activity of the target population
+# for each projection of the pallido striatal network is investigated. This is
+# done by obtaining the caused gaba current of each projection if the mod_f
+# of the projection is 1. To obtian the relation of "changing mod_f this much
+# changes activity this much" (activity/mod_f), the gaba currents are divided by the base_noise
+# values, which represent the change of input current neccessary to obtain a
+# specific change in firing rate i.e. activity. Finally, since the base_noise
+# values consider absolute firing rate changes and the target firing rates of
+# the populations are different, the obtained relations (activity/mod_f) are
+# further divided by the target firing rates of the target populations.
+# Final result = values for each projection representing relation activity/mod_f
+
 from CompNeuroPy import create_dir
 import numpy as np
 import json
@@ -13,6 +25,28 @@ from fit_pallido_striatal_hyperopt import (
 
 
 def get_I_gaba_values(I_0, I_lat_inp, proj):
+    """
+    Sets the mod_f of one projection to 1 and obtains the caused gaba current in the target population.
+    Meanwhile all firing rates are set to the target values using I_0 and I_lat_inp.
+
+    Args:
+
+        I_0: dict
+            Contains the base_mean values for the network with all mod_f==0
+            keys are the population names.
+            Used to set the correct firing rate for all populations without input.
+
+        I_lat_inpt: dict
+            Contains the base_mean values for different mod_f of the lateral and input
+            projections (here lat and inp mod_f have to be either 0 or 1) of the
+            populations, keys are the population names.
+            Used to set the correct firing rate for the population with input from
+            the given projection.
+
+        proj: str
+            The name of the projection whose mod_f is set to 1 and whose caused gaba
+            current in its target population is obtained.
+    """
 
     ### set the standard baselines to the baselines obtained from all mod_f==0
     baseline_dict = I_0.copy()

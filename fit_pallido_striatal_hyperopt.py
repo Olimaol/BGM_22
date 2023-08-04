@@ -1,3 +1,6 @@
+# initial plan for this script: hyperopt optimization of the paramters of the pallido-striatal network
+# currently it is not used and just provides functions for the other striato_pallidal scripts
+
 from ANNarchy import (
     setup,
     simulate,
