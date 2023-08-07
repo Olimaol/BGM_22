@@ -1,0 +1,18 @@
+Goal is to obtain connectivity parameters and baseline acitivity (base_mean currents) to archive target firing rates in pallido-striatal network in both conditions, dd and control.
+
+Pipeline:
+
+1. get_I_base_noise
+    save "results/fit_pallido_striatal/I_0_10Hz_20Hz.json" in "fit_pallido_striatal_archive/I_0_10Hz_20Hz.json"
+
+2. get_relative_mod_factors
+    save "results/fit_pallido_striatal/activity_by_mod_f.json" in "fit_pallido_striatal_archive/activity_by_mod_f.json"
+
+3. get_I_lat_inp
+    save "results/fit_pallido_striatal/I_lat_inp.json" in "fit_pallido_striatal_archive/I_lat_inp.json"
+
+4. get_model_config
+
+fit_pallido_striatal_hyperopt currently not used, provides functions for other scripts
+fit_pallifdo_striatal_analyze: one simulation with hard coded paramters + detailed analyses
+parameters.py: paramters for all scripts

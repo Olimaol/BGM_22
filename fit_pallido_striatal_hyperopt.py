@@ -203,11 +203,6 @@ def dd_to_control(a, b, model_dd_list):
         get_population(f"str_d2{name_appendix}").base_mean = (
             a * get_population(f"str_d2{name_appendix}").base_mean
         )
-        if isinstance(paramsS["base_noise"], type(None)):
-            ### update str_d2 input noise
-            get_population(f"str_d2{name_appendix}").base_noise = (
-                0.1 * get_population(f"str_d2{name_appendix}").base_mean
-            )
         ### prune synapses
         rng = np.random.default_rng(paramsS["seed"])
         proj = get_projection(f"str_fsi__str_d2{name_appendix}")
@@ -243,10 +238,6 @@ def which_simulation(model_dd_list, mon):
                     get_population(f"{pop_name}{name_appendix}").base_mean = (
                         paramsS["increase_step"] * n_it
                     )
-                    if isinstance(paramsS["base_noise"], type(None)):
-                        get_population(f"{pop_name}{name_appendix}").base_noise = (
-                            0.1 * get_population(f"{pop_name}{name_appendix}").base_mean
-                        )
             simulate(paramsS["t.increase_duration"])
             mon.pause()
 
@@ -325,16 +316,6 @@ def get_parameter_dict(parameter_list):
         else:
             parameter_dict[key] = paramsS["parameter_bound_dict"][key]
 
-    key_list = list(parameter_dict.keys())
-    for key in key_list:
-        ### if base_mean is set
-        if key.split(".")[1] == "base_mean" and isinstance(
-            paramsS["base_noise"], type(None)
-        ):
-            ### also set base_noise
-            parameter_dict[f"{key.split('.')[0]}.base_noise"] = (
-                0.1 * parameter_dict[key]
-            )
     return parameter_dict
 
 
@@ -458,6 +439,12 @@ def compile_models():
                 for pop_name in model.populations:
                     if pop_name == f"{key}{name_appendix}":
                         get_population(pop_name).base_noise = val
+    else:
+        ### without base_noise values --> no noise
+        for model in model_dd_list:
+            name_appendix = model.name_appendix
+            for pop_name in model.populations:
+                get_population(pop_name).base_noise = 0
 
     ### compile
     model_dd_list[-1].compile()

@@ -121,6 +121,14 @@ def get_I_gaba_values(I_0, I_lat_inp, proj):
 
 
 if __name__ == "__main__":
+    if paramsS["simulation_protocol"] != "resting" or isinstance(
+        paramsS["base_noise"], type(None)
+    ):
+        raise ValueError(
+            "simulation_protocol has to be resting! and there have to be noise values!"
+        )
+        quit()
+
     create_dir("results/fit_pallido_striatal/")
 
     ### create file to store results
@@ -138,10 +146,10 @@ if __name__ == "__main__":
     mon = create_monitors(model_dd_list, analyze=True)
 
     ### load fitted baselines for mod_f==0 for each projection
-    with open("archive/I_0_dd_mod_f_0_1.json") as f:
+    with open("fit_pallido_striatal_archive/I_0_dd_mod_f_0_1.json") as f:
         I_0 = json.load(f)
     ### load fitted baselines for mod_f==1 for each projection
-    with open("archive/I_lat_inp_dd_mod_f_0_1.json") as f:
+    with open("fit_pallido_striatal_archive/I_lat_inp_dd_mod_f_0_1.json") as f:
         I_lat_inp = json.load(f)
     ### for each projection get I_gaba of target pop when mod_f==1
     I_gaba_values_dict = {}

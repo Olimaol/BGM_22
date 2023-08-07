@@ -460,8 +460,12 @@ def get_I_lat_inp(mode, I_0, mean_firing_rate_dict_target, mon, model_dd_list):
 
 
 if __name__ == "__main__":
-    if paramsS["simulation_protocol"] != "resting":
-        raise ValueError("simulation_protocol has to be resting!")
+    if paramsS["simulation_protocol"] != "resting" or isinstance(
+        paramsS["base_noise"], type(None)
+    ):
+        raise ValueError(
+            "simulation_protocol has to be resting! and there have to be noise values!"
+        )
         quit()
 
     create_dir("results/fit_pallido_striatal/", clear=True)

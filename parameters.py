@@ -69,17 +69,19 @@ parameters_fit_pallido_striatal["timestep"] = 0.1
 parameters_fit_pallido_striatal["seed"] = 10
 parameters_fit_pallido_striatal["num_threads"] = 1
 try:
-    with open("archive/I_0_10Hz_20Hz.json") as f:
+    with open("fit_pallido_striatal_archive/I_0_10Hz_20Hz.json") as f:
         parameters_fit_pallido_striatal["base_noise"] = json.load(f)["base_noise"]
 except:
-    warnings.warn("WARNING: parameters: no 'archive/I_0_10Hz_20Hz.json' for base_noise")
+    warnings.warn(
+        "WARNING: parameters: no 'fit_pallido_striatal_archive/I_0_10Hz_20Hz.json' for base_noise"
+    )
     parameters_fit_pallido_striatal["base_noise"] = None
 try:
-    with open("archive/activity_by_mod_f.json") as f:
+    with open("fit_pallido_striatal_archive/activity_by_mod_f.json") as f:
         parameters_fit_pallido_striatal["activity_by_mod"] = json.load(f)
 except:
     warnings.warn(
-        "WARNING: parameters: no 'archive/activity_by_mod_f.json' for fit increase"
+        "WARNING: parameters: no 'fit_pallido_striatal_archive/activity_by_mod_f.json' for fit increase"
     )
     parameters_fit_pallido_striatal["activity_by_mod"] = None
 ### simulation, can be resting or increase (see function "which_simulation" in fit_hyperopt...)
