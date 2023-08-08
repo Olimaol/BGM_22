@@ -166,6 +166,7 @@ if __name__ == "__main__":
         "n2": 0.043,
         "x": 1,
         "R_input_megOhm": 450,
+        "r": [0, 1],
     }
     old_params_arky = {
         "a": 0.0054,
@@ -177,6 +178,7 @@ if __name__ == "__main__":
         "n2": 0.04,
         "x": 1,
         "R_input_megOhm": 560,
+        "r": [0, 1],
     }
     old_params = [old_params_proto, old_params_arky][int(sys.argv[1])]
 

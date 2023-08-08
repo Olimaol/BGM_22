@@ -98,6 +98,7 @@ def get_results(mon, model_dd_list, only_simulate, analyze):
                     f"{pop_name}{model_dd_list[model_idx].name_appendix};spike"
                 ]
                 t, _ = raster_plot(spike_dict)
+                ### TODO does this work with current scipy?
                 nbr_of_neurons = len(spike_dict)
                 ### calculate for each preiod in chunk the firing rate
                 for rec_period in range(
