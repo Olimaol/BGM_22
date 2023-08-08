@@ -58,10 +58,32 @@ print(
 )
 
 plt.figure(dpi=300)
-plt.plot(f_I_proto["inj_current_pA"], f_I_proto["ist"], label="PROTO fit")
-plt.plot(f_I_proto["inj_current_pA"], f_I_proto["target"], label="PROTO target")
-plt.plot(f_I_arky["inj_current_pA"], f_I_arky["ist"], label="ARKY fit")
-plt.plot(f_I_arky["inj_current_pA"], f_I_arky["target"], label="ARKY target")
+plt.plot(
+    f_I_proto["inj_current_pA"],
+    f_I_proto["ist"],
+    label="PROTO fit",
+    color="r",
+)
+plt.plot(
+    f_I_proto["inj_current_pA"],
+    f_I_proto["target"],
+    label="PROTO target",
+    color="r",
+    ls="dashed",
+)
+plt.plot(
+    f_I_arky["inj_current_pA"],
+    f_I_arky["ist"],
+    label="ARKY fit",
+    color="g",
+)
+plt.plot(
+    f_I_arky["inj_current_pA"],
+    f_I_arky["target"],
+    label="ARKY target",
+    color="g",
+    ls="dashed",
+)
 plt.legend()
 plt.tight_layout()
 plt.savefig("best_fit.png")
