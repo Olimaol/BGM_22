@@ -5,7 +5,7 @@ from ANNarchy import setup
 
 setup(dt=0.1)
 
-id_list = list(range(1, 11))
+id_list = list(range(1, 2))
 loss_arr = np.zeros((len(id_list), 2))
 for id_idx, id in enumerate(id_list):
     best_proto = np.load(
