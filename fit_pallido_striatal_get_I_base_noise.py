@@ -12,13 +12,14 @@ from fit_pallido_striatal_hyperopt import (
     compile_models,
     paramsS,
 )
-from fit_pallido_striatal_base_mean import get_I_0
+from fit_pallido_striatal_get_I_lat_inp import get_I_0
 
 
 if __name__ == "__main__":
     if paramsS["simulation_protocol"] != "resting":
         raise ValueError("simulation_protocol has to be resting!")
         quit()
+    paramsS["base_noise"] = None
 
     create_dir("results/fit_pallido_striatal/", clear=True)
     create_dir("results/fit_pallido_striatal/opt_run_figs", clear=True)

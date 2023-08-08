@@ -124,7 +124,6 @@ def get_loss(results_ist, results_soll, return_ist=False, which_neuron="proto"):
 
     ### get the important data for calculating the loss from the recordings
     rate_arr_ist = np.ones(len(rate_arr_target)) * np.nan
-    t_init = 500
     for chunk in range(len(rec_ist)):
         spike_dict = rec_ist[chunk][f"{pop_ist};spike"]
         t, _ = raster_plot(spike_dict)
@@ -149,9 +148,6 @@ def get_loss(results_ist, results_soll, return_ist=False, which_neuron="proto"):
 
 
 if __name__ == "__main__":
-
-    ### which variables should be optimized and between which bounds (min and max values)
-    variation = 0.5
 
     ### to replicate lorenz fits:
     replicate_Lorenz = False
@@ -184,23 +180,24 @@ if __name__ == "__main__":
     }
     old_params = [old_params_proto, old_params_arky][int(sys.argv[1])]
 
+    ### which variables should be optimized and between which bounds (min and max values)
     variables_bounds = {
-        "a": [0.0054 * (1 - variation), 0.0054 * (1 + variation)],
-        "b": [0.34 * (1 - variation), 0.34 * (1 - variation) * (1 + variation)],
-        "c": [-71 - 10, -71 + 10],
-        "d": [9.81 * (1 - variation), 9.81 * (1 + variation)],
-        "n0": [113 * (1 - variation), 113 * (1 + variation)],
-        "n1": [4.47 * (1 - variation), 4.47 * (1 + variation)],
-        "n2": [0.04 * (1 - variation), 0.04 * (1 + variation)],
+        "a": [0.01, 0.1],
+        "b": [0, 1],
+        "c": [-80, -40],
+        "d": [100, 300],
+        "n0": [0, 200],
+        "n1": [0, 10],
+        "n2": [0, 0.1],
         "R_input_megOhm": 1,
-        "x": [1, 2],
+        "x": 1,
         "tau_ampa": 1,
         "tau_gaba": 1,
         "E_ampa": 0,
         "E_gaba": 0,
         "increase_noise": 0,
         "rates_noise": 0,
-        "r": [0, 1],
+        "r": 0,
     }
 
     if replicate_Lorenz:
@@ -230,7 +227,7 @@ if __name__ == "__main__":
 
     ### f-I curve losses of Lorenz fits: proto=1.4, arky=0.9
 
-    ### our fit:
+    ### our fit with nonlin:
     # proto: 0.5176893289799147
     # params = {
     #     "a": 0.004894445882993041,
