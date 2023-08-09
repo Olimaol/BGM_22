@@ -5,7 +5,7 @@ from ANNarchy import setup
 
 setup(dt=0.1)
 
-id_list = list(range(1, 2))
+id_list = list(range(1, 13))
 loss_arr = np.zeros((len(id_list), 2))
 for id_idx, id in enumerate(id_list):
     best_proto = np.load(
@@ -39,6 +39,7 @@ for key, val in best_proto.items():
     if not (key in ["loss", "all_loss", "std", "results", "results_soll"]):
         print_fitting_dict[key] = val
 print(
+    "proto",
     np.sqrt(np.mean((f_I_proto["ist"] - f_I_proto["target"]) ** 2)),
     print_fitting_dict,
 )
@@ -53,6 +54,7 @@ for key, val in best_arky.items():
     if not (key in ["loss", "all_loss", "std", "results", "results_soll"]):
         print_fitting_dict[key] = val
 print(
+    "arky",
     np.sqrt(np.mean((f_I_arky["ist"] - f_I_arky["target"]) ** 2)),
     print_fitting_dict,
 )
