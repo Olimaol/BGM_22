@@ -151,12 +151,34 @@ if __name__ == "__main__":
 
     ### to replicate lorenz fits:
     replicate_Lorenz = False
+    ### to use already fitted values
+    use_fitted_params = True
+    fitted_params_proto = {
+        "a": 0.039191890241715294,
+        "b": 0.000548238111291427,
+        "c": -49.88014418530518,
+        "d": 108.0208225074675,
+        "n0": 24.2219699019072,
+        "n1": 1.1929776239208976,
+        "n2": 0.08899515481507077,
+    }
+    fitted_params_arky = {
+        "a": 0.02838072375428212,
+        "b": 0.19512028115003693,
+        "c": -42.5741678730728,
+        "d": 145.05548508832746,
+        "n0": 0.13769286237123363,
+        "n1": 0.00485927350881888,
+        "n2": 0.04806752535231682,
+    }
+    fitted_params = [fitted_params_proto, fitted_params_arky][int(sys.argv[1])]
+
     ### 1. use old paramters
     ### 2. also use parameter "R_input_megOhm"
     ### 3. divide input current by 1000
     ### 4. set refractory to 5
     ### this is not how the neuron models are used in the BG model!!!
-    old_params_proto = {
+    lorenz_params_proto = {
         "a": 0.0058,
         "b": 0.56,
         "c": -65,
@@ -166,9 +188,8 @@ if __name__ == "__main__":
         "n2": 0.043,
         "x": 1,
         "R_input_megOhm": 450,
-        "r": [0, 1],
     }
-    old_params_arky = {
+    lorenz_params_arky = {
         "a": 0.0054,
         "b": 0.34,
         "c": -71,
@@ -178,9 +199,8 @@ if __name__ == "__main__":
         "n2": 0.04,
         "x": 1,
         "R_input_megOhm": 560,
-        "r": [0, 1],
     }
-    old_params = [old_params_proto, old_params_arky][int(sys.argv[1])]
+    lorenz_params = [lorenz_params_proto, lorenz_params_arky][int(sys.argv[1])]
 
     ### which variables should be optimized and between which bounds (min and max values)
     variables_bounds = {
@@ -203,10 +223,15 @@ if __name__ == "__main__":
     }
 
     if replicate_Lorenz:
-        for key, val in old_params.items():
+        for key, val in lorenz_params.items():
             variables_bounds[key] = val
         variables_bounds["r"] = [0, 1]
         neuron_model.refractory = 5
+
+    if use_fitted_params:
+        for key, val in fitted_params.items():
+            variables_bounds[key] = val
+        variables_bounds["r"] = [0, 1]
 
     which_neuron = ["proto", "arky"][int(sys.argv[1])]
     sim_id = int(sys.argv[2])
@@ -225,7 +250,7 @@ if __name__ == "__main__":
     )
 
     ### run the optimization, define how often the experiment should be repeated
-    opt.run(max_evals=30000, results_file_name=f"best_{which_neuron}_{sim_id}.npy")
+    opt.run(max_evals=1, results_file_name=f"best_{which_neuron}_{sim_id}.npy")
 
     ### f-I curve losses of Lorenz fits: proto=1.4, arky=0.9
 
