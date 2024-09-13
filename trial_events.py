@@ -24,9 +24,9 @@ def add_events(trial_procedure):
         get_population("cor_pause").rates = 0
 
     def integrator_reset(self):
-        get_population("integrator_go").decision = 0
+        get_population("integrator_go").decision = -1
         get_population("integrator_go").g_ampa = 0
-        get_population("integrator_stop").decision = 0
+        get_population("integrator_stop").decision = -1
 
     ### add all events
     trial_procedure.add_event(

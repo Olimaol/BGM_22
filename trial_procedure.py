@@ -127,8 +127,8 @@ class trial_procedure_cl:
         """
         ### loop to check if model trigger got active
         for model_trigger in self.model_trigger_list:
-            if int(get_population(model_trigger).decision[0]) == -1:
-                ### -1 means git active
+            if int(get_population(model_trigger).decision[0]) >= 0:
+                ### >= 0 means got active
                 ### find the events triggerd by the model_trigger and run them
                 for event in self.event_list:
                     if event.model_trigger == model_trigger:

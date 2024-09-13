@@ -1,5 +1,5 @@
 from ANNarchy import setup, get_population
-from CompNeuroPy.models import BGM
+from CompNeuroPy.full_models import BGM
 from CompNeuroPy import Monitors, generate_simulation, plot_recordings, print_df
 from tqdm import tqdm
 
@@ -23,14 +23,13 @@ def SST_trial_function(params, paramsS, mode="go"):
     trial_procedure.run()
 
     ### return if go decision was made
-    if get_population("integrator_go").decision[0] == -1:
+    if get_population("integrator_go").decision[0] >= 0:
         return 1
     else:
         return 0
 
 
 if __name__ == "__main__":
-
     ### SETUP TIMESTEP + SEED
     if paramsS["seed"] == None:
         setup(dt=paramsS["timestep"])
@@ -58,19 +57,19 @@ if __name__ == "__main__":
     ### INIT MONITORS ###
     mon = Monitors(
         {
-            "pop;gpe_arky": ["spike", "g_ampa", "g_gaba"],
-            "pop;str_d1": ["spike", "g_ampa", "g_gaba"],
-            "pop;str_d2": ["spike", "g_ampa", "g_gaba"],
-            "pop;stn": ["spike", "g_ampa", "g_gaba"],
-            "pop;cor_go": ["spike"],
-            "pop;gpe_cp": ["spike", "g_ampa", "g_gaba"],
-            "pop;gpe_proto": ["spike", "g_ampa", "g_gaba"],
-            "pop;snr": ["spike", "g_ampa", "g_gaba"],
-            "pop;thal": ["spike", "g_ampa", "g_gaba"],
-            "pop;cor_stop": ["spike"],
-            "pop;str_fsi": ["spike", "g_ampa", "g_gaba"],
-            "pop;integrator_go": ["g_ampa", "decision"],
-            "pop;integrator_stop": ["g_ampa", "decision"],
+            "gpe_arky": ["spike", "g_ampa", "g_gaba"],
+            "str_d1": ["spike", "g_ampa", "g_gaba"],
+            "str_d2": ["spike", "g_ampa", "g_gaba"],
+            "stn": ["spike", "g_ampa", "g_gaba"],
+            "cor_go": ["spike"],
+            "gpe_cp": ["spike", "g_ampa", "g_gaba"],
+            "gpe_proto": ["spike", "g_ampa", "g_gaba"],
+            "snr": ["spike", "g_ampa", "g_gaba"],
+            "thal": ["spike", "g_ampa", "g_gaba"],
+            "cor_stop": ["spike"],
+            "str_fsi": ["spike", "g_ampa", "g_gaba"],
+            "integrator_go": ["g_ampa", "decision"],
+            "integrator_stop": ["g_ampa", "decision"],
         }
     )
 
@@ -89,7 +88,6 @@ if __name__ == "__main__":
         print("\n\nSTART " + mode + " TRIALS")
         ### LOOP OVER TRIALS
         for _ in tqdm(range(paramsS["trials"])):
-
             ### TRIAL RUN
             SST_trial.run({"mode": mode})
 
