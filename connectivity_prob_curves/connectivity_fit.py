@@ -1,8 +1,10 @@
 import numpy as np
 from scipy.integrate import quad
-from scipy.optimize import minimize
+from skopt import gp_minimize
+from skopt.space import Real
 import matplotlib.pyplot as plt
 from scipy.stats import norm
+import json  # added for JSON output
 
 
 class Dataset:
@@ -30,28 +32,20 @@ class Dataset:
         """
         Computes the expected connectivity probability using a half-Gaussian model.
 
-        For a specified sigma, the expectation (average) of the half-Gaussian probability
-        density function is calculated via an integral. The half-Gaussian probability density
-        is given by: exp(-d^2/(2*sigma^2)), and the expectation is computed by integrating
-        this function over the relevant distance interval and weighting it with the
-        appropriate probability distribution of distances.
+        For a specified sigma, the expectation (average) of the half-Gaussian function
+        is calculated via an integral. The half-Gaussian function,
+        p(d) = exp(-d^2/(sigma^2)), describes how connectivity probability decays
+        with distance. It is weighted by the distance distribution P(d) and integrated.
 
-        So in very general:
+        General form:
         E[p] = ∫[0,maxdistance] p(d) * P(d) dd
-        where p(d) = exp(-d^2/(2*sigma^2)) is the half-Gaussian probability density function
-        and P(d) is the probability density function of the distance distribution.
 
-        For a uniform distance interval [d_min, d_max]:
-            E[p] = (1 / (d_max - d_min)) * ∫[d_min, d_max] exp(-d^2/(2*sigma^2)) dd
-            P(d) here is constant over the interval, so we can factor it out.
+        Uniform interval [d_min, d_max]:
+            E[p] = (1 / (d_max - d_min)) * ∫[d_min, d_max] p(d) dd
 
-        For a dataset defined by a normal distribution (with given mean and std) truncated at d = 0:
-            1. Compute the normalization constant:
-               Z = norm.cdf(∞) - norm.cdf(0) = norm.cdf((∞-mean)/std) - norm.cdf((0-mean)/std)
-            2. Then, the expectation is:
-               E[p] = ∫[0, mean+5*std] (exp(-d^2/(2*sigma^2)) * norm.pdf(d, mean, std) / Z) dd
-
-        Integration is used here to average the probability density over the chosen range.
+        Truncated normal distances (mean, std):
+            Z = norm.cdf(∞) - norm.cdf(0)
+            E[p] = ∫[0, mean+5*std] p(d) * norm.pdf(d, mean, std) / Z dd
 
         Args:
             sigma (float): Scale parameter of the half-Gaussian.
@@ -61,7 +55,7 @@ class Dataset:
         """
         if self.d_max is not None:
             # Calculate expectation over a uniform distance interval [0, d_max]
-            integrand = lambda d: np.exp(-(d**2) / (2 * sigma**2))
+            integrand = lambda d: np.exp(-(d**2) / (sigma**2))
             integral, _ = quad(integrand, self.d_min, self.d_max)
             return integral / (self.d_max - self.d_min)
         elif self.mean is not None and self.std is not None:
@@ -71,7 +65,7 @@ class Dataset:
                 (a - self.mean) / self.std
             )
             integrand = (
-                lambda d: np.exp(-(d**2) / (2 * sigma**2))
+                lambda d: np.exp(-(d**2) / (sigma**2))
                 * norm.pdf(d, loc=self.mean, scale=self.std)
                 / Z
             )
@@ -99,7 +93,10 @@ def neg_log_likelihood(params, datasets):
     for ds in datasets:
         p_avg = ds.avg_pred(sigma)
         p = np.clip(A * p_avg, 1e-6, 1 - 1e-6)
-        total -= ds.x * np.log(p) + (ds.n - ds.x) * np.log(1 - p)
+        # weight by confidence from Wilson interval
+        _, margin = wilson_interval(ds.x, ds.n)
+        weight = 1.0 / margin
+        total -= weight * (ds.x * np.log(p) + (ds.n - ds.x) * np.log(1 - p))
     return total
 
 
@@ -123,7 +120,7 @@ def wilson_interval(x, n, z=1.96):
 
 
 if __name__ == "__main__":
-    # Datasets
+    # Datasets from experimental_data/Connectivity_intrinsic_striatum/connectivity_probabilities.ods
     datasets = {
         "dSPN-dSPN": [
             Dataset(0, 7, d_max=50, label="0/7 6-OHDA lesion"),
@@ -134,9 +131,9 @@ if __name__ == "__main__":
             Dataset(3, 47, d_max=50, label="3/47 baseline"),
             Dataset(3, 66, d_max=100, label="3/66 baseline"),
         ],
-        "FS-Chol": [
-            Dataset(0, 3, d_max=250, label="0/3 baseline"),
-        ],
+        # "FS-Chol": [
+        #     Dataset(0, 3, d_max=250, label="0/3 baseline"),
+        # ],
         "FS-dSPN": [
             Dataset(22, 40, mean=105, std=50.1, label="22/40 6-OHDA lesion"),
             Dataset(8, 9, d_max=100, label="8/9 baseline"),
@@ -154,9 +151,9 @@ if __name__ == "__main__":
             Dataset(21, 54, mean=116, std=46, label="21/54 baseline"),
             Dataset(27, 77, d_max=250, label="27/77 baseline"),
         ],
-        "FS-PLTS": [
-            Dataset(0, 9, d_max=250, label="0/9 baseline"),
-        ],
+        # "FS-PLTS": [
+        #     Dataset(0, 9, d_max=250, label="0/9 baseline"),
+        # ],
         "iSPN-dSPN": [
             Dataset(3, 12, d_max=50, label="3/12 6-OHDA lesion"),
             Dataset(13, 47, d_max=50, label="13/47 baseline"),
@@ -167,45 +164,49 @@ if __name__ == "__main__":
             Dataset(14, 39, d_max=50, label="14/39 baseline"),
             Dataset(7, 31, d_max=100, label="7/31 baseline"),
         ],
-        "NPYNGF-SPN": [
-            Dataset(25, 29, d_max=100, label="25/29 baseline"),
-        ],
-        "NPYPLTS-SPN": [
-            Dataset(0, 9, d_max=100, label="0/9 baseline"),
-            Dataset(3, 21, d_max=100, label="3/21 baseline"),
-        ],
-        "PLTS-Chol": [
-            Dataset(0, 8, d_max=250, label="0/8 baseline"),
-        ],
-        "PLTS-FS": [
-            Dataset(0, 9, d_max=250, label="0/9 baseline"),
-        ],
-        "PLTS-PLTS": [
-            Dataset(0, 26, d_max=250, label="0/26 baseline"),
-        ],
-        "PLTS-SPN": [
-            Dataset(2, 60, mean=153, std=80, label="2/60 baseline"),
-        ],
+        # "NPYNGF-SPN": [
+        #     Dataset(25, 29, d_max=100, label="25/29 baseline"),
+        # ],
+        # "NPYPLTS-SPN": [
+        #     Dataset(0, 9, d_max=100, label="0/9 baseline"),
+        #     Dataset(3, 21, d_max=100, label="3/21 baseline"),
+        # ],
+        # "PLTS-Chol": [
+        #     Dataset(0, 8, d_max=250, label="0/8 baseline"),
+        # ],
+        # "PLTS-FS": [
+        #     Dataset(0, 9, d_max=250, label="0/9 baseline"),
+        # ],
+        # "PLTS-PLTS": [
+        #     Dataset(0, 26, d_max=250, label="0/26 baseline"),
+        # ],
+        # "PLTS-SPN": [
+        #     Dataset(2, 60, mean=153, std=80, label="2/60 baseline"),
+        # ],
     }
 
     import os
 
-    output_dir = "connectivity_fits_plots"
+    output_dir = "connectivity_fits"
     os.makedirs(output_dir, exist_ok=True)
 
+    params = {}  # initialize dict to collect fitted parameters
+
     for group, ds_list in datasets.items():
-        res = minimize(
-            neg_log_likelihood,
-            x0=[50.0, 1.0],
-            args=(ds_list,),
-            bounds=[(1e-3, None), (0, 1)],
-            method="L-BFGS-B",
+        # Bayesian optimization of negative log-likelihood
+        search_space = [Real(1e-3, 500, name="sigma"), Real(0.0, 1.0, name="A")]
+        res = gp_minimize(
+            lambda params: neg_log_likelihood(params, ds_list),
+            search_space,
+            n_calls=50,
+            n_initial_points=10,
+            random_state=42,
         )
         sigma_hat, A_hat = res.x
-        print(f"[{group}] Fitted sigma: {sigma_hat:.2f} m, A: {A_hat:.2f}")
+        print(f"[{group}] Fitted sigma: {sigma_hat:.2f} μm, A: {A_hat:.2f}")
 
         d_vals = np.linspace(0, 200, 500)
-        p_curve = A_hat * np.exp(-(d_vals**2) / (2 * sigma_hat**2))
+        p_curve = A_hat * np.exp(-(d_vals**2) / (sigma_hat**2))
 
         plt.figure()
         plt.plot(d_vals, p_curve, label="Fitted curve")
@@ -229,3 +230,13 @@ if __name__ == "__main__":
 
         plt.savefig(os.path.join(output_dir, f"{group.replace(' ', '_')}.png"))
         plt.close()
+
+        # store in params dict under tuple key
+        params[group] = {
+            "amplitude": A_hat,
+            "sigma_um": sigma_hat,
+        }
+
+    # after all fits, write out JSON
+    with open(os.path.join(output_dir, "fitted_params.json"), "w") as f:
+        json.dump(params, f, indent=4)
