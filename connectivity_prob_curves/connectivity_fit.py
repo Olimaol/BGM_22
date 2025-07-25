@@ -120,7 +120,7 @@ def wilson_interval(x, n, z=1.96):
 
 
 if __name__ == "__main__":
-    # Datasets from experimental_data/Connectivity_intrinsic_striatum/connectivity_probabilities.ods
+    # Datasets from Connectivity_intrinsic_striatum/connectivity_probabilities.ods
     datasets = {
         "dSPN-dSPN": [
             Dataset(0, 7, d_max=50, label="0/7 6-OHDA lesion"),
