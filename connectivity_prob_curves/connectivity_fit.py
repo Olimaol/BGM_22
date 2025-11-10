@@ -4,25 +4,44 @@ from skopt import gp_minimize
 from skopt.space import Real
 import matplotlib.pyplot as plt
 from scipy.stats import norm
-import json  # added for JSON output
+import json
+import os
 
 
 class Dataset:
-    def __init__(self, successes, trials, d_max=None, mean=None, std=None, label=None):
+    def __init__(
+        self,
+        pairs_recorded,
+        pairs_connected_uni,
+        pairs_connected_bi=None,
+        d_min=None,
+        d_max=None,
+        mean=None,
+        std=None,
+        label=None,
+    ):
         """
         Initializes a Dataset instance.
 
         Args:
-            successes (int): Number of successful observations.
-            trials (int): Total number of trials.
+            pairs_recorded (int): Total number of recorded pairs.
+            pairs_connected_uni (int): Number of unidirectionally connected pairs.
+            pairs_connected_bi (Optional[int]): Number of bidirectionally connected pairs (if given assume bidirectional recordings).
+            d_min (Optional[float]): Minimum distance for the uniform distribution.
             d_max (Optional[float]): Maximum distance for the uniform distribution.
             mean (Optional[float]): Mean of the normal distance distribution.
             std (Optional[float]): Standard deviation of the normal distance distribution.
             label (Optional[str]): Label for the dataset.
         """
+        trials = pairs_recorded if pairs_connected_bi is None else pairs_recorded * 2
+        successes = (
+            pairs_connected_uni
+            if pairs_connected_bi is None
+            else pairs_connected_uni + 2 * pairs_connected_bi
+        )
         self.x = successes
         self.n = trials
-        self.d_min = 0
+        self.d_min = 0 if d_min is None else d_min
         self.d_max = d_max
         self.mean = mean
         self.std = std
@@ -54,7 +73,7 @@ class Dataset:
             float: Expected connectivity probability.
         """
         if self.d_max is not None:
-            # Calculate expectation over a uniform distance interval [0, d_max]
+            # Calculate expectation over a uniform distance interval [d_min, d_max]
             integrand = lambda d: np.exp(-(d**2) / (sigma**2))
             integral, _ = quad(integrand, self.d_min, self.d_max)
             return integral / (self.d_max - self.d_min)
@@ -119,73 +138,159 @@ def wilson_interval(x, n, z=1.96):
     return center, margin
 
 
+def plot_connectivity(datasets, sigma, A, group_label, output_dir):
+    """
+    Plots the observed and fitted connectivity probabilities for a list of datasets.
+
+    Args:
+        datasets (list): A list of Dataset instances.
+        sigma (float): Fitted scale parameter of the half-Gaussian.
+        A (float): Fitted scaling factor.
+        group_label (str): Label for the group of datasets.
+        output_dir (str): Directory to save the plot.
+    """
+    plt.figure(figsize=(8, 6))
+
+    # Plot observed data points with error bars
+    for ds in datasets:
+        if ds.d_max is not None:
+            x_pos = (ds.d_max + ds.d_min) / 2
+        else:
+            x_pos = ds.mean
+        p_obs = ds.x / ds.n
+        _, margin = wilson_interval(ds.x, ds.n)
+        # x errorbar is 95% CI for the position distribution (+- 1.96*std or half the uniform interval)
+        if ds.d_max is not None:
+            x_err = 0.95 * (ds.d_max - ds.d_min) / 2
+        else:
+            x_err = 1.96 * ds.std
+        plt.errorbar(
+            x_pos,
+            p_obs,
+            yerr=margin,
+            xerr=x_err,
+            fmt="o",
+            label=ds.label,
+            capsize=5,
+            markersize=8,
+        )
+
+    # Plot fitted curve
+    d_values = np.linspace(
+        0, max(ds.d_max or (ds.mean + 5 * ds.std) for ds in datasets), 500
+    )
+    p_values = [A * np.exp(-(d**2) / (sigma**2)) for d in d_values]
+    plt.plot(d_values, p_values, label="Fitted curve", color="black")
+
+    plt.xlabel("Distance (μm)")
+    plt.ylabel("Connectivity Probability")
+    plt.title(f"Connectivity Fit: {group_label}")
+    plt.ylim(-0.05, 1.05)
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    plt.savefig(
+        os.path.join(
+            output_dir, f"connectivity_fit_{group_label.replace(' ', '_')}.png"
+        )
+    )
+    plt.close()
+
+
 if __name__ == "__main__":
     # Datasets from Connectivity_intrinsic_striatum/connectivity_probabilities.ods
+    """
+    Some datasets were for SPN-SPN --> I use them for all combinations
+    (dSPN-dSPN, dSPN-iSPN, iSPN-dSPN, iSPN-iSPN) but divide the counts by 4
+    Some datasets were for FS-SPN --> I use them for both combinations
+    (FS-dSPN, FS-iSPN) but divide the counts by 2
+
+    """
     datasets = {
         "dSPN-dSPN": [
-            Dataset(0, 7, d_max=50, label="0/7 6-OHDA lesion"),
-            Dataset(5, 19, d_max=50, label="5/19 baseline"),
-            Dataset(3, 43, d_max=100, label="3/43 baseline"),
+            Dataset(7, 0, 0, d_max=50, label="[1] 6-OHDA"),
+            Dataset(8, 0, 0, d_max=50, label="[1] reserpine"),
+            Dataset(19, 5, 0, d_max=50, label="[1] baseline"),
+            Dataset(7, 3, 0, d_max=50, label="[1] baseline"),
+            Dataset(43, 3, d_max=100, label="[2] baseline"),
+            Dataset(202 // 4, 40 // 4, 0 // 4, d_max=100, label="[2] baseline"),
+            Dataset(
+                45 // 4, 9 // 4, 0 // 4, d_min=153, d_max=509, label="[7] baseline"
+            ),
+            Dataset(69 // 4, 18 // 4, 8 // 4, d_max=5, label="[8] baseline"),
+            Dataset(38 // 4, 5 // 4, d_max=10, label="[8] baseline"),
+            Dataset(38 // 4, 12 // 4, 1 // 4, d_min=2, d_max=50, label="[9] baseline"),
+            Dataset(325 // 4, 39 // 4, d_max=100, label="[10] baseline"),
         ],
         "dSPN-iSPN": [
-            Dataset(3, 47, d_max=50, label="3/47 baseline"),
-            Dataset(3, 66, d_max=100, label="3/66 baseline"),
+            Dataset(24, 3, d_max=50, label="[1] baseline"),
+            Dataset(66, 3, d_max=100, label="[2] baseline"),
+            Dataset(202 // 4, 40 // 4, 0 // 4, d_max=100, label="[2] baseline"),
+            Dataset(
+                45 // 4, 9 // 4, 0 // 4, d_min=153, d_max=509, label="[7] baseline"
+            ),
+            Dataset(69 // 4, 18 // 4, 8 // 4, d_max=5, label="[8] baseline"),
+            Dataset(38 // 4, 5 // 4, d_max=10, label="[8] baseline"),
+            Dataset(38 // 4, 12 // 4, 1 // 4, d_min=2, d_max=50, label="[9] baseline"),
+            Dataset(325 // 4, 39 // 4, d_max=100, label="[10] baseline"),
         ],
-        # "FS-Chol": [
-        #     Dataset(0, 3, d_max=250, label="0/3 baseline"),
-        # ],
         "FS-dSPN": [
-            Dataset(22, 40, mean=105, std=50.1, label="22/40 6-OHDA lesion"),
-            Dataset(8, 9, d_max=100, label="8/9 baseline"),
-            Dataset(48, 90, d_max=250, label="48/90 baseline"),
-            Dataset(29, 48, mean=113, std=49, label="29/48 baseline"),
+            Dataset(9, 8, d_max=100, label="[2] baseline"),
+            Dataset(90, 48, d_max=250, label="[3] baseline"),
+            Dataset(80, 43, mean=105, std=50.1, label="[6] 6-OHDA"),
+            Dataset(96, 58, mean=113, std=49, label="[6] baseline"),
+            Dataset(39 // 2, 29 // 2, d_max=100, label="[2] baseline"),
+            Dataset(167 // 2, 75 // 2, mean=106, std=25, label="[3] baseline"),
         ],
         "FS-FS": [
-            Dataset(7, 12, mean=106, std=25, label="7/12 baseline"),
-            Dataset(2, 6, d_max=250, label="2/6 baseline"),
-            Dataset(3, 7, d_max=250, label="3/7 baseline"),
+            Dataset(6, 1, 3, d_max=250, label="[3] baseline"),
+            # Dataset(6, 0, 2, d_max=250, label="[4] baseline gap"),
+            # Dataset(721650, 0, 167, d_max=1000, label="[11] baseline gap"),
+            # Dataset(721650, 0, 4000, d_max=1000, label="[11] baseline gap"),
+            # Dataset(78, 0, 6, d_max=200, label="[12] baseline gap"),
+            Dataset(78, 0, 0, d_max=200, label="[12] baseline"),
+            Dataset(85, 50, 22, d_max=100, label="[14] baseline"),
+            Dataset(66, 20, 9, d_min=100, d_max=200, label="[14] baseline"),
+            Dataset(19, 0, 0, d_min=200, d_max=800, label="[14] baseline"),
         ],
         "FS-iSPN": [
-            Dataset(33, 43, mean=101, std=48, label="33/43 6-OHDA lesion"),
-            Dataset(6, 9, d_max=100, label="6/9 baseline"),
-            Dataset(21, 54, mean=116, std=46, label="21/54 baseline"),
-            Dataset(27, 77, d_max=250, label="27/77 baseline"),
+            Dataset(9, 6, d_max=100, label="[2] baseline"),
+            Dataset(86, 66, mean=101, std=48, label="[6] 6-OHDA"),
+            Dataset(108, 42, mean=116, std=46, label="[6] baseline"),
+            Dataset(77, 27, d_max=250, label="[3] baseline"),
+            Dataset(39 // 2, 29 // 2, d_max=100, label="[2] baseline"),
+            Dataset(167 // 2, 75 // 2, mean=106, std=25, label="[3] baseline"),
         ],
-        # "FS-PLTS": [
-        #     Dataset(0, 9, d_max=250, label="0/9 baseline"),
-        # ],
         "iSPN-dSPN": [
-            Dataset(3, 12, d_max=50, label="3/12 6-OHDA lesion"),
-            Dataset(13, 47, d_max=50, label="13/47 baseline"),
-            Dataset(10, 80, d_max=100, label="10/80 baseline"),
+            Dataset(12, 3, d_max=50, label="[1] 6-OHDA"),
+            Dataset(10, 1, d_max=50, label="[1] reserpine"),
+            Dataset(24, 13, d_max=50, label="[1] baseline"),
+            Dataset(80, 10, d_max=100, label="[2] baseline"),
+            Dataset(202 // 4, 40 // 4, 0 // 4, d_max=100, label="[2] baseline"),
+            Dataset(
+                45 // 4, 9 // 4, 0 // 4, d_min=153, d_max=509, label="[7] baseline"
+            ),
+            Dataset(69 // 4, 18 // 4, 8 // 4, d_max=5, label="[8] baseline"),
+            Dataset(38 // 4, 5 // 4, d_max=10, label="[8] baseline"),
+            Dataset(38 // 4, 12 // 4, 1 // 4, d_min=2, d_max=50, label="[9] baseline"),
+            Dataset(325 // 4, 39 // 4, d_max=100, label="[10] baseline"),
         ],
         "iSPN-iSPN": [
-            Dataset(3, 17, d_max=50, label="3/17 6-OHDA lesion"),
-            Dataset(14, 39, d_max=50, label="14/39 baseline"),
-            Dataset(7, 31, d_max=100, label="7/31 baseline"),
+            Dataset(17, 3, 0, d_max=50, label="[1] 6-OHDA"),
+            Dataset(18, 5, 0, d_max=50, label="[1] reserpine"),
+            Dataset(39, 14, 0, d_max=50, label="[1] baseline"),
+            Dataset(9, 4, 0, d_max=50, label="[1] baseline"),
+            Dataset(31, 7, d_max=100, label="[2] baseline"),
+            Dataset(202 // 4, 40 // 4, 0 // 4, d_max=100, label="[2] baseline"),
+            Dataset(
+                45 // 4, 9 // 4, 0 // 4, d_min=153, d_max=509, label="[7] baseline"
+            ),
+            Dataset(69 // 4, 18 // 4, 8 // 4, d_max=5, label="[8] baseline"),
+            Dataset(38 // 4, 5 // 4, d_max=10, label="[8] baseline"),
+            Dataset(38 // 4, 12 // 4, 1 // 4, d_min=2, d_max=50, label="[9] baseline"),
+            Dataset(325 // 4, 39 // 4, d_max=100, label="[10] baseline"),
         ],
-        # "NPYNGF-SPN": [
-        #     Dataset(25, 29, d_max=100, label="25/29 baseline"),
-        # ],
-        # "NPYPLTS-SPN": [
-        #     Dataset(0, 9, d_max=100, label="0/9 baseline"),
-        #     Dataset(3, 21, d_max=100, label="3/21 baseline"),
-        # ],
-        # "PLTS-Chol": [
-        #     Dataset(0, 8, d_max=250, label="0/8 baseline"),
-        # ],
-        # "PLTS-FS": [
-        #     Dataset(0, 9, d_max=250, label="0/9 baseline"),
-        # ],
-        # "PLTS-PLTS": [
-        #     Dataset(0, 26, d_max=250, label="0/26 baseline"),
-        # ],
-        # "PLTS-SPN": [
-        #     Dataset(2, 60, mean=153, std=80, label="2/60 baseline"),
-        # ],
     }
-
-    import os
 
     output_dir = "connectivity_fits"
     os.makedirs(output_dir, exist_ok=True)
@@ -205,31 +310,8 @@ if __name__ == "__main__":
         sigma_hat, A_hat = res.x
         print(f"[{group}] Fitted sigma: {sigma_hat:.2f} μm, A: {A_hat:.2f}")
 
-        d_vals = np.linspace(0, 200, 500)
-        p_curve = A_hat * np.exp(-(d_vals**2) / (sigma_hat**2))
-
-        plt.figure()
-        plt.plot(d_vals, p_curve, label="Fitted curve")
-
-        for ds in ds_list:
-            if ds.d_max is not None:
-                x_pos = ds.d_max / 2
-            else:
-                x_pos = ds.mean
-            p_obs = ds.x / ds.n
-            center, margin = wilson_interval(ds.x, ds.n)
-            plt.errorbar(x_pos, p_obs, yerr=margin, fmt="o", label=ds.label)
-
-        plt.xlabel("Distance (μm)")
-        plt.ylabel("Connectivity probability")
-        plt.title(f"Scaled half-Gaussian fit: {group}")
-        plt.xlim(0, 200)
-        plt.ylim(0, 1)
-        plt.legend()
-        plt.grid(True)
-
-        plt.savefig(os.path.join(output_dir, f"{group.replace(' ', '_')}.png"))
-        plt.close()
+        # plotting
+        plot_connectivity(ds_list, sigma_hat, A_hat, group, output_dir)
 
         # store in params dict under tuple key
         params[group] = {
