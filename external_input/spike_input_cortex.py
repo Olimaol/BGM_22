@@ -181,8 +181,9 @@ def build_groups_homogeneous(R, N, f, s, rng, build_reverse: bool = True):
         (or ``None`` if ``build_reverse`` is False).
     """
     k, k_float = compute_k_from_f(R, f)
-    # Total groups G based on total inputs M = N*R/k; groups hold s inputs each -> G = M/s.
-    M = int(round(N * R / k))  # Total inputs.
+    # total inputs = N * R, each group outputs to k receivers -> required inputs = M = N*R/k
+    # each group holds s inputs -> total groups = G = M/s
+    M = N * R / k  # Total inputs.
     G = max(1, int(round(M / s)))
     # Build groups: G rows, each row has k random distinct receiver indices.
     receivers = np.arange(R, dtype=np.int32)
