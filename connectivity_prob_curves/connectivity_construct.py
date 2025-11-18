@@ -5,6 +5,8 @@ from scipy.sparse import lil_matrix
 import matplotlib.pyplot as plt
 import os
 import json
+from math import pi, sqrt
+from scipy import integrate
 
 
 class Microcircuit:
@@ -201,7 +203,7 @@ class Microcircuit:
                 P0, sigma_um = self.conn_params[key]
                 sigma = sigma_um * 1e-3
                 dist = self._periodic_distance(pre_global, post_global)
-                p = P0 * np.exp(-(dist**2) / (sigma**2))
+                p = self._p_exp(dist, P0, sigma)
                 self.con_probs[key].append((p, 0))
                 if self.rng.random() < p:
                     # store global adjacency
@@ -213,6 +215,124 @@ class Microcircuit:
                     self.weights_by_type[key][pre_local, post_local] = 1.0
                     # record distance (mm)
                     self.connection_distances_by_pair[key].append(dist)
+
+    def expected_outer(rho, Rin, Rout, p_func):
+        """
+        Expected number of inputs from the outer shell [Rin, Rout] for a single receiver.
+
+        Math:
+            E[N_outer] = rho * ∫_{shell} p(r) dV
+                    = 4*pi * rho * ∫_{Rin}^{Rout} p(r) r^2 dr
+
+        Parameters
+        ----------
+        rho : float
+            Presynaptic neuron density (neurons per unit volume).
+        Rin : float
+            Inner radius of the outer shell (units consistent with distance).
+        Rout : float
+            Outer cutoff radius.
+        p_func : callable
+            p_func(r) returns connection probability at distance r.
+
+        Returns
+        -------
+        float
+            Expected number of connections originating in the outer shell.
+
+        Practical notes
+        ---------------
+        - Evaluate the integral with scipy.integrate.quad (adaptive).
+        - Ensure units are consistent.
+        - If p_func returns 0 beyond some radius, that is fine; integration will account for it.
+
+        Example
+        -------
+        >>> E_outer = expected_outer(1e5, 0.05, 0.8, lambda r: p_exp(r, 0.5, 0.2))
+        """
+        integrand = lambda r: p_func(r) * r**2
+        val, err = integrate.quad(
+            integrand, Rin, Rout, epsabs=1e-8, epsrel=1e-6, limit=200
+        )
+        return 4 * pi * rho * val
+
+    def expected_shared_for_d(rho, Rin, Rout, p_func, d):
+        """
+        Expected number of shared presynaptic inputs from the outer shells of two receivers separated by distance d.
+
+        Math derivation (summary):
+            E[N_shared(d)] = rho * ∫ p(r_A) p(r_B) dV
+        Place receiver A at origin, receiver B on polar axis at distance d.
+            E[N_shared(d)] = 2*pi * rho * ∫_{r=Rin}^{Rout} r^2 ∫_{theta=0}^{pi}
+                            p(r) p(r_B) sin(theta) dtheta dr
+        where r_B = sqrt(r^2 + d^2 - 2*r*d*cos(theta)).
+
+        Parameters
+        ----------
+        rho : float
+            Presynaptic density (neurons per unit volume).
+        Rin, Rout : float
+            Inner and outer radii defining the shell of interest.
+        p_func : callable
+            Connection kernel p(r).
+        d : float
+            Distance between the two receiving neurons (units consistent with radii).
+
+        Returns
+        -------
+        float
+            Expected number of shared presynaptic neurons that are in both outer shells and connect to both receivers.
+
+        Edge cases & checks
+        -------------------
+        - If d >= 2*Rout there is no overlap of the outer shells -> returns 0.
+        - If d == 0, this reduces to E[N_shared(0)] = 4*pi*rho * ∫_{Rin}^{Rout} p(r)^2 r^2 dr.
+
+        Numerical considerations
+        ------------------------
+        - This is a nested integral (r then theta). Use quad for the inner theta integral and then quad for r.
+        - For many d values, consider caching/interpolating results.
+        """
+        if d >= 2 * Rout:
+            return 0.0
+
+        def inner_theta(theta, r):
+            # distance to receiver B
+            rB = sqrt(max(0.0, r * r + d * d - 2 * r * d * np.cos(theta)))
+            # if rB is outside the outer shell, p_func(rB) will be small/zero if kernel is zeroed outside
+            return p_func(r) * p_func(rB) * (r**2) * np.sin(theta)
+
+        def integrand_r(r):
+            val_theta, _ = integrate.quad(
+                lambda th: inner_theta(th, r),
+                0.0,
+                pi,
+                epsabs=1e-6,
+                epsrel=1e-5,
+                limit=200,
+            )
+            return val_theta
+
+        val_r, _ = integrate.quad(
+            integrand_r, Rin, Rout, epsabs=1e-6, epsrel=1e-5, limit=200
+        )
+        return 2 * pi * rho * val_r
+
+    def _p_exp(
+        self, d: float | np.ndarray, P0: float, sigma: float
+    ) -> float | np.ndarray:
+        """
+        Exponential connection probability function.
+        """
+        return P0 * np.exp(-(d**2) / (sigma**2))
+
+    def _missing_local_input(self):
+        """
+        For every striatal neuron we simulated the neruons around it, the max distance
+        within the actually simulated periodic cube TODO
+        """
+        # TODO
+        pass
 
     # ----------------------
     # Reporting & summaries
@@ -436,7 +556,7 @@ class Microcircuit:
         max_x = self.dim_x_um / 2
         x_vals = np.linspace(0, max_x, 500)
         for (pre, post), (P0, sigma_um) in self.conn_params.items():
-            p_vals = P0 * np.exp(-(x_vals**2) / (sigma_um**2))
+            p_vals = self._p_exp(x_vals, P0, sigma_um)
             plt.plot(x_vals, p_vals, label=f"{pre}→{post} (d={sigma_um:.0f}µm)")
         plt.axvline(max_x, color="black", linestyle="--", label="Max periodic dist")
         plt.xlabel("Distance (µm)")
