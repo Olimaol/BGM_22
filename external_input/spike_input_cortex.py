@@ -22,11 +22,60 @@ The script also contains a demonstration section (under ``if __name__ ==
 - Building groups and inspecting their assignment to receivers.
 - Receiver-level counts with overlap (``k > 1``) and the no-overlap fast path
     (``k == 1``).
+New (distance-dependent) functionality
+-------------------------------------
+The module now also supports constructing input sharing using a distance-
+dependent shared fraction target ``f(d)`` for a 3D periodic (toroidal) grid
+of receivers. The user provides:
+
+* ``receiver_positions``: integer grid coordinates of receivers with periodic
+    boundary conditions (wrap-around along each axis).
+* ``f_target(d)``: a callable giving the desired expected shared fraction of
+    inputs between two receivers separated by distance ``d``.
+* ``N``: desired approximate number of distinct inputs per receiver.
+* ``s``: group size (inputs per group).
+
+We model the probability that a group positioned at location ``x`` connects
+to a receiver at location ``r`` via a Gaussian kernel
+
+``p(d) = p0 * exp(-d^2 / (2 * sigma^2))``
+
+with parameters ``(p0, sigma)`` chosen so that the resulting theoretical
+expected shared fraction curve matches ``f_target(d)`` in a least-squares
+sense. Under spatial homogeneity and uniform random placement of groups on
+grid points, the expected shared fraction for receivers separated by distance
+``d`` is:
+
+``E[f(d)] = E[p(dist(r_i, g)) * p(dist(r_j, g))] / E[p(dist(r_i, g))]``.
+
+Because ``p(d)`` is linear in ``p0`` and the numerator quadratic, this reduces
+to ``E[f(d)] = p0 * h_sigma(d)`` for a precomputable kernel-dependent function
+``h_sigma(d)`` when ``sigma`` is fixed. We therefore: (1) scan candidate
+``sigma`` values, (2) obtain the optimal ``p0`` in closed form, and (3) select
+``(p0, sigma)`` minimizing the squared error to the supplied ``f_target``.
+
+Given ``(p0, sigma)``, we determine required total distinct inputs ``M = G * s``
+by equating the target per-receiver inputs ``N`` with the theoretical
+expectation ``E[I] = M * E[p(dist(r, g))]``. We then build ``G`` groups at
+random grid locations and sample each receiver-group connection independently
+with probability ``p(distance)``. A distance-based simulation state is stored
+in ``DistanceGroupsState``.
+
+The ``__main__`` demonstration constructs a 10x10x10 grid, fits ``p(d)``,
+verifies the empirical shared fraction against the target, and visualizes
+input count distributions across receivers.
 """
 
 import numpy as np
-from typing import Tuple, Optional
+import math
+from typing import Tuple, Optional, Callable, Dict, List
 from dataclasses import dataclass
+
+# Optional plotting; demonstration will guard imports.
+try:  # pragma: no cover - demo convenience
+    import matplotlib.pyplot as plt  # type: ignore
+except Exception:  # pragma: no cover
+    plt = None
 
 
 def beta_params_from_p_rho(p: float, rho: float) -> Tuple[float, float]:
@@ -307,6 +356,334 @@ def build_groups_state(
     )
 
 
+# ---------------------------------------------------------------------------
+# Distance-dependent shared fraction construction (periodic 3D grid)
+# ---------------------------------------------------------------------------
+
+
+def _periodic_component(delta: int, L: int) -> int:
+    """Minimal wrapped distance along one axis for periodic boundaries."""
+    delta = abs(delta)
+    return min(delta, L - delta)
+
+
+def periodic_distance(a: np.ndarray, b: np.ndarray, Lx: int, Ly: int, Lz: int) -> float:
+    """Compute Euclidean distance on a 3D torus between integer grid points.
+
+    Args:
+        a, b: Arrays of length 3 with integer coordinates.
+        Lx, Ly, Lz: Domain lengths along x, y, z.
+
+    Returns:
+        float: Wrapped Euclidean distance.
+    """
+    dx = _periodic_component(int(a[0]) - int(b[0]), Lx)
+    dy = _periodic_component(int(a[1]) - int(b[1]), Ly)
+    dz = _periodic_component(int(a[2]) - int(b[2]), Lz)
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+
+@dataclass(frozen=True)
+class DistanceGroupsState:
+    """State for distance-dependent group sharing on a periodic 3D grid.
+
+    Attributes:
+        receiver_positions (np.ndarray): Shape (R, 3) integer coordinates.
+        L (Tuple[int,int,int]): Domain lengths along each axis.
+        R (int): Number of receivers.
+        N_target (int): Desired expected number of distinct inputs per receiver.
+        s (int): Group size (inputs per group).
+        G (int): Number of groups.
+        group_positions (np.ndarray): Shape (G, 3) chosen grid positions.
+        p0 (float): Amplitude of Gaussian connection probability.
+        sigma (float): Width of Gaussian connection probability.
+        groups_by_receiver (List[np.ndarray]): For each receiver, array of group indices.
+        group_dtype (np.dtype): Unsigned dtype for per-group counts.
+        receiver_dtype (np.dtype): Unsigned dtype for per-receiver counts.
+        f_target_samples (Dict[float, float]): Target shared fraction samples vs distance.
+        f_model_samples (Dict[float, float]): Model shared fraction samples vs distance (theoretical).
+    """
+
+    receiver_positions: np.ndarray
+    L: Tuple[int, int, int]
+    R: int
+    N_target: int
+    s: int
+    G: int
+    group_positions: np.ndarray
+    p0: float
+    sigma: float
+    groups_by_receiver: List[np.ndarray]
+    group_dtype: np.dtype
+    receiver_dtype: np.dtype
+    f_target_samples: Dict[float, float]
+    f_model_samples: Dict[float, float]
+
+
+def _compute_distance_matrix_receivers_to_grid(
+    receiver_positions: np.ndarray,
+) -> Tuple[np.ndarray, Tuple[int, int, int], np.ndarray]:
+    """Precompute distances from each receiver to every grid point (periodic).
+
+    Returns:
+        distances (np.ndarray): Shape (R, Ggrid) of wrapped distances.
+        L (tuple): Domain lengths.
+        grid_points (np.ndarray): Shape (Ggrid, 3) array of grid coordinates.
+    """
+    R = receiver_positions.shape[0]
+    mins = receiver_positions.min(axis=0)
+    shifted = receiver_positions - mins  # Ensure domain starts at 0.
+    Lx = int(shifted[:, 0].max() + 1)
+    Ly = int(shifted[:, 1].max() + 1)
+    Lz = int(shifted[:, 2].max() + 1)
+    grid_points = np.array(
+        [(x, y, z) for x in range(Lx) for y in range(Ly) for z in range(Lz)],
+        dtype=np.int16,
+    )
+    Ggrid = grid_points.shape[0]
+    distances = np.empty((R, Ggrid), dtype=np.float32)
+    for i in range(R):
+        a = shifted[i]
+        for j in range(Ggrid):
+            b = grid_points[j]
+            dx = _periodic_component(int(a[0]) - int(b[0]), Lx)
+            dy = _periodic_component(int(a[1]) - int(b[1]), Ly)
+            dz = _periodic_component(int(a[2]) - int(b[2]), Lz)
+            distances[i, j] = math.sqrt(dx * dx + dy * dy + dz * dz)
+    return distances, (Lx, Ly, Lz), grid_points
+
+
+def _fit_gaussian_p(
+    receiver_positions: np.ndarray,
+    f_target: Callable[[float], float],
+    sigma_candidates: np.ndarray,
+    center_index: int = 0,
+) -> Tuple[
+    float, float, Dict[float, float], Dict[float, float], float, Dict[float, float]
+]:
+    """Fit Gaussian p(d)=p0*exp(-d^2/(2*sigma^2)) to target shared fraction curve.
+
+    Exploits spatial homogeneity by fixing one receiver (``center_index``) and
+    comparing it to all others. For a given ``sigma`` the theoretical curve is
+    ``f_model(d) = p0 * h_sigma(d)`` where the optimal ``p0`` (least squares) is:
+
+    ``p0 = sum_d f_target(d) * h_sigma(d) / sum_d h_sigma(d)^2``.
+
+    Args:
+        receiver_positions: (R,3) grid coordinates.
+        f_target: Callable returning target shared fraction for distance ``d``.
+        sigma_candidates: 1D array of sigma values to scan.
+        center_index: Reference receiver index.
+
+    Returns:
+        p0, sigma, f_target_samples, f_model_samples, mean_g (for chosen sigma), h_sigma_map.
+    """
+    distances_matrix, L, grid_points = _compute_distance_matrix_receivers_to_grid(
+        receiver_positions
+    )
+    R = receiver_positions.shape[0]
+    # Distances between center receiver and all receivers.
+    mins = receiver_positions.min(axis=0)
+    shifted = receiver_positions - mins
+    Lx, Ly, Lz = L
+    center_pos = shifted[center_index]
+    dist_center_to_receivers = np.array(
+        [periodic_distance(center_pos, shifted[i], Lx, Ly, Lz) for i in range(R)],
+        dtype=np.float32,
+    )
+    # Unique distance bins.
+    unique_dists = np.unique(dist_center_to_receivers)
+    # Precompute distance arrays from center and each receiver to all grid points.
+    dist_center_to_grid = distances_matrix[center_index]
+    results = []
+    for sigma in sigma_candidates:
+        if sigma <= 0:
+            continue
+        g_center = np.exp(-(dist_center_to_grid**2) / (2.0 * sigma * sigma))
+        mean_g = float(g_center.mean())
+        # For each receiver compute mean of g_center * g_receiver over grid points.
+        g_all = np.exp(
+            -(distances_matrix**2) / (2.0 * sigma * sigma)
+        )  # shape (R, Ggrid)
+        mean_g_gshift = (g_center * g_all).mean(axis=1)  # shape (R,)
+        # Aggregate h_sigma(d) = mean_g_gshift / mean_g.
+        h_sigma_map: Dict[float, float] = {}
+        for d in unique_dists:
+            mask = dist_center_to_receivers == d
+            h_sigma_map[float(d)] = float(mean_g_gshift[mask].mean() / mean_g)
+        # Build arrays for least squares over actual occurring distances (weight by multiplicity).
+        h_vals = []
+        f_vals = []
+        weights = []
+        for d in unique_dists:
+            h = h_sigma_map[float(d)]
+            f_t = float(f_target(float(d)))
+            count = int((dist_center_to_receivers == d).sum())
+            h_vals.append(h)
+            f_vals.append(f_t)
+            weights.append(count)
+        h_vals = np.array(h_vals)
+        f_vals = np.array(f_vals)
+        weights = np.array(weights)
+        numerator = float(np.sum(f_vals * h_vals * weights))
+        denominator = float(np.sum((h_vals**2) * weights))
+        if denominator <= 0:
+            continue
+        p0 = numerator / denominator
+        # Enforce p0 so that p(d)=p0*exp(-d^2/(2 sigma^2)) <= 1 for all d (d>=0 gives max at d=0).
+        p0 = min(p0, 1.0)
+        # Model curve samples.
+        f_model_samples = {d: p0 * h_sigma_map[d] for d in h_sigma_map}
+        # Loss (weighted MSE).
+        mse = float(np.sum(((f_vals - p0 * h_vals) ** 2) * weights) / weights.sum())
+        f_target_samples = {float(d): float(f_target(float(d))) for d in h_sigma_map}
+        results.append(
+            (mse, p0, sigma, f_target_samples, f_model_samples, mean_g, h_sigma_map)
+        )
+    if not results:
+        raise RuntimeError("No valid sigma candidates for Gaussian fit.")
+    results.sort(key=lambda x: x[0])
+    mse, p0, sigma, f_target_samples, f_model_samples, mean_g, h_sigma_map = results[0]
+    return p0, sigma, f_target_samples, f_model_samples, mean_g, h_sigma_map
+
+
+def build_distance_groups_state(
+    receiver_positions: np.ndarray,
+    N_target: int,
+    s: int,
+    f_target: Callable[[float], float],
+    rng: np.random.Generator,
+    sigma_candidates: Optional[np.ndarray] = None,
+    center_index: int = 0,
+) -> DistanceGroupsState:
+    """Construct distance-dependent group sharing state.
+
+    Args:
+        receiver_positions: Integer grid coordinates shape (R,3).
+        N_target: Desired expected distinct inputs per receiver.
+        s: Group size (inputs per group).
+        f_target: Callable f(d) target shared fraction; must accept float distances.
+        rng: Random generator.
+        sigma_candidates: Optional array of sigma values to scan; if None, auto-generate.
+        center_index: Reference receiver for fitting (default 0).
+
+    Returns:
+        DistanceGroupsState.
+    """
+    if sigma_candidates is None:
+        # Heuristic sigma range based on grid diagonal length.
+        mins = receiver_positions.min(axis=0)
+        shifted = receiver_positions - mins
+        Lx = shifted[:, 0].max() + 1
+        Ly = shifted[:, 1].max() + 1
+        Lz = shifted[:, 2].max() + 1
+        diag = math.sqrt(Lx * Lx + Ly * Ly + Lz * Lz)
+        sigma_candidates = np.linspace(diag * 0.05, diag * 0.5, 25, dtype=np.float32)
+    p0, sigma, f_target_samples, f_model_samples, mean_g, _h_map = _fit_gaussian_p(
+        receiver_positions, f_target, sigma_candidates, center_index=center_index
+    )
+    # Determine total distinct inputs M = G*s to achieve N_target ≈ M * mean_p with mean_p = p0 * mean_g.
+    mean_p = p0 * mean_g
+    if mean_p <= 0:
+        raise RuntimeError(
+            "Mean connection probability is zero; increase sigma or adjust f_target."
+        )
+    M = N_target / mean_p
+    G_float = M / s
+    G = max(1, int(round(G_float)))
+    # Build group positions (uniform over grid points). Reuse precomputed grid.
+    distances_matrix, L, grid_points = _compute_distance_matrix_receivers_to_grid(
+        receiver_positions
+    )
+    Ggrid = grid_points.shape[0]
+    if G <= Ggrid:
+        group_indices = rng.choice(Ggrid, size=G, replace=False)
+    else:
+        group_indices = rng.choice(Ggrid, size=G, replace=True)
+    group_positions = grid_points[group_indices].astype(np.int16)
+    # Build adjacency lists using Bernoulli draws with probability p(distance).
+    # Precompute distances receiver -> chosen group positions.
+    R = receiver_positions.shape[0]
+    mins = receiver_positions.min(axis=0)
+    shifted = receiver_positions - mins
+    Lx, Ly, Lz = L
+    groups_by_receiver: List[List[int]] = [[] for _ in range(R)]
+    for g_idx, g_pos in enumerate(group_positions):
+        # Compute distances to all receivers.
+        dists = np.array(
+            [periodic_distance(g_pos, shifted[r], Lx, Ly, Lz) for r in range(R)],
+            dtype=np.float32,
+        )
+        probs = p0 * np.exp(-(dists**2) / (2.0 * sigma * sigma))
+        probs = np.clip(probs, 0.0, 1.0)
+        rand = rng.random(R)
+        connected_mask = rand < probs
+        connected_receivers = np.nonzero(connected_mask)[0]
+        if connected_receivers.size == 0:
+            # Guarantee at least one connection: choose nearest receiver.
+            nearest = int(np.argmin(dists))
+            connected_receivers = np.array([nearest], dtype=np.int32)
+        for r in connected_receivers:
+            groups_by_receiver[r].append(g_idx)
+    # Convert to arrays.
+    groups_by_receiver_arr = [
+        np.array(lst, dtype=np.int32) if lst else np.empty(0, dtype=np.int32)
+        for lst in groups_by_receiver
+    ]
+    # Dtypes.
+    group_dtype = _smallest_unsigned_dtype(int(s))
+    degrees = np.array([len(lst) for lst in groups_by_receiver_arr])
+    receiver_cap = int(s) * int(degrees.max() if degrees.size else 0)
+    receiver_dtype = _smallest_unsigned_dtype(max(1, receiver_cap))
+    return DistanceGroupsState(
+        receiver_positions=receiver_positions.astype(np.int16),
+        L=L,
+        R=R,
+        N_target=N_target,
+        s=s,
+        G=G,
+        group_positions=group_positions,
+        p0=p0,
+        sigma=sigma,
+        groups_by_receiver=groups_by_receiver_arr,
+        group_dtype=group_dtype,
+        receiver_dtype=receiver_dtype,
+        f_target_samples=f_target_samples,
+        f_model_samples=f_model_samples,
+    )
+
+
+def simulate_receiver_counts_distance_dependent(
+    state: DistanceGroupsState,
+    rate: float,
+    dt: float,
+    rho: float,
+    num_bins: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Simulate receiver counts using a distance-dependent state.
+
+    Each group first generates spike counts (size ``s``) across ``num_bins``
+    time bins (Beta-Binomial / Binomial depending on ``rho``), then counts are
+    summed for receivers connected to that group.
+    """
+    group_counts = simulate_counts_direct(
+        G=state.G,
+        N=state.s,
+        rate=rate,
+        dt=dt,
+        rho=rho,
+        num_bins=num_bins,
+        rng=rng,
+        dtype=state.group_dtype,
+    )
+    receiver_counts = np.zeros((state.R, num_bins), dtype=state.receiver_dtype)
+    for r, groups in enumerate(state.groups_by_receiver):
+        for g in groups:
+            receiver_counts[r] += group_counts[g]
+    return receiver_counts
+
+
 def simulate_receiver_counts_with_groups(
     state: GroupsState,
     rate: float,
@@ -514,3 +891,124 @@ if __name__ == "__main__":
     print("-->")
     print("receiver spike counts shape:", receiver_counts_no.shape)
     print("receiver 0, first 10 bins:", receiver_counts_no[0, :10])
+
+    # ------------------------------------------------------------------
+    # Distance-dependent shared fraction demonstration
+    # ------------------------------------------------------------------
+    print("\nDistance-dependent shared fraction demonstration:")
+    # Build a 10x10x10 grid of receiver positions.
+    grid_side = 10
+    receiver_positions = np.array(
+        [
+            (x, y, z)
+            for x in range(grid_side)
+            for y in range(grid_side)
+            for z in range(grid_side)
+        ],
+        dtype=np.int16,
+    )
+    R_dist = receiver_positions.shape[0]
+    # Target shared fraction function f(d).
+
+    def f_target(d: float) -> float:
+        # Example: modest amplitude decaying Gaussian in distance.
+        return 0.2 * math.exp(-((d / 4.0) ** 2))
+
+    N_target = 400  # desired distinct inputs per receiver (approximate)
+    s_group = 20  # group size
+    print("Fitting Gaussian connection probability to target shared fraction...")
+    dist_state = build_distance_groups_state(
+        receiver_positions=receiver_positions,
+        N_target=N_target,
+        s=s_group,
+        f_target=f_target,
+        rng=rng,
+    )
+    print(
+        f"Optimized p(d)=p0*exp(-d^2/(2*sigma^2)) parameters: p0={dist_state.p0:.4f}, sigma={dist_state.sigma:.3f}"
+    )
+    mean_inputs_empirical = np.mean(
+        [len(g) * s_group for g in dist_state.groups_by_receiver]
+    )
+    print(
+        f"Empirical mean distinct inputs per receiver (groups * s): {mean_inputs_empirical:.2f} (target {N_target})"
+    )
+    print(f"Total groups G: {dist_state.G}")
+    # Simulate spike counts for distance-dependent state.
+    rate_dd, dt_dd, rho_dd, num_bins_dd = 15.0, 0.001, 0.25, 30
+    receiver_counts_dd = simulate_receiver_counts_distance_dependent(
+        state=dist_state,
+        rate=rate_dd,
+        dt=dt_dd,
+        rho=rho_dd,
+        num_bins=num_bins_dd,
+        rng=rng,
+    )
+    print("Receiver counts (distance-dependent) shape:", receiver_counts_dd.shape)
+    # Empirical shared fraction estimation (sampled pairs for efficiency).
+    print("Sampling receiver pairs to estimate empirical shared fraction curve...")
+    max_pairs_sample = 20000
+    mins = dist_state.receiver_positions.min(axis=0)
+    shifted_positions = dist_state.receiver_positions - mins
+    Lx, Ly, Lz = dist_state.L
+    # Precompute sets of groups per receiver for intersection.
+    group_sets = [set(arr.tolist()) for arr in dist_state.groups_by_receiver]
+    # Random pairs.
+    pair_indices_i = rng.integers(0, R_dist, size=max_pairs_sample)
+    pair_indices_j = rng.integers(0, R_dist, size=max_pairs_sample)
+    bins_empirical: Dict[float, List[float]] = {}
+    for i, j in zip(pair_indices_i, pair_indices_j):
+        if i == j:
+            continue
+        pos_i = shifted_positions[i]
+        pos_j = shifted_positions[j]
+        d = periodic_distance(pos_i, pos_j, Lx, Ly, Lz)
+        shared_groups = group_sets[i].intersection(group_sets[j])
+        shared_inputs = len(shared_groups) * s_group
+        inputs_i = len(group_sets[i]) * s_group
+        if inputs_i == 0:
+            continue
+        frac = shared_inputs / inputs_i
+        bins_empirical.setdefault(d, []).append(frac)
+    # Aggregate means.
+    empirical_curve = {d: float(np.mean(vals)) for d, vals in bins_empirical.items()}
+    # Prepare plotting data sorted by distance.
+    d_model = sorted(dist_state.f_model_samples.keys())
+    f_model = [dist_state.f_model_samples[d] for d in d_model]
+    f_target_vals = [dist_state.f_target_samples[d] for d in d_model]
+    # Match empirical distances to model distances (within tolerance) by rounding.
+    empirical_d_sorted = sorted(empirical_curve.keys())
+    if plt is not None:
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+        ax0, ax1 = axes
+        ax0.plot(d_model, f_target_vals, label="target f(d)", color="black")
+        ax0.plot(d_model, f_model, label="model f(d)", color="tab:blue")
+        # Scatter empirical means.
+        ax0.scatter(
+            empirical_d_sorted,
+            [empirical_curve[d] for d in empirical_d_sorted],
+            s=12,
+            color="tab:orange",
+            alpha=0.7,
+            label="empirical",
+        )
+        ax0.set_xlabel("distance d")
+        ax0.set_ylabel("shared fraction")
+        ax0.set_title("Shared fraction vs distance")
+        ax0.legend()
+        # Histogram of distinct inputs counts.
+        distinct_inputs_counts = [
+            len(g) * s_group for g in dist_state.groups_by_receiver
+        ]
+        ax1.hist(distinct_inputs_counts, bins=30, color="tab:green", alpha=0.8)
+        ax1.set_xlabel("distinct inputs per receiver")
+        ax1.set_ylabel("count")
+        ax1.set_title("Distribution of inputs")
+        fig.tight_layout()
+        try:
+            plt.show()
+        except Exception:
+            print("(Plot display failed; non-interactive environment.)")
+    else:
+        print("matplotlib not available; skipping plots.")
+    print("Distance-dependent demonstration complete.")
