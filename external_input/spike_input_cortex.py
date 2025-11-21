@@ -978,37 +978,30 @@ if __name__ == "__main__":
     f_target_vals = [dist_state.f_target_samples[d] for d in d_model]
     # Match empirical distances to model distances (within tolerance) by rounding.
     empirical_d_sorted = sorted(empirical_curve.keys())
-    if plt is not None:
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-        ax0, ax1 = axes
-        ax0.plot(d_model, f_target_vals, label="target f(d)", color="black")
-        ax0.plot(d_model, f_model, label="model f(d)", color="tab:blue")
-        # Scatter empirical means.
-        ax0.scatter(
-            empirical_d_sorted,
-            [empirical_curve[d] for d in empirical_d_sorted],
-            s=12,
-            color="tab:orange",
-            alpha=0.7,
-            label="empirical",
-        )
-        ax0.set_xlabel("distance d")
-        ax0.set_ylabel("shared fraction")
-        ax0.set_title("Shared fraction vs distance")
-        ax0.legend()
-        # Histogram of distinct inputs counts.
-        distinct_inputs_counts = [
-            len(g) * s_group for g in dist_state.groups_by_receiver
-        ]
-        ax1.hist(distinct_inputs_counts, bins=30, color="tab:green", alpha=0.8)
-        ax1.set_xlabel("distinct inputs per receiver")
-        ax1.set_ylabel("count")
-        ax1.set_title("Distribution of inputs")
-        fig.tight_layout()
-        try:
-            plt.show()
-        except Exception:
-            print("(Plot display failed; non-interactive environment.)")
-    else:
-        print("matplotlib not available; skipping plots.")
-    print("Distance-dependent demonstration complete.")
+
+    # plot
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    ax0, ax1 = axes
+    ax0.plot(d_model, f_target_vals, label="target f(d)", color="black")
+    ax0.plot(d_model, f_model, label="model f(d)", color="tab:blue")
+    # Scatter empirical means.
+    ax0.scatter(
+        empirical_d_sorted,
+        [empirical_curve[d] for d in empirical_d_sorted],
+        s=12,
+        color="tab:orange",
+        alpha=0.7,
+        label="empirical",
+    )
+    ax0.set_xlabel("distance d")
+    ax0.set_ylabel("shared fraction")
+    ax0.set_title("Shared fraction vs distance")
+    ax0.legend()
+    # Histogram of distinct inputs counts.
+    distinct_inputs_counts = [len(g) * s_group for g in dist_state.groups_by_receiver]
+    ax1.hist(distinct_inputs_counts, bins=30, color="tab:green", alpha=0.8)
+    ax1.set_xlabel("distinct inputs per receiver")
+    ax1.set_ylabel("count")
+    ax1.set_title("Distribution of inputs")
+    fig.tight_layout()
+    plt.show()
