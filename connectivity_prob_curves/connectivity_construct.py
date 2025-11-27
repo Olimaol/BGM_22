@@ -5,8 +5,13 @@ from scipy.sparse import lil_matrix
 import matplotlib.pyplot as plt
 import os
 import json
-from math import pi, sqrt
 from scipy import integrate
+from scipy.interpolate import interp1d
+
+from external_input.spike_input_cortex import (
+    build_distance_groups_state,
+    periodic_distance,
+)
 
 
 class Microcircuit:
@@ -69,26 +74,10 @@ class Microcircuit:
             for key, val in fitted.items()
         }
 
-        # compute max sigma (um) per post type (for neighbor query radius)
-        self.max_sigma_um = {
-            post_type: max(
-                sigma_um
-                for (_, post_type2), (_, sigma_um) in self.conn_params.items()
-                if post_type2 == post_type
-            )
-            for post_type in self.cell_types
-        }
-
         # --- Lattice and neuron types ---
         self.n_total = self.nx * self.b * self.b
         # spacing per cell (mm)
         self.d = (1.0 / self.density) ** (1 / 3)  # mm
-        # margin for central analysis (index units) – unused due to periodic boundaries
-        global_max_sigma_um = max(
-            sigma_um for (_, _), (_, sigma_um) in self.conn_params.items()
-        )
-        self.margin = int(np.ceil(3 * global_max_sigma_um * 1e-3 / self.d))
-        self.margin = 0
 
         # positions (mm)
         xs = np.arange(self.nx) * self.d
@@ -165,15 +154,55 @@ class Microcircuit:
             key: [] for key in self.conn_params.keys()
         }
 
+        # get the radius for the simulated neighborhood per post type (mm) and
+        # theoretical max sigma, required for _missing_local_input() and _build_connectivity()
+        self.neighborhood_radii_mm, self.max_sigma_mm = (
+            self._get_neighborhood_radii_mm()
+        )
+
+        # TODO: for testing, remove
+        self._missing_local_input()
+        quit()
+
         # build connectivity and fill per-type weight matrices
         self._build_connectivity()
 
         if self.verbose:
             self.summary()
 
+        # TODO: define missing local gaba inputs (spike counts) for all neurons
+        self._missing_local_input()
+
+        # TODO: define excitatory inputs (spike counts) for all neurons
+
     # ----------------------
     # Connectivity creation
     # ----------------------
+    def _get_neighborhood_radii_mm(self):
+        """
+        Get the neighborhood radius (mm) for each post type based on max sigma. It can
+        not exceed half the max dimension of the periodic cube.
+        """
+
+        # compute max sigma (um) per post type (for neighbor query radius)
+        max_sigma_um = {
+            post_type: max(
+                sigma_um
+                for (_, post_type2), (_, sigma_um) in self.conn_params.items()
+                if post_type2 == post_type
+            )
+            for post_type in self.cell_types
+        }
+        # 3 times max sigma
+        max_sigma_mm = {pt: max_sigma_um[pt] * 3 * 1e-3 for pt in self.cell_types}
+
+        # compute neighborhood radii (mm) which cannot exceed half the box size
+        radii_mm = {
+            post_type: min(max_sigma_mm[post_type], self.L.max() / 2)
+            for post_type in self.cell_types
+        }
+        return radii_mm, max_sigma_mm
+
     def _neighbors_within(self, j: int, r_mm: float) -> set:
         idxs = self.tree.query_ball_point(self.positions[j], r=r_mm)
         return set(idx % self.n_total for idx in idxs)
@@ -187,9 +216,9 @@ class Microcircuit:
         # loop over postsynaptic neurons (global indices)
         for post_global in range(self.n_total):
             post_type = self.types[post_global]
-            dmax = self.max_sigma_um[post_type] * 3 * 1e-3
-            dmax = min(dmax, self.L.max() / 2)
-            neighbor_idxs = self._neighbors_within(post_global, dmax)
+            neighbor_idxs = self._neighbors_within(
+                post_global, r_mm=self.neighborhood_radii_mm[post_type]
+            )
             self.neighbor_sizes.append(len(neighbor_idxs))
 
             # loop over presynaptic candidates (global indices)
@@ -216,7 +245,7 @@ class Microcircuit:
                     # record distance (mm)
                     self.connection_distances_by_pair[key].append(dist)
 
-    def expected_outer(rho, Rin, Rout, p_func):
+    def _expected_outer(self, rho, Rin, Rout, p_func):
         """
         Expected number of inputs from the outer shell [Rin, Rout] for a single receiver.
 
@@ -254,9 +283,9 @@ class Microcircuit:
         val, err = integrate.quad(
             integrand, Rin, Rout, epsabs=1e-8, epsrel=1e-6, limit=200
         )
-        return 4 * pi * rho * val
+        return 4 * np.pi * rho * val
 
-    def expected_shared_for_d(rho, Rin, Rout, p_func, d):
+    def _expected_shared_for_d(self, rho, Rin, Rout, p_func, d):
         """
         Expected number of shared presynaptic inputs from the outer shells of two receivers separated by distance d.
 
@@ -298,15 +327,16 @@ class Microcircuit:
 
         def inner_theta(theta, r):
             # distance to receiver B
-            rB = sqrt(max(0.0, r * r + d * d - 2 * r * d * np.cos(theta)))
-            # if rB is outside the outer shell, p_func(rB) will be small/zero if kernel is zeroed outside
+            rB = np.sqrt(max(0.0, r * r + d * d - 2 * r * d * np.cos(theta)))
+            if (rB < Rin) or (rB > Rout):
+                return 0.0
             return p_func(r) * p_func(rB) * (r**2) * np.sin(theta)
 
         def integrand_r(r):
             val_theta, _ = integrate.quad(
                 lambda th: inner_theta(th, r),
                 0.0,
-                pi,
+                np.pi,
                 epsabs=1e-6,
                 epsrel=1e-5,
                 limit=200,
@@ -316,7 +346,7 @@ class Microcircuit:
         val_r, _ = integrate.quad(
             integrand_r, Rin, Rout, epsabs=1e-6, epsrel=1e-5, limit=200
         )
-        return 2 * pi * rho * val_r
+        return 2 * np.pi * rho * val_r
 
     def _p_exp(
         self, d: float | np.ndarray, P0: float, sigma: float
@@ -328,11 +358,285 @@ class Microcircuit:
 
     def _missing_local_input(self):
         """
-        For every striatal neuron we simulated the neruons around it, the max distance
-        within the actually simulated periodic cube TODO
+        TODO It seems I tried to implement this directly here, in the meanwhile I implemented a working method in spike_input_cortex.py --> TODO use the version which create groups achieving distance dependent shared input fractions from spike_input_cortex
         """
         # TODO
-        pass
+        # Get distance dependent shared input curves f(d)
+        (
+            f_d_interp_dict,
+            f_d_raw_dict,
+            expected_outer_dict,
+            expected_shared_dict,
+        ) = self._define_distance_dependent_shared_input_curves()
+
+        # Build input groups based on f(d) TODO
+        self._define_distance_dependent_shared_input_groups(
+            expected_outer_dict=expected_outer_dict,
+            f_d_interp_dict=f_d_interp_dict,
+            expected_shared_dict=expected_shared_dict,
+        )
+
+    def _define_distance_dependent_shared_input_groups(
+        self, expected_outer_dict, f_d_interp_dict, expected_shared_dict
+    ):
+        # TODO
+
+        # Loop over postsynaptic neuron type
+        for post_type in self.cell_types:
+            # loop over presynaptic neuron type
+            for pre_type in self.cell_types:
+                key = (pre_type, post_type)
+                if key not in self.conn_params:
+                    continue
+                # get receiver positions of this post type
+                receiver_positions = self.positions[self.types == post_type]
+                # N_target: expeted inputs from outer shell per receiver neuron
+                N_target = expected_outer_dict[key]
+                # f_target: distance-dependent shared input fraction f(d)
+                f_target = f_d_interp_dict[key]
+                # the given f_d expects distances in mm, but creating the groups uses grid coordinates
+                f_target_grid = lambda d_grid: f_target(d_grid * self.d)
+                # s_group: group size, I use max(expected shared) / 10 and min 1
+                s_group = max(int(expected_shared_dict[key][1].max() / 10), 1)
+                # create groups and distribute them over receiver neurons
+                if self.verbose:
+                    print(
+                        f"{pre_type}->{post_type} - Defining distance-dependent shared input groups for..."
+                    )
+                    print(f"receiver positions (first 5): {receiver_positions[:5]}")
+                    print(f"N_target: {N_target}")
+                    print(f"s_group: {s_group}")
+                    print("\n")
+
+                dist_state = build_distance_groups_state(
+                    receiver_positions=receiver_positions,
+                    bounding_box_width=self.L[0],
+                    N_target=N_target,
+                    s=s_group,
+                    f_target=f_target_grid,
+                    rng=self.rng,
+                    fine_grid_resolution=10,
+                )
+
+                if self.verbose:
+                    print(
+                        f"Optimized p(d)=p0*exp(-d^2/(2*sigma^2)) parameters: p0={dist_state.p0:.4f}, sigma={dist_state.sigma:.3f}"
+                    )
+                    mean_inputs_empirical = np.mean(
+                        [len(g) * s_group for g in dist_state.groups_by_receiver]
+                    )
+                    print(
+                        f"Empirical mean distinct inputs per receiver (groups * s): {mean_inputs_empirical:.2f} (target {N_target})"
+                    )
+                    print(f"Total groups G: {dist_state.G}")
+
+                    # Empirical shared fraction estimation (sampled pairs for efficiency).
+                    print(
+                        f"{pre_type}->{post_type} - Sampling receiver pairs to estimate empirical shared fraction curve..."
+                    )
+                    R_dist = receiver_positions.shape[0]
+                    max_pairs_sample = 20000
+                    mins = dist_state.receiver_positions.min(axis=0)
+                    shifted_positions = dist_state.receiver_positions - mins
+                    Lx, Ly, Lz = dist_state.L
+                    # Precompute sets of groups per receiver for intersection.
+                    group_sets = [
+                        set(arr.tolist()) for arr in dist_state.groups_by_receiver
+                    ]
+                    # Random pairs.
+                    pair_indices_i = self.rng.integers(0, R_dist, size=max_pairs_sample)
+                    pair_indices_j = self.rng.integers(0, R_dist, size=max_pairs_sample)
+                    bins_empirical = {}
+                    for i, j in zip(pair_indices_i, pair_indices_j):
+                        if i == j:
+                            continue
+                        pos_i = shifted_positions[i]
+                        pos_j = shifted_positions[j]
+                        d = periodic_distance(pos_i, pos_j, Lx, Ly, Lz)
+                        shared_groups = group_sets[i].intersection(group_sets[j])
+                        shared_inputs = len(shared_groups) * s_group
+                        inputs_i = len(group_sets[i]) * s_group
+                        if inputs_i == 0:
+                            continue
+                        frac = shared_inputs / inputs_i
+                        bins_empirical.setdefault(d, []).append(frac)
+                    # Aggregate means.
+                    empirical_curve = {
+                        d: float(np.mean(vals)) for d, vals in bins_empirical.items()
+                    }
+                    # Prepare plotting data sorted by distance.
+                    d_model = sorted(dist_state.f_model_samples.keys())
+                    f_model = [dist_state.f_model_samples[d] for d in d_model]
+                    f_target_vals = [dist_state.f_target_samples[d] for d in d_model]
+                    # Match empirical distances to model distances (within tolerance) by rounding.
+                    empirical_d_sorted = sorted(empirical_curve.keys())
+
+                    # plot
+                    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+                    ax0, ax1 = axes
+                    ax0.plot(d_model, f_target_vals, label="target f(d)", color="black")
+                    ax0.plot(d_model, f_model, label="model f(d)", color="tab:blue")
+                    # Scatter empirical means.
+                    ax0.scatter(
+                        empirical_d_sorted,
+                        [empirical_curve[d] for d in empirical_d_sorted],
+                        s=12,
+                        color="tab:orange",
+                        alpha=0.7,
+                        label="empirical",
+                    )
+                    ax0.set_xlabel("distance d")
+                    ax0.set_ylabel("shared fraction")
+                    ax0.set_title("Shared fraction vs distance")
+                    ax0.legend()
+                    # Histogram of distinct inputs counts.
+                    distinct_inputs_counts = [
+                        len(g) * s_group for g in dist_state.groups_by_receiver
+                    ]
+                    ax1.hist(
+                        distinct_inputs_counts, bins=30, color="tab:green", alpha=0.8
+                    )
+                    ax1.set_xlabel("distinct inputs per receiver")
+                    ax1.set_ylabel("count")
+                    ax1.set_title("Distribution of inputs")
+                    fig.tight_layout()
+                    # set figure name
+                    fig.suptitle(
+                        f"{pre_type}->{post_type} - Shared fraction and input distribution"
+                    )
+                    plt.show()
+
+    def _define_distance_dependent_shared_input_curves(self):
+
+        # Get shared input fraction depending on distance f(d) considering the size of
+        # the simulated volume and the distance-dependent connection probability
+        # Number of inputs from outer shell:
+        Rin_mm = (
+            self.neighborhood_radii_mm
+        )  # inner radius of outer shell (mm), i.e. simulated volume around receiver neuron
+        Rout_mm = (
+            self.max_sigma_mm
+        )  # outer cutoff radius (mm), i.e. theoretical max sigma
+        rho_pre = {
+            pre_type: self.props[pre_type] * self.density
+            for pre_type in self.cell_types
+        }  # presynaptic density (neurons/mm^3)
+
+        # variables to store the returns
+        f_d_interp_dict = {}
+        f_d_raw_dict = {}
+        expected_outer_dict = {}
+        expected_shared_dict = {}
+
+        # Loop over postsynaptic type
+        for post_type in self.cell_types:
+            # loop over presynaptic type
+            for pre_type in self.cell_types:
+                key = (pre_type, post_type)
+                if key not in self.conn_params:
+                    continue
+                P0, sigma_um = self.conn_params[key]
+                sigma_mm = sigma_um * 1e-3  # mm
+
+                # define p_func
+                p_func = lambda r_mm: self._p_exp(r_mm, P0, sigma_mm)
+
+                # compute expected number of inputs from outer shell per receiver neuron
+                expected_outer = self._expected_outer(
+                    rho=rho_pre[pre_type],
+                    Rin=Rin_mm[post_type],
+                    Rout=Rout_mm[post_type],
+                    p_func=p_func,
+                )
+                expected_inner = self._expected_outer(
+                    rho=rho_pre[pre_type],
+                    Rin=0.0,
+                    Rout=Rin_mm[post_type],
+                    p_func=p_func,
+                )
+                if self.verbose:
+                    print(f"Computed E_outer for {pre_type}->{post_type}...")
+                    print(
+                        f"  Rin={Rin_mm[post_type]:.3f} mm, Rout={Rout_mm[post_type]:.3f} mm"
+                    )
+                    print(f"  rho_pre={rho_pre[pre_type]:.2f} neurons/mm^3")
+                    print(
+                        f"  p_func at 0 mm = {p_func(0):.4f}, p_func at Rin = {p_func(Rin_mm[post_type]):.4f}"
+                    )
+                    print(
+                        f"  E_outer = {expected_outer:.4f} inputs per receiver neuron"
+                    )
+                    print(
+                        f"  E_inner = {expected_inner:.4f} inputs per receiver neuron (has to match with local inputs in simulated volume)"
+                    )
+                    print("\n")
+
+                # compute expected shared inputs for distance d between two neurons
+                # precalculate the expected shared inputs for some distances to later interpolate
+                dmax = (
+                    np.sqrt(3) * self.L.max() / 2
+                )  # maximum possible distance between pair of neurons in periodic cube, i.e. half the space diagonal
+                d_vals = np.linspace(0, dmax, 50)
+                expected_shared_vals = np.array(
+                    [
+                        self._expected_shared_for_d(
+                            rho_pre[pre_type],
+                            Rin_mm[post_type],
+                            Rout_mm[post_type],
+                            p_func,
+                            d,
+                        )
+                        for d in d_vals
+                    ]
+                )
+                if self.verbose:
+                    print(f"Computed E_shared_outer for {pre_type}->{post_type}...")
+                    print(f"  For distances between pairs d in [0, {dmax:.3f}] mm")
+                    print(
+                        f"  Expected shared inputs at d=0 mm: {expected_shared_vals[0]:.4f}"
+                    )
+                    print(
+                        f"  Expected shared inputs at d={dmax:.3f} mm: {expected_shared_vals[-1]:.4f}"
+                    )
+                    print("\n")
+
+                # distance-dependent shared input fraction f(d)
+                f_d = expected_shared_vals / max(expected_outer, 1e-12)
+
+                # store f(d) as an interpolating function
+                f_d_interp_dict[key] = interp1d(
+                    d_vals, f_d, kind="cubic", fill_value="extrapolate"
+                )
+
+                # store the raw f_d values and expected outer and shared numbers for later use
+                f_d_raw_dict[key] = (d_vals, f_d)
+                expected_outer_dict[key] = expected_outer
+                expected_shared_dict[key] = (d_vals, expected_shared_vals)
+
+                # visualization of f(d) (optional)
+                # plt.figure(figsize=(8, 6))
+                # plt.subplot(211)
+                # d_vals_plot = np.linspace(0, dmax, 200)
+                # plt.plot(d_vals_plot, f_d_dict[key](d_vals_plot))
+                # plt.plot(d_vals, f_d, "o")
+                # plt.title(
+                #     f"Shared input fraction f(d) for {pre_type}->{post_type} \n E_outer={expected_outer:.2f}"
+                # )
+                # plt.xlabel("Distance d (mm)")
+                # plt.ylabel("Shared input fraction f(d)")
+                # plt.subplot(212)
+                # plt.plot(d_vals, expected_shared_vals)
+                # plt.title(f"Expected shared inputs for {pre_type}->{post_type}")
+                # plt.xlabel("Distance d (mm)")
+                # plt.ylabel("Expected shared inputs")
+                # plt.show()
+
+        return (
+            f_d_interp_dict,
+            f_d_raw_dict,
+            expected_outer_dict,
+            expected_shared_dict,
+        )
 
     # ----------------------
     # Reporting & summaries
@@ -394,9 +698,9 @@ class Microcircuit:
         if j is None:
             j = self.j_center
         post_type = self.types[j]
-        dmax = self.max_sigma_um[post_type] * 3 * 1e-3
-        dmax = min(dmax, self.L.max() / 2)
-        neighbor_idxs = self._neighbors_within(j, dmax)
+        neighbor_idxs = self._neighbors_within(
+            j, r_mm=self.neighborhood_radii_mm[post_type]
+        )
 
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(projection="3d")
@@ -495,24 +799,8 @@ class Microcircuit:
                 for pre_idx, post_idx in pairs:
                     counts[post_idx] += 1
                 print(f"{pre_type} -> {post_type}: {int(np.sum(counts))} total inputs")
-                margin_mm = self.margin * self.d
-                dim_x_mm = self.nx * self.d
-                dim_y_mm = self.b * self.d
-                dim_z_mm = self.b * self.d
-                mask_x = (self.X.ravel() >= margin_mm) & (
-                    self.X.ravel() < (dim_x_mm - margin_mm)
-                )
-                mask_y = (self.Y.ravel() >= margin_mm) & (
-                    self.Y.ravel() < (dim_y_mm - margin_mm)
-                )
-                mask_z = (self.Z.ravel() >= margin_mm) & (
-                    self.Z.ravel() < (dim_z_mm - margin_mm)
-                )
-                central = mask_x & mask_y & mask_z & (self.types == post_type)
-                print(
-                    f"{pre_type} -> {post_type}: {int(np.sum(central))} central neurons of type {post_type}"
-                )
-                hist_data[pre_type][post_type] = counts[central]
+                mask = self.types == post_type
+                hist_data[pre_type][post_type] = counts[mask]
                 plt.figure()
                 plt.hist(hist_data[pre_type][post_type], bins=30)
                 plt.title(f"{pre_type} -> {post_type} input counts")
@@ -702,6 +990,13 @@ class Microcircuit:
             )
             ax.set_xlabel("post")
             ax.set_ylabel("pre")
+            # print the connection type and the expected number of inputs for a single post neuron:
+            print(f"{pre_type} -> {post_type}: expected inputs per post neuron:")
+            n_inputs_per_post = W.sum(axis=0)
+            print(f"  Mean: {n_inputs_per_post.mean():.2f}")
+            print(f"  Std: {n_inputs_per_post.std():.2f}")
+            print(f"  Min: {n_inputs_per_post.min():.2f}")
+            print(f"  Max: {n_inputs_per_post.max():.2f}")
         # hide unused axes
         for extra in range(n, rows * cols):
             r = extra // cols
@@ -837,7 +1132,7 @@ class Microcircuit:
 
 if __name__ == "__main__":
     # Example usage: build microcircuit and reproduce main analyses, saving to output_dir
-    mc = Microcircuit(verbose=True)
+    mc = Microcircuit(nx=10, b=10, verbose=True)
     mc.plot_ext_kdtree_points(show=False)
     mc.plot_neighborhood(show=False)
     mc.plot_neighbor_candidate_counts(show=False)

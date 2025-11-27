@@ -1145,7 +1145,7 @@ if __name__ == "__main__":
         s=s_group,
         f_target=f_target,
         rng=rng,
-        center_index=center_index,
+        center_index=0,  # center_index,
         fine_grid_resolution=10,
     )
     print(
