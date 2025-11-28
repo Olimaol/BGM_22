@@ -397,8 +397,8 @@ class Microcircuit:
                 f_target = f_d_interp_dict[key]
                 # the given f_d expects distances in mm, but creating the groups uses grid coordinates
                 f_target_grid = lambda d_grid: f_target(d_grid * self.d)
-                # s_group: group size, I use max(expected shared) / 10 and min 1
-                s_group = max(int(expected_shared_dict[key][1].max() / 10), 1)
+                # s_group: group size, I use max(expected shared) / 2 and min 1
+                s_group = max(int(expected_shared_dict[key][1].max() / 2), 1)
                 # create groups and distribute them over receiver neurons
                 if self.verbose:
                     print(

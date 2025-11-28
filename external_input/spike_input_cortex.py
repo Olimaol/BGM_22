@@ -590,9 +590,9 @@ def _fit_gaussian_p_with_fine_grid(
     receiver_positions: np.ndarray,
     bounding_box_width: float,
     f_target: Callable[[float], float],
-    sigma_candidates: np.ndarray,
     center_index: int = 0,
-    fine_res: int = 100,
+    fine_res: int = 5,
+    use_diagonal_receivers: bool = True,
 ) -> Tuple[float, float, Dict[float, float], Dict[float, float], float]:
     """Fit p(d)=p0*exp(-d^2/(2*sigma^2)) using a fine uniform grid (fine_res^3).
 
@@ -617,12 +617,47 @@ def _fit_gaussian_p_with_fine_grid(
         dtype=np.float32,
     )
     Ggrid = grid_points.shape[0]
-    center = receiver_positions[center_index].astype(np.float32)
     print(f"Total fine grid points: {Ggrid}")
+
+    # Choose which receiver set to use for fitting:
+    # 1) By default, use 100 receivers along the half-diagonal
+    #    from cube center to a corner (uniformly spaced), with the center as index 0.
+    # 2) Else, use actual receiver positions when R <= n^3.
+    # 3) Else, fall back to n^3 virtual receivers placed on the fine grid (cell centers).
+    if use_diagonal_receivers:
+        # Build 100 receivers from center to near-corner along the (1,1,1) direction.
+        num_diag = 100
+        center_pt = np.array([L / 2.0, L / 2.0, L / 2.0], dtype=np.float32)
+        # Keep last point strictly inside [0, L) to respect periodic assumptions.
+        eps = max(L * 1e-6, 1e-6)
+        corner_pt = np.array([L - eps, L - eps, L - eps], dtype=np.float32)
+        ts = np.linspace(0.0, 1.0, num_diag, dtype=np.float32)
+        rec_pos_used = center_pt[np.newaxis, :] + ts[:, np.newaxis] * (
+            corner_pt - center_pt
+        )
+        R_used = num_diag
+        center_index_used = 0
+        print(
+            f"Using half-diagonal receivers: {R_used} positions from center to corner."
+        )
+    elif R > Ggrid:
+        rec_pos_used = grid_points  # shape (Ggrid, 3)
+        R_used = Ggrid
+        center_index_used = 0  # homogeneous grid; any index is equivalent
+        print(
+            f"Using virtual receivers: R={R} > n^3={Ggrid}. Evaluating with {R_used} uniformly distributed positions."
+        )
+    else:
+        rec_pos_used = receiver_positions.astype(np.float32)
+        R_used = R
+        center_index_used = min(max(0, int(center_index)), R_used - 1)
+
+    center = rec_pos_used[center_index_used].astype(np.float32)
+
     # Distances from center receiver to all other receivers (for binning).
     dist_center_to_receivers = _perdiodic_distance_float_parallel(
-        np.repeat(center[np.newaxis, :], R, axis=0),
-        receiver_positions.astype(np.float32),
+        np.repeat(center[np.newaxis, :], R_used, axis=0),
+        rec_pos_used.astype(np.float32, copy=False),
         L,
     )
     unique_dists, unique_dists_inv = np.unique(
@@ -637,15 +672,15 @@ def _fit_gaussian_p_with_fine_grid(
     f_target_samples = {float(d): float(f_target(float(d))) for d in unique_dists}
 
     # Precompute distances matrix (receivers -> fine grid points) and center distances to grid.
-    distances_matrix = np.empty((R, Ggrid), dtype=np.float32)
-    rec_pos = receiver_positions.astype(np.float32, copy=False)
-    for i in range(R):
+    distances_matrix = np.empty((R_used, Ggrid), dtype=np.float32)
+    rec_pos = rec_pos_used.astype(np.float32, copy=False)
+    for i in range(R_used):
         a = np.broadcast_to(rec_pos[i], (grid_points.shape[0], 3))
         d = _perdiodic_distance_float_parallel(a, grid_points, L)
         distances_matrix[i] = d.astype(np.float32, copy=False)
-    dist_center_to_grid = distances_matrix[center_index]
+    dist_center_to_grid = distances_matrix[center_index_used]
 
-    print(f"receiver_positions shape: {receiver_positions.shape}")
+    print(f"receiver_positions shape (used): {rec_pos.shape}")
     print(f"distances_matrix shape: {distances_matrix.shape}")
 
     # Objective function: given sigma, compute weighted MSE and optimal p0.
@@ -784,9 +819,8 @@ def build_distance_groups_state(
     s: int,
     f_target: Callable[[float], float],
     rng: np.random.Generator,
-    sigma_candidates: Optional[np.ndarray] = None,
     center_index: int = 0,
-    fine_grid_resolution: int = 100,
+    fine_grid_resolution: int = 5,
 ) -> DistanceGroupsState:
     """Construct distance-dependent group sharing state with explicit bounding box.
 
@@ -801,16 +835,11 @@ def build_distance_groups_state(
     replacement to assign exactly ``G`` distinct group locations. This guarantees
     ``G <= n_side^3``.
     """
-    if sigma_candidates is None:
-        # Sigma heuristic based on box diagonal.
-        diag = math.sqrt(3.0) * bounding_box_width
-        sigma_candidates = np.linspace(diag * 0.02, diag * 0.5, 30, dtype=np.float32)
     p0, sigma, f_target_samples, f_model_samples, mean_g = (
         _fit_gaussian_p_with_fine_grid(
             receiver_positions=receiver_positions,
             bounding_box_width=bounding_box_width,
             f_target=f_target,
-            sigma_candidates=sigma_candidates,
             center_index=center_index,
             fine_res=fine_grid_resolution,
         )
@@ -1286,7 +1315,7 @@ if __name__ == "__main__":
     center_index = R_dist // 2
 
     def f_target(d: float) -> float:
-        return 0.2 * math.exp(-((d / (bounding_box_width / 2.5)) ** 2))
+        return 0.2 * math.exp(-((d / (bounding_box_width / 12.5)) ** 2))
 
     N_target = 400
     s_group = 20
@@ -1298,8 +1327,6 @@ if __name__ == "__main__":
         s=s_group,
         f_target=f_target,
         rng=rng,
-        center_index=0,  # center_index,
-        fine_grid_resolution=10,
     )
     print(
         f"Optimized p(d)=p0*exp(-d^2/(2*sigma^2)) parameters: p0={dist_state.p0:.4f}, sigma={dist_state.sigma:.3f}"
