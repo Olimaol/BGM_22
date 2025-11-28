@@ -10,7 +10,8 @@ from scipy.interpolate import interp1d
 
 from external_input.spike_input_cortex import (
     build_distance_groups_state,
-    periodic_distance,
+    _periodic_distance_float,
+    plot_empirical_and_target_distance_dependent_shared_fraction,
 )
 
 
@@ -380,7 +381,7 @@ class Microcircuit:
         self, expected_outer_dict, f_d_interp_dict, expected_shared_dict
     ):
         # TODO
-
+        bounding_box_width = self.L[0]  # assuming cubic box
         # Loop over postsynaptic neuron type
         for post_type in self.cell_types:
             # loop over presynaptic neuron type
@@ -403,6 +404,11 @@ class Microcircuit:
                     print(
                         f"{pre_type}->{post_type} - Defining distance-dependent shared input groups for..."
                     )
+                    print(f"Number of receivers: {len(receiver_positions)}")
+                    print(f"minimum distance between receivers: {self.d:.3f}")
+                    print(
+                        f"maximum possible periodic distance within bounding box: {np.sqrt(3) * (bounding_box_width / 2):.3f}"
+                    )
                     print(f"receiver positions (first 5): {receiver_positions[:5]}")
                     print(f"N_target: {N_target}")
                     print(f"s_group: {s_group}")
@@ -410,13 +416,30 @@ class Microcircuit:
 
                 dist_state = build_distance_groups_state(
                     receiver_positions=receiver_positions,
-                    bounding_box_width=self.L[0],
+                    bounding_box_width=bounding_box_width,
                     N_target=N_target,
                     s=s_group,
                     f_target=f_target_grid,
                     rng=self.rng,
                     fine_grid_resolution=10,
                 )
+
+                # loop over all receiver positions pairs and calculate their periodic distances
+                distance_matrix = np.zeros((dist_state.R, dist_state.R))
+                for i in range(dist_state.R):
+                    for j in range(i + 1, dist_state.R):
+                        if i == j:
+                            continue
+                        pos_i = dist_state.receiver_positions[i]
+                        pos_j = dist_state.receiver_positions[j]
+                        d = _periodic_distance_float(pos_i, pos_j, dist_state.L)
+                        distance_matrix[i, j] = d
+                        distance_matrix[j, i] = d
+                print(
+                    f"dist_state.L: {dist_state.L} and bounding_box_width: {bounding_box_width}"
+                )
+                print(f"minimum distance in distance matrix: {distance_matrix.min()}")
+                print(f"maximum distance in distance matrix: {distance_matrix.max()}")
 
                 if self.verbose:
                     print(
@@ -434,77 +457,11 @@ class Microcircuit:
                     print(
                         f"{pre_type}->{post_type} - Sampling receiver pairs to estimate empirical shared fraction curve..."
                     )
-                    R_dist = receiver_positions.shape[0]
-                    max_pairs_sample = 20000
-                    mins = dist_state.receiver_positions.min(axis=0)
-                    shifted_positions = dist_state.receiver_positions - mins
-                    Lx, Ly, Lz = dist_state.L
-                    # Precompute sets of groups per receiver for intersection.
-                    group_sets = [
-                        set(arr.tolist()) for arr in dist_state.groups_by_receiver
-                    ]
-                    # Random pairs.
-                    pair_indices_i = self.rng.integers(0, R_dist, size=max_pairs_sample)
-                    pair_indices_j = self.rng.integers(0, R_dist, size=max_pairs_sample)
-                    bins_empirical = {}
-                    for i, j in zip(pair_indices_i, pair_indices_j):
-                        if i == j:
-                            continue
-                        pos_i = shifted_positions[i]
-                        pos_j = shifted_positions[j]
-                        d = periodic_distance(pos_i, pos_j, Lx, Ly, Lz)
-                        shared_groups = group_sets[i].intersection(group_sets[j])
-                        shared_inputs = len(shared_groups) * s_group
-                        inputs_i = len(group_sets[i]) * s_group
-                        if inputs_i == 0:
-                            continue
-                        frac = shared_inputs / inputs_i
-                        bins_empirical.setdefault(d, []).append(frac)
-                    # Aggregate means.
-                    empirical_curve = {
-                        d: float(np.mean(vals)) for d, vals in bins_empirical.items()
-                    }
-                    # Prepare plotting data sorted by distance.
-                    d_model = sorted(dist_state.f_model_samples.keys())
-                    f_model = [dist_state.f_model_samples[d] for d in d_model]
-                    f_target_vals = [dist_state.f_target_samples[d] for d in d_model]
-                    # Match empirical distances to model distances (within tolerance) by rounding.
-                    empirical_d_sorted = sorted(empirical_curve.keys())
-
-                    # plot
-                    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-                    ax0, ax1 = axes
-                    ax0.plot(d_model, f_target_vals, label="target f(d)", color="black")
-                    ax0.plot(d_model, f_model, label="model f(d)", color="tab:blue")
-                    # Scatter empirical means.
-                    ax0.scatter(
-                        empirical_d_sorted,
-                        [empirical_curve[d] for d in empirical_d_sorted],
-                        s=12,
-                        color="tab:orange",
-                        alpha=0.7,
-                        label="empirical",
+                    plot_empirical_and_target_distance_dependent_shared_fraction(
+                        dist_state=dist_state,
+                        rng=self.rng,
+                        title=f"Empirical vs Target shared input fraction: {pre_type}->{post_type}",
                     )
-                    ax0.set_xlabel("distance d")
-                    ax0.set_ylabel("shared fraction")
-                    ax0.set_title("Shared fraction vs distance")
-                    ax0.legend()
-                    # Histogram of distinct inputs counts.
-                    distinct_inputs_counts = [
-                        len(g) * s_group for g in dist_state.groups_by_receiver
-                    ]
-                    ax1.hist(
-                        distinct_inputs_counts, bins=30, color="tab:green", alpha=0.8
-                    )
-                    ax1.set_xlabel("distinct inputs per receiver")
-                    ax1.set_ylabel("count")
-                    ax1.set_title("Distribution of inputs")
-                    fig.tight_layout()
-                    # set figure name
-                    fig.suptitle(
-                        f"{pre_type}->{post_type} - Shared fraction and input distribution"
-                    )
-                    plt.show()
 
     def _define_distance_dependent_shared_input_curves(self):
 

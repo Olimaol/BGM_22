@@ -629,90 +629,152 @@ def _fit_gaussian_p_with_fine_grid(
         dist_center_to_receivers, return_inverse=True
     )
 
-    print(f"receiver_positions shape: {receiver_positions.shape}")
-    print(f"distances_matrix shape: {(R, Ggrid)}")
+    # Precompute target f(d) for unique distances and multiplicity weights.
+    f_vals = np.array(
+        [float(f_target(float(d))) for d in unique_dists], dtype=np.float32
+    )
+    weights = np.bincount(unique_dists_inv).astype(np.float32)
+    f_target_samples = {float(d): float(f_target(float(d))) for d in unique_dists}
 
-    # Precompute distance arrays from center and each receiver to all grid points.
-    # Precompute full distances matrix (receivers -> fine grid points) and the
-    # center receiver's distances to the grid, analogous to _fit_gaussian_p.
+    # Precompute distances matrix (receivers -> fine grid points) and center distances to grid.
     distances_matrix = np.empty((R, Ggrid), dtype=np.float32)
     rec_pos = receiver_positions.astype(np.float32, copy=False)
-
     for i in range(R):
         a = np.broadcast_to(rec_pos[i], (grid_points.shape[0], 3))
         d = _perdiodic_distance_float_parallel(a, grid_points, L)
         distances_matrix[i] = d.astype(np.float32, copy=False)
-
     dist_center_to_grid = distances_matrix[center_index]
 
     print(f"receiver_positions shape: {receiver_positions.shape}")
     print(f"distances_matrix shape: {distances_matrix.shape}")
 
-    results = []
-    for sigma in sigma_candidates:
+    # Objective function: given sigma, compute weighted MSE and optimal p0.
+    def evaluate_sigma(sigma: float):
         if sigma <= 0:
-            continue
-        """
-        * we initially ignore the amplitude p0 of the gaussian connection probability
-        * we need the gauss from a single receiver (center) to all group grid points -> g_center
-        * then we need the gauss from all receivers to all group grid points -> g_all
-        * then we can compute g_center * g_all and average over all group grid points -> mean_g_gshift
-        * g_center * g_all reflects the probability that a group is connected to both the center receiver and receiver j
-        * because g_center and g_all are both for all group grid points we can average over all group grid points and get the expectation over the groups of that probability
-        * dividing by mean_g (the average connection probability of the center receiver alone) gives us h_sigma(d) which is the expected shared fraction between the center receiver and any other receiver at distance d
-        * but we ignored the amplitude p0 so the actual expected shared fraction is p0 * h_sigma(d)
-        * we can then do weighted least squares to find the optimal p0 for the current sigma
-        """
+            return float("inf"), 0.0, 0.0, {}
         g_center = np.exp(
             -(dist_center_to_grid**2) / (2.0 * sigma * sigma)
         )  # shape (Ggrid,)
-        mean_g = float(g_center.mean())
-        # For each receiver compute mean of g_center * g_receiver over grid points.
+        mean_g = float(g_center.mean())  # scalar
+        if mean_g <= 0:
+            return float("inf"), 0.0, 0.0, {}
         g_all = np.exp(
             -(distances_matrix**2) / (2.0 * sigma * sigma)
         )  # shape (R, Ggrid)
         mean_g_gshift = (g_center * g_all).mean(axis=1)  # shape (R,)
-        # Aggregate h_sigma(d) = mean_g_gshift / mean_g.
-        h_vals = (
-            np.array(
-                [
-                    mean_g_gshift[unique_dists_inv == i].mean()
-                    for i in range(len(unique_dists))
-                ]
-            )
-            / mean_g
+        # Aggregate h_sigma(d) by distance bins.
+        # Compute mean per unique distance using unique_dists_inv.
+        # For efficiency, accumulate sums by bins then divide by counts.
+        sums = np.bincount(
+            unique_dists_inv, weights=mean_g_gshift, minlength=len(unique_dists)
         )
-        h_sigma_map = {float(d): float(v) for d, v in zip(unique_dists, h_vals)}
-        # Build arrays for least squares over actual occurring distances (weight by multiplicity).
-        f_vals = []
-        weights = []
-        for d in unique_dists:
-            f_t = float(f_target(float(d)))
-            count = int((dist_center_to_receivers == d).sum())
-            f_vals.append(f_t)
-            weights.append(count)
-        f_vals = np.array(f_vals)
-        weights = np.array(weights)
-        # This numerator/denominator gives optimal p0 in weighted least squares.
-        # Using this p0 we minimize sum_d weights[d] * (f_vals[d] - p0 * h_vals[d])^2. with the current h_vals
+        h_vals = (sums / weights) / mean_g  # shape (num_unique_dists,)
+        # Weighted least squares for p0.
         numerator = float(np.sum(f_vals * h_vals * weights))
         denominator = float(np.sum((h_vals**2) * weights))
         if denominator <= 0:
-            continue
-        p0 = numerator / denominator
-        # Enforce p0 so that p(d)=p0*exp(-d^2/(2 sigma^2)) <= 1 for all d (d>=0 gives max at d=0).
-        p0 = min(p0, 1.0)
-        # Model curve samples.
-        f_model_samples = {d: p0 * h_sigma_map[d] for d in h_sigma_map}
-        # Loss (weighted MSE).
-        mse = float(np.sum(((f_vals - p0 * h_vals) ** 2) * weights) / weights.sum())
-        f_target_samples = {float(d): float(f_target(float(d))) for d in h_sigma_map}
-        results.append((mse, p0, sigma, f_target_samples, f_model_samples, mean_g))
-    if not results:
-        raise RuntimeError("No valid sigma candidates produced in fine grid fitting.")
-    results.sort(key=lambda x: x[0])
-    mse, p0, sigma, f_target_samples, f_model_samples, mean_g = results[0]
-    return p0, sigma, f_target_samples, f_model_samples, mean_g
+            return float("inf"), 0.0, mean_g, {}
+        p0 = min(numerator / denominator, 1.0)
+        # Model samples at the unique distances.
+        f_model = p0 * h_vals
+        mse = float(np.sum(((f_vals - f_model) ** 2) * weights) / np.sum(weights))
+        f_model_samples = {float(d): float(m) for d, m in zip(unique_dists, f_model)}
+        return mse, p0, mean_g, f_model_samples
+
+    # Build initial search bracket for sigma.
+    max_dist = math.sqrt(3.0) * L / 2.0
+    sigma_lo = float(max_dist * 0.02)
+    sigma_hi = float(max_dist)
+    # Start from geometric mean as a reasonable initial point.
+    sigma_mid = math.sqrt(sigma_lo * sigma_hi)
+    expand_factor = 1.6
+
+    # Evaluate at three points and ensure we have a proper bracket: f(mid) <= f(lo), f(mid) <= f(hi).
+    mse_mid, p0_mid, mean_g_mid, fmodel_mid = evaluate_sigma(sigma_mid)
+    mse_lo, p0_lo, mean_g_lo, fmodel_lo = evaluate_sigma(sigma_lo)
+    mse_hi, p0_hi, mean_g_hi, fmodel_hi = evaluate_sigma(sigma_hi)
+
+    # Expand lower side if needed.
+    iter_guard = 0
+    while mse_lo < mse_mid and iter_guard < 20:
+        sigma_hi, mse_hi, p0_hi, mean_g_hi, fmodel_hi = (
+            sigma_mid,
+            mse_mid,
+            p0_mid,
+            mean_g_mid,
+            fmodel_mid,
+        )
+        sigma_mid, mse_mid, p0_mid, mean_g_mid, fmodel_mid = (
+            sigma_lo,
+            mse_lo,
+            p0_lo,
+            mean_g_lo,
+            fmodel_lo,
+        )
+        sigma_lo = max(sigma_mid / expand_factor, 1e-8)
+        mse_lo, p0_lo, mean_g_lo, fmodel_lo = evaluate_sigma(sigma_lo)
+        iter_guard += 1
+
+    # Expand upper side if needed.
+    iter_guard = 0
+    while mse_hi < mse_mid and iter_guard < 20:
+        sigma_lo, mse_lo, p0_lo, mean_g_lo, fmodel_lo = (
+            sigma_mid,
+            mse_mid,
+            p0_mid,
+            mean_g_mid,
+            fmodel_mid,
+        )
+        sigma_mid, mse_mid, p0_mid, mean_g_mid, fmodel_mid = (
+            sigma_hi,
+            mse_hi,
+            p0_hi,
+            mean_g_hi,
+            fmodel_hi,
+        )
+        sigma_hi = min(sigma_mid * expand_factor, max_dist * 5.0)
+        mse_hi, p0_hi, mean_g_hi, fmodel_hi = evaluate_sigma(sigma_hi)
+        iter_guard += 1
+
+    # At this point we expect a bracket [sigma_lo, sigma_hi] with a minimum near sigma_mid.
+    a, b = sigma_lo, sigma_hi
+    gr = (math.sqrt(5) + 1.0) / 2.0
+    c = b - (b - a) / gr
+    d = a + (b - a) / gr
+    cache: Dict[float, Tuple[float, float, float, Dict[float, float]]] = {}
+
+    def cached_eval(s: float):
+        if s not in cache:
+            cache[s] = evaluate_sigma(s)
+        return cache[s]
+
+    mse_c, p0_c, mean_g_c, fmodel_c = cached_eval(c)
+    mse_d, p0_d, mean_g_d, fmodel_d = cached_eval(d)
+
+    tol_rel = 1e-3
+    max_iter = 32
+    it = 0
+    while (b - a) > tol_rel * (abs(a) + abs(b)) * 0.5 and it < max_iter:
+        if mse_c < mse_d:
+            b, mse_d = d, mse_c
+            d, p0_d, mean_g_d, fmodel_d = c, p0_c, mean_g_c, fmodel_c
+            c = b - (b - a) / gr
+            mse_c, p0_c, mean_g_c, fmodel_c = cached_eval(c)
+        else:
+            a, mse_c = c, mse_d
+            c, p0_c, mean_g_c, fmodel_c = d, p0_d, mean_g_d, fmodel_d
+            d = a + (b - a) / gr
+            mse_d, p0_d, mean_g_d, fmodel_d = cached_eval(d)
+        it += 1
+
+    # Choose best between c and d.
+    if mse_c < mse_d:
+        sigma_best, p0_best, mean_g_best, fmodel_best = c, p0_c, mean_g_c, fmodel_c
+    else:
+        sigma_best, p0_best, mean_g_best, fmodel_best = d, p0_d, mean_g_d, fmodel_d
+
+    print(f"Optimized sigma: {sigma_best:.5f}, p0: {p0_best:.5f}")
+    return p0_best, float(sigma_best), f_target_samples, fmodel_best, float(mean_g_best)
 
 
 def build_distance_groups_state(
@@ -812,11 +874,11 @@ def build_distance_groups_state(
         connected_receivers = np.nonzero(connected_mask)[0]
         if connected_receivers.size == 0:
             print(
-                f"Warning: Group {g_idx} at position {g_pos} connected to no receivers; "
-                "connecting to nearest receiver."
+                f"Warning: Group {g_idx} at position {g_pos} connected to no receivers."
             )
-            nearest = int(np.argmin(dists))
-            connected_receivers = np.array([nearest], dtype=np.int32)
+            # nearest = int(np.argmin(dists))
+            # connected_receivers = np.array([nearest], dtype=np.int32)
+            # TODO There can be groups without any receivers --> I don't need to simulate their counts later
         for r in connected_receivers:
             groups_by_receiver[r].append(g_idx)
     groups_by_receiver_arr = [
@@ -847,7 +909,7 @@ def build_distance_groups_state(
 
     return DistanceGroupsState(
         receiver_positions=receiver_positions.astype(np.float32),
-        L=(int(bounding_box_width), int(bounding_box_width), int(bounding_box_width)),
+        L=bounding_box_width,
         R=R,
         N_target=N_target,
         s=s,
@@ -1013,6 +1075,97 @@ def simulate_receiver_counts_homogeneous(
     )
 
 
+def plot_empirical_and_target_distance_dependent_shared_fraction(
+    dist_state: DistanceGroupsState,
+    rng: np.random.Generator,
+    title: Optional[str] = None,
+) -> None:
+    print("Sampling receiver pairs to estimate empirical shared fraction curve...")
+    max_pairs_sample = 20000
+    group_sets = [set(arr.tolist()) for arr in dist_state.groups_by_receiver]
+    pair_indices_i = rng.integers(0, dist_state.R, size=max_pairs_sample)
+    pair_indices_j = rng.integers(0, dist_state.R, size=max_pairs_sample)
+    # replace the sampled pairs with all unique pairs
+    pair_indices_i = []
+    pair_indices_j = []
+    for i in range(dist_state.R):
+        for j in range(i + 1, dist_state.R):
+            pair_indices_i.append(i)
+            pair_indices_j.append(j)
+    bins_empirical_shared_groups: Dict[float, List[float]] = {}
+    bins_empirical_shared_frac: Dict[float, List[float]] = {}
+    for i, j in zip(pair_indices_i, pair_indices_j):
+        if i == j:
+            continue
+        pos_i = dist_state.receiver_positions[i]
+        pos_j = dist_state.receiver_positions[j]
+        d = _periodic_distance_float(pos_i, pos_j, dist_state.L)
+        shared_groups = group_sets[i].intersection(group_sets[j])
+        # if not shared_groups:
+        #     continue
+        shared_inputs = len(shared_groups) * dist_state.s
+        inputs_i = len(group_sets[i]) * dist_state.s
+        if inputs_i == 0:
+            continue
+        frac = shared_inputs / inputs_i
+        bins_empirical_shared_groups.setdefault(d, []).append(len(shared_groups))
+        bins_empirical_shared_frac.setdefault(d, []).append(frac)
+    # Average empirical shared fraction per distance bin.
+    empirical_curve_shared_groups = {
+        d: float(np.mean(vals)) for d, vals in bins_empirical_shared_groups.items()
+    }
+    empirical_curve = {
+        d: float(np.mean(vals)) for d, vals in bins_empirical_shared_frac.items()
+    }
+    print("Plotting fitted and empirical shared fraction curves...")
+    d_model = sorted(dist_state.f_model_samples.keys())
+    f_model = [dist_state.f_model_samples[d] for d in d_model]
+    f_target_vals = [dist_state.f_target_samples[d] for d in d_model]
+    empirical_d_sorted = sorted(empirical_curve.keys())
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    ax0, ax1, ax2, _ = axes.flatten()
+    ax0.plot(d_model, f_target_vals, label="target f(d)", color="black")
+    ax0.plot(d_model, f_model, label="model f(d)", color="tab:blue")
+    ax0.scatter(
+        empirical_d_sorted,
+        [empirical_curve[d] for d in empirical_d_sorted],
+        s=12,
+        color="tab:orange",
+        alpha=0.7,
+        label="empirical",
+    )
+    ax0.set_xlabel("distance d")
+    ax0.set_ylabel("average shared fraction")
+    ax0.set_title("Shared fraction vs distance")
+    ax0.legend()
+    distinct_inputs_counts = [
+        len(g) * dist_state.s for g in dist_state.groups_by_receiver
+    ]
+    ax1.hist(distinct_inputs_counts, bins=30, color="tab:green", alpha=0.8)
+    ax1.set_xlabel("distinct inputs per receiver")
+    ax1.set_ylabel("count")
+    ax1.set_title("Distribution of inputs")
+
+    ax2.scatter(
+        empirical_d_sorted,
+        [empirical_curve_shared_groups[d] for d in empirical_d_sorted],
+        s=12,
+        color="tab:orange",
+        alpha=0.7,
+        label="empirical",
+    )
+    ax2.set_xlabel("distance d")
+    ax2.set_ylabel("average shared groups")
+    ax2.set_title("Shared groups vs distance")
+    ax2.legend()
+
+    if title:
+        fig.suptitle(title, fontsize=16)
+
+    fig.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
 
     rng = np.random.default_rng()
@@ -1168,85 +1321,11 @@ if __name__ == "__main__":
         rng=rng,
     )
     print("Receiver counts (distance-dependent) shape:", receiver_counts_dd.shape)
-    print("Sampling receiver pairs to estimate empirical shared fraction curve...")
-    max_pairs_sample = 20000
-    group_sets = [set(arr.tolist()) for arr in dist_state.groups_by_receiver]
-    pair_indices_i = rng.integers(0, R_dist, size=max_pairs_sample)
-    pair_indices_j = rng.integers(0, R_dist, size=max_pairs_sample)
-    # replace the sampled pairs with all unique pairs
-    pair_indices_i = []
-    pair_indices_j = []
-    for i in range(R_dist):
-        for j in range(i + 1, R_dist):
-            pair_indices_i.append(i)
-            pair_indices_j.append(j)
-    bins_empirical_shared_groups: Dict[float, List[float]] = {}
-    bins_empirical_shared_frac: Dict[float, List[float]] = {}
-    for i, j in zip(pair_indices_i, pair_indices_j):
-        if i == j:
-            continue
-        pos_i = receiver_positions[i]
-        pos_j = receiver_positions[j]
-        d = _periodic_distance_float(pos_i, pos_j, bounding_box_width)
-        shared_groups = group_sets[i].intersection(group_sets[j])
-        # if not shared_groups:
-        #     continue
-        shared_inputs = len(shared_groups) * s_group
-        inputs_i = len(group_sets[i]) * s_group
-        if inputs_i == 0:
-            continue
-        frac = shared_inputs / inputs_i
-        bins_empirical_shared_groups.setdefault(d, []).append(len(shared_groups))
-        bins_empirical_shared_frac.setdefault(d, []).append(frac)
-    # Average empirical shared fraction per distance bin.
-    empirical_curve_shared_groups = {
-        d: float(np.mean(vals)) for d, vals in bins_empirical_shared_groups.items()
-    }
-    empirical_curve = {
-        d: float(np.mean(vals)) for d, vals in bins_empirical_shared_frac.items()
-    }
-    print("Plotting fitted and empirical shared fraction curves...")
-    d_model = sorted(dist_state.f_model_samples.keys())
-    f_model = [dist_state.f_model_samples[d] for d in d_model]
-    f_target_vals = [dist_state.f_target_samples[d] for d in d_model]
-    empirical_d_sorted = sorted(empirical_curve.keys())
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    ax0, ax1, ax2, ax3 = axes.flatten()
-    ax0.plot(d_model, f_target_vals, label="target f(d)", color="black")
-    ax0.plot(d_model, f_model, label="model f(d)", color="tab:blue")
-    ax0.scatter(
-        empirical_d_sorted,
-        [empirical_curve[d] for d in empirical_d_sorted],
-        s=12,
-        color="tab:orange",
-        alpha=0.7,
-        label="empirical",
+    plot_empirical_and_target_distance_dependent_shared_fraction(
+        dist_state=dist_state,
+        rng=rng,
     )
-    ax0.set_xlabel("distance d")
-    ax0.set_ylabel("average shared fraction")
-    ax0.set_title("Shared fraction vs distance")
-    ax0.legend()
-    distinct_inputs_counts = [len(g) * s_group for g in dist_state.groups_by_receiver]
-    ax1.hist(distinct_inputs_counts, bins=30, color="tab:green", alpha=0.8)
-    ax1.set_xlabel("distinct inputs per receiver")
-    ax1.set_ylabel("count")
-    ax1.set_title("Distribution of inputs")
 
-    ax2.scatter(
-        empirical_d_sorted,
-        [empirical_curve_shared_groups[d] for d in empirical_d_sorted],
-        s=12,
-        color="tab:orange",
-        alpha=0.7,
-        label="empirical",
-    )
-    ax2.set_xlabel("distance d")
-    ax2.set_ylabel("average shared groups")
-    ax2.set_title("Shared groups vs distance")
-    ax2.legend()
-
-    fig.tight_layout()
-    plt.show()
 
 """ CHECK IF THIS WORKED
 
