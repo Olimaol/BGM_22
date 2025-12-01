@@ -70,6 +70,7 @@ import numpy as np
 import math
 from typing import Tuple, Optional, Callable, Dict, List
 from dataclasses import dataclass
+from tqdm import tqdm
 
 # Optional plotting; demonstration will guard imports.
 try:  # pragma: no cover - demo convenience
@@ -964,7 +965,7 @@ def build_distance_groups_state(
     )
 
 
-def simulate_receiver_counts_distance_dependent(
+def simulate_receiver_counts_distance_dependent_old(
     state: DistanceGroupsState,
     rate: float,
     dt: float,
@@ -995,6 +996,196 @@ def simulate_receiver_counts_distance_dependent(
         for g in groups:
             receiver_counts[r] += group_counts[g]
     return receiver_counts
+
+
+def simulate_receiver_counts_distance_dependent(
+    state: DistanceGroupsState,
+    rate: float,
+    dt: float,
+    rho: float,
+    num_bins: int,
+    rng: np.random.Generator,
+    verbose: bool = False,
+) -> np.ndarray:
+    """
+    Simulate receiver counts using a distance-dependent state.
+
+    Uses the precomputed group positions and adjacency lists based on the fitted
+    Gaussian connection probability. Group spike counts are generated and then
+    aggregated to receivers.
+    """
+
+    def _get_group_counts(nchunk: int) -> np.ndarray:
+        # returns array with shape (G, nchunk) with dtype state.group_dtype
+        return simulate_counts_direct(
+            G=state.G,
+            N=state.s,
+            rate=rate,
+            dt=dt,
+            rho=rho,
+            num_bins=nchunk,
+            rng=rng,
+            dtype=state.group_dtype,
+        )
+
+    def _group_counts_to_receiver_counts(group_counts: np.ndarray) -> np.ndarray:
+        # input: (G, nchunk) with dtype state.group_dtype
+        # output: (R, nchunk) with dtype state.receiver_dtype
+        receiver_counts = np.zeros(
+            (state.R, group_counts.shape[1]), dtype=state.receiver_dtype
+        )
+        # for each receiver loop over its groups and sum their counts to get the receivers' counts
+        for r, receiver_groups in enumerate(state.groups_by_receiver):
+            if receiver_groups.size == 0:
+                continue
+            for g in receiver_groups:
+                receiver_counts[r] += group_counts[g]
+        return receiver_counts
+
+    # preallocate receiver_counts
+    nrows, ncols = state.R, num_bins
+    receiver_counts = np.zeros((state.R, num_bins), dtype=state.receiver_dtype)
+
+    # Define a suitable chunk size for processing
+    target_chunk_bytes = 128 * 1024 * 1024  # cap in-memory data per chunk (~128 MB)
+    bytes_per_bin = (
+        state.R * np.dtype(state.receiver_dtype).itemsize
+        + state.G * np.dtype(state.group_dtype).itemsize
+    )
+    chunk_size = max(1, min(num_bins, target_chunk_bytes // max(1, bytes_per_bin)))
+
+    if verbose:
+        print(f"Simulating receiver counts in chunks of size {chunk_size} bins...")
+        print(f"This makes {math.ceil(ncols / chunk_size)} chunks in total.")
+        print(
+            f"Each chunk uses up to {bytes_per_bin * chunk_size / (1024*1024):.2f} MB RAM."
+        )
+        print(
+            f"In total, receiver_counts array size: {nrows*ncols*np.dtype(state.receiver_dtype).itemsize/(1024*1024):.2f} MB."
+        )
+
+    # loop over chunks
+    for start in tqdm(range(0, ncols, chunk_size)):
+        end = min(start + chunk_size, ncols)
+        nchunk = end - start
+        group_counts_chunk = _get_group_counts(nchunk)  # returns shape (G, nchunk)
+        receiver_counts_chunk = _group_counts_to_receiver_counts(
+            group_counts_chunk
+        )  # returns shape (R, nchunk)
+        receiver_counts[:, start:end] = receiver_counts_chunk
+        del group_counts_chunk
+        del receiver_counts_chunk
+
+    return receiver_counts
+
+
+def simulate_receiver_counts_distance_dependent_on_drive(
+    filename: str,
+    state: DistanceGroupsState,
+    rate: float,
+    dt: float,
+    rho: float,
+    num_bins: int,
+    rng: np.random.Generator,
+    verbose: bool = False,
+) -> np.ndarray:
+    """
+    Simulate receiver counts using a distance-dependent state.
+
+    Uses the precomputed group positions and adjacency lists based on the fitted
+    Gaussian connection probability. Group spike counts are generated and then
+    aggregated to receivers.
+
+    The receiver counts are stored in a memory-mapped file on disk to avoid
+    excessive memory usage for large simulations.
+    """
+
+    def _get_group_counts(nchunk: int) -> np.ndarray:
+        # returns array with shape (G, nchunk) with dtype state.group_dtype
+        return simulate_counts_direct(
+            G=state.G,
+            N=state.s,
+            rate=rate,
+            dt=dt,
+            rho=rho,
+            num_bins=nchunk,
+            rng=rng,
+            dtype=state.group_dtype,
+        )
+
+    def _group_counts_to_receiver_counts(group_counts: np.ndarray) -> np.ndarray:
+        # input: (G, nchunk) with dtype state.group_dtype
+        # output: (R, nchunk) with dtype state.receiver_dtype
+        receiver_counts = np.zeros(
+            (state.R, group_counts.shape[1]), dtype=state.receiver_dtype
+        )
+        # for each receiver loop over its groups and sum their counts to get the receivers' counts
+        for r, receiver_groups in enumerate(state.groups_by_receiver):
+            if receiver_groups.size == 0:
+                continue
+            for g in receiver_groups:
+                receiver_counts[r] += group_counts[g]
+        return receiver_counts
+
+    # preallocate memmap on disk
+    nrows, ncols = state.R, num_bins
+    mm = np.memmap(
+        filename, dtype=state.receiver_dtype, mode="w+", shape=(nrows, ncols)
+    )
+
+    # Define a suitable chunk size for processing
+    target_chunk_bytes = 128 * 1024 * 1024  # cap in-memory data per chunk (~128 MB)
+    bytes_per_bin = (
+        state.R * np.dtype(state.receiver_dtype).itemsize
+        + state.G * np.dtype(state.group_dtype).itemsize
+    )
+    chunk_size = max(1, min(num_bins, target_chunk_bytes // max(1, bytes_per_bin)))
+
+    if verbose:
+        print(f"Simulating receiver counts in chunks of size {chunk_size} bins...")
+        print(f"This makes {math.ceil(ncols / chunk_size)} chunks in total.")
+        print(
+            f"Each chunk uses up to {bytes_per_bin * chunk_size / (1024*1024):.2f} MB RAM."
+        )
+        print(
+            f"In total, receiver counts memmap size: {nrows*ncols*np.dtype(state.receiver_dtype).itemsize/(1024*1024):.2f} MB."
+        )
+
+    # loop over chunks
+    for start in tqdm(range(0, ncols, chunk_size)):
+        end = min(start + chunk_size, ncols)
+        nchunk = end - start
+        group_counts_chunk = _get_group_counts(nchunk)  # returns shape (G, nchunk)
+        receiver_counts_chunk = _group_counts_to_receiver_counts(
+            group_counts_chunk
+        )  # returns shape (R, nchunk)
+        mm[:, start:end] = receiver_counts_chunk  # write straight into memmap
+        del group_counts_chunk
+        del receiver_counts_chunk
+
+    # flush to disk
+    mm.flush()
+
+
+def iter_memmap_spike_counts(
+    state: DistanceGroupsState,
+    filename,
+    num_bins,
+    chunk_size=1000,
+    copy=False,
+    verbose=False,
+):
+    dtype = state.receiver_dtype
+    nrows, ncols = state.R, num_bins
+    if verbose:
+        print(
+            f"Obtaining chunks from memmap file: {filename} will need {nrows*chunk_size*np.dtype(dtype).itemsize/(1024*1024):.2f} MB per chunk."
+        )
+    mm = np.memmap(filename, dtype=dtype, mode="r", shape=(nrows, ncols))
+    for start in range(0, ncols, chunk_size):
+        end = min(start + chunk_size, ncols)
+        chunk = mm[:, start:end]
+        yield chunk.copy() if copy else chunk
 
 
 def simulate_receiver_counts_with_groups(
@@ -1325,7 +1516,7 @@ if __name__ == "__main__":
     center_index = R_dist // 2
 
     def f_target(d: float) -> float:
-        return 0.2 * math.exp(-((d / (bounding_box_width / 12.5)) ** 2))
+        return 0.2 * math.exp(-((d / (bounding_box_width / 2.5)) ** 2))
 
     N_target = 400
     s_group = 20
@@ -1348,20 +1539,71 @@ if __name__ == "__main__":
         f"Empirical mean distinct inputs per receiver (groups * s): {mean_inputs_empirical:.2f} (target {N_target})"
     )
     print(f"Total groups G: {dist_state.G}")
-    rate_dd, dt_dd, rho_dd, num_bins_dd = 15.0, 0.001, 0.25, 30
+
+    plot_empirical_and_target_distance_dependent_shared_fraction(
+        dist_state=dist_state,
+        rng=rng,
+    )
+
+    # simulate receiver counts
+    rng_int = rng.integers(0, 2**31 - 1)
+    rng_normal = np.random.default_rng(rng_int)
+    rng_memmap = np.random.default_rng(rng_int)
+    rate_dd, dt_dd, rho_dd, num_bins_dd = 15.0, 0.001, 0.25, 300000
     receiver_counts_dd = simulate_receiver_counts_distance_dependent(
         state=dist_state,
         rate=rate_dd,
         dt=dt_dd,
         rho=rho_dd,
         num_bins=num_bins_dd,
-        rng=rng,
+        rng=rng_normal,
     )
     print("Receiver counts (distance-dependent) shape:", receiver_counts_dd.shape)
-    plot_empirical_and_target_distance_dependent_shared_fraction(
-        dist_state=dist_state,
-        rng=rng,
+
+    # simulate receiver counts using memmap version
+    simulate_receiver_counts_distance_dependent_on_drive(
+        filename="receiver_counts_distance_dependent.dat",
+        state=dist_state,
+        rate=rate_dd,
+        dt=dt_dd,
+        rho=rho_dd,
+        num_bins=num_bins_dd,
+        rng=rng_memmap,
     )
+
+    # create iterator over memmapmed receiver counts
+    it = iter_memmap_spike_counts(
+        state=dist_state,
+        filename="receiver_counts_distance_dependent.dat",
+        num_bins=num_bins_dd,
+        chunk_size=num_bins_dd // 2,
+        copy=False,
+        verbose=True,
+    )
+
+    print(
+        "Now reading chunks from memmap and compare with in-memory counts for receiver 0:"
+    )
+
+    # first chunk
+    counts = next(it)
+    diff = np.abs(counts[0, :] - receiver_counts_dd[0, : counts.shape[1]])
+    max_diff = diff.max()
+    print("Chunk 1:")
+    print(f"    in_memory vals: {receiver_counts_dd[0, : 10]}")
+    print(f"    memmapmed vals: {counts[0, :10]}")
+    print(f"    Maximum difference between memmapmed and in-memory counts: {max_diff}")
+
+    # second chunk
+    counts = next(it)
+    diff = np.abs(counts[0, :] - receiver_counts_dd[0, counts.shape[1] :])
+    max_diff = diff.max()
+    print("Chunk 2:")
+    print(
+        f"    in_memory vals: {receiver_counts_dd[0, counts.shape[1] : counts.shape[1] + 10]}"
+    )
+    print(f"    memmapmed vals: {counts[0, :10]}")
+    print(f"    Maximum difference between memmapmed and in-memory counts: {max_diff}")
 
 
 """ CHECK IF THIS WORKED
