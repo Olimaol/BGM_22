@@ -424,24 +424,28 @@ class Microcircuit:
                     fine_grid_resolution=10,
                 )
 
-                # loop over all receiver positions pairs and calculate their periodic distances
-                distance_matrix = np.zeros((dist_state.R, dist_state.R))
-                for i in range(dist_state.R):
-                    for j in range(i + 1, dist_state.R):
-                        if i == j:
-                            continue
-                        pos_i = dist_state.receiver_positions[i]
-                        pos_j = dist_state.receiver_positions[j]
-                        d = _periodic_distance_float(pos_i, pos_j, dist_state.L)
-                        distance_matrix[i, j] = d
-                        distance_matrix[j, i] = d
-                print(
-                    f"dist_state.L: {dist_state.L} and bounding_box_width: {bounding_box_width}"
-                )
-                print(f"minimum distance in distance matrix: {distance_matrix.min()}")
-                print(f"maximum distance in distance matrix: {distance_matrix.max()}")
-
                 if self.verbose:
+                    # loop over all receiver positions pairs and calculate their periodic distances
+                    distance_matrix = np.zeros((dist_state.R, dist_state.R))
+                    for i in range(dist_state.R):
+                        for j in range(i + 1, dist_state.R):
+                            if i == j:
+                                continue
+                            pos_i = dist_state.receiver_positions[i]
+                            pos_j = dist_state.receiver_positions[j]
+                            d = _periodic_distance_float(pos_i, pos_j, dist_state.L)
+                            distance_matrix[i, j] = d
+                            distance_matrix[j, i] = d
+                    print(
+                        f"dist_state.L: {dist_state.L} and bounding_box_width: {bounding_box_width}"
+                    )
+                    print(
+                        f"minimum distance in distance matrix: {distance_matrix.min()}"
+                    )
+                    print(
+                        f"maximum distance in distance matrix: {distance_matrix.max()}"
+                    )
+
                     print(
                         f"Optimized p(d)=p0*exp(-d^2/(2*sigma^2)) parameters: p0={dist_state.p0:.4f}, sigma={dist_state.sigma:.3f}"
                     )

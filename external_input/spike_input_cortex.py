@@ -821,6 +821,7 @@ def build_distance_groups_state(
     rng: np.random.Generator,
     center_index: int = 0,
     fine_grid_resolution: int = 5,
+    verbose: bool = False,
 ) -> DistanceGroupsState:
     """Construct distance-dependent group sharing state with explicit bounding box.
 
@@ -834,6 +835,11 @@ def build_distance_groups_state(
     The coarse grid cell centers (``n_side^3`` positions) are sampled *without*
     replacement to assign exactly ``G`` distinct group locations. This guarantees
     ``G <= n_side^3``.
+
+    We don't create a groups array as in the homogeneous case (there it was more
+    efficient to store groups explicitly). Here we build the reverse mapping
+    from receivers to groups directly, since we don't have to loop over all possible
+    receivers, the connectivity is created calculating distances.
     """
     p0, sigma, f_target_samples, f_model_samples, mean_g = (
         _fit_gaussian_p_with_fine_grid(
@@ -871,17 +877,18 @@ def build_distance_groups_state(
         ],
         dtype=np.float32,
     )
-    dists = _perdiodic_distance_float_parallel(
-        np.repeat(
-            coarse_grid_points[0][np.newaxis, :],
-            receiver_positions.shape[0],
-            axis=0,
-        ),
-        receiver_positions.astype(np.float32),
-        bounding_box_width,
-    )
-    mean_p_calc = np.mean(p0 * np.exp(-(dists**2) / (2.0 * sigma * sigma)))
-    print(f"Mean connection probability of first group: {mean_p_calc:.4f}")
+    if verbose:
+        dists = _perdiodic_distance_float_parallel(
+            np.repeat(
+                coarse_grid_points[0][np.newaxis, :],
+                receiver_positions.shape[0],
+                axis=0,
+            ),
+            receiver_positions.astype(np.float32),
+            bounding_box_width,
+        )
+        mean_p_calc = np.mean(p0 * np.exp(-(dists**2) / (2.0 * sigma * sigma)))
+        print(f"Mean connection probability of first group: {mean_p_calc:.4f}")
     Ggrid = coarse_grid_points.shape[0]
     # Sample G distinct coarse grid positions (guaranteed G <= Ggrid).
     group_indices = rng.choice(Ggrid, size=G, replace=False)
@@ -919,22 +926,25 @@ def build_distance_groups_state(
     receiver_cap = int(s) * int(degrees.max() if degrees.size else 0)
     receiver_dtype = _smallest_unsigned_dtype(max(1, receiver_cap))
 
-    # Compute per-receiver degree and min degree
-    degrees = np.array([len(lst) for lst in groups_by_receiver_arr])
-    print("Min groups per receiver (degree):", degrees.min(), "Mean:", degrees.mean())
+    if verbose:
+        # Compute per-receiver degree and min degree
+        degrees = np.array([len(lst) for lst in groups_by_receiver_arr])
+        print(
+            "Min groups per receiver (degree):", degrees.min(), "Mean:", degrees.mean()
+        )
 
-    # Compute pairwise shared groups and store all receiver pairs with no shared groups
-    no_shared_pairs = []
-    print(f"loop over {R} receivers to find pairs with no shared groups...")
-    print(f"this makes {R*(R-1)//2} pairs to check...")
-    for r1 in range(R):
-        groups_r1 = set(groups_by_receiver_arr[r1])
-        for r2 in range(r1 + 1, R):
-            groups_r2 = set(groups_by_receiver_arr[r2])
-            shared = groups_r1.intersection(groups_r2)
-            if len(shared) == 0:
-                no_shared_pairs.append((r1, r2))
-    print("Number of receiver pairs with no shared groups:", len(no_shared_pairs))
+        # Compute pairwise shared groups and store all receiver pairs with no shared groups
+        no_shared_pairs = []
+        print(f"loop over {R} receivers to find pairs with no shared groups...")
+        print(f"this makes {R*(R-1)//2} pairs to check...")
+        for r1 in range(R):
+            groups_r1 = set(groups_by_receiver_arr[r1])
+            for r2 in range(r1 + 1, R):
+                groups_r2 = set(groups_by_receiver_arr[r2])
+                shared = groups_r1.intersection(groups_r2)
+                if len(shared) == 0:
+                    no_shared_pairs.append((r1, r2))
+        print("Number of receiver pairs with no shared groups:", len(no_shared_pairs))
 
     return DistanceGroupsState(
         receiver_positions=receiver_positions.astype(np.float32),
