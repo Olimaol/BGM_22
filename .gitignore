@@ -16,3 +16,4 @@ external_input/bino_in_ann_poisson_network/*
 external_input/bino_in_ann_self_spiking_network/*
 external_input/bino_in_ann_pre_defined_spiking_network/*
 external_input/big_array.dat
+*.dat

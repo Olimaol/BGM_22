@@ -12,6 +12,7 @@ from external_input.spike_input_cortex import (
     build_distance_groups_state,
     _periodic_distance_float,
     plot_empirical_and_target_distance_dependent_shared_fraction,
+    simulate_receiver_counts_distance_dependent_on_drive,
 )
 
 
@@ -36,6 +37,10 @@ class Microcircuit:
         nx: int = 10,
         b: int = 10,
         density: float = 84900.0,
+        firing_rate_dict: dict | None = None,
+        correlation_dict: dict | None = None,
+        dt: float = 0.1,
+        T: float = 1000.0,
         seed: int = 42,
         props_delRey: np.ndarray | None = None,
         fitted_params_path: str | None = None,
@@ -48,6 +53,26 @@ class Microcircuit:
         self.density = density
         self.seed = seed
         self.verbose = verbose
+
+        # firing rates per cell type (Hz)
+        # default for D1 and D2 extracted from: (Liang et al., 2008) using with levodopa treatment, see experimental_data/activity_striatum/extract_from_liang_etal_2008.py
+        # default for FS: TODO
+        if firing_rate_dict is None:
+            firing_rate_dict = {"FS": 10.0, "dSPN": 37.07, "iSPN": 29.07}
+        self.firing_rate_dict = firing_rate_dict
+
+        # average correlations between pairs of cell types
+        if correlation_dict is None:
+            # default based on (Adler et al., 2013):
+            correlation_dict = {"FS": 0.06, "dSPN": 0.004, "iSPN": 0.004}
+        self.correlation_dict = correlation_dict
+
+        # timestep for simulation in ms
+        self.dt = dt
+
+        # total simulation time in ms and simulation steps
+        self.T = T
+        self.n_steps = int(T / dt)
 
         # proportions (del Rey et al. 2022)
         if props_delRey is None:
@@ -370,12 +395,35 @@ class Microcircuit:
             expected_shared_dict,
         ) = self._define_distance_dependent_shared_input_curves()
 
-        # Build input groups based on f(d) TODO
-        self._define_distance_dependent_shared_input_groups(
+        # Build input groups based on f(d)
+        dist_state_dict = self._define_distance_dependent_shared_input_groups(
             expected_outer_dict=expected_outer_dict,
             f_d_interp_dict=f_d_interp_dict,
             expected_shared_dict=expected_shared_dict,
         )
+
+        # TODO simulate spike counts for these groups and assign to receivers
+        self._simulate_distance_dependent_spike_counts(dist_state_dict=dist_state_dict)
+
+    def _simulate_distance_dependent_spike_counts(self, dist_state_dict):
+        # TODO
+        # Loop over postsynaptic neuron type
+        for post_type in self.cell_types:
+            # loop over presynaptic neuron type
+            for pre_type in self.cell_types:
+                key = (pre_type, post_type)
+                if key not in self.conn_params:
+                    continue
+
+                simulate_receiver_counts_distance_dependent_on_drive(
+                    filename=f"receiver_counts_distance_dependent_{pre_type}_{post_type}.dat",
+                    state=dist_state_dict[key],
+                    rate=self.firing_rate_dict[pre_type],
+                    dt=self.dt,
+                    rho=self.correlation_dict[pre_type],
+                    num_bins=self.n_steps,
+                    rng=self.rng,
+                )
 
     def _define_distance_dependent_shared_input_groups(
         self, expected_outer_dict, f_d_interp_dict, expected_shared_dict
@@ -383,6 +431,7 @@ class Microcircuit:
         # TODO
         bounding_box_width = self.L[0]  # assuming cubic box
         # Loop over postsynaptic neuron type
+        dist_state_dict = {}
         for post_type in self.cell_types:
             # loop over presynaptic neuron type
             for pre_type in self.cell_types:
@@ -423,6 +472,7 @@ class Microcircuit:
                     rng=self.rng,
                     fine_grid_resolution=10,
                 )
+                dist_state_dict[key] = dist_state
 
                 if self.verbose:
                     # loop over all receiver positions pairs and calculate their periodic distances
@@ -466,6 +516,8 @@ class Microcircuit:
                         rng=self.rng,
                         title=f"Empirical vs Target shared input fraction: {pre_type}->{post_type}",
                     )
+
+        return dist_state_dict
 
     def _define_distance_dependent_shared_input_curves(self):
 
