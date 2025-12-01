@@ -92,26 +92,112 @@ def self_spiking_network(N_pre=1000, N_post=1, rate=100.0, weight=0.01):
     return data
 
 
+def store_spike_counts_to_disk(
+    N_pre,
+    N_post,
+    rate,
+    num_bins,
+    rng: np.random.Generator,
+    dtype=np.int64,
+    chunk_size=1000,
+    filename="big_array.dat",
+):
+    nrows, ncols = (num_bins, N_post)
+
+    def get_inp_arr(nchunk):
+        return rng.binomial(
+            n=N_pre, p=rate / 1000.0, size=(nchunk, ncols)
+        )  # size equals (timesteps, neurons), p: firing rate in Hz with dt=1 ms (r/1000)
+
+    # preallocate memmap on disk
+    mm = np.memmap(filename, dtype=dtype, mode="w+", shape=(nrows, ncols))
+
+    # loop over chunks
+    for start in range(0, nrows, chunk_size):
+        end = min(start + chunk_size, nrows)
+        nchunk = end - start
+        chunk = get_inp_arr(nchunk)  # returns shape (nchunk, ncols)
+        mm[start:end, :] = chunk  # write straight into memmap
+        del chunk  # free local memory
+
+    # flush to disk
+    mm.flush()
+
+
+def iter_memmap_spike_counts(
+    filename, num_bins, N_post, dtype=np.int64, chunk_size=1000, copy=False
+):
+    nrows, ncols = (num_bins, N_post)
+    mm = np.memmap(filename, dtype=dtype, mode="r", shape=(nrows, ncols))
+    for start in range(0, nrows, chunk_size):
+        end = min(start + chunk_size, nrows)
+        chunk = mm[start:end, :]
+        yield chunk.copy() if copy else chunk
+
+
 def pre_defined_spiking_network(N_pre=1000, N_post=1, rate=100.0, weight=0.01):
     net = Network()
     rng = np.random.default_rng(seed=42)
-    inputs = weight * rng.binomial(
-        n=N_pre, p=rate / 1000.0, size=(10000, N_post)
-    )  # size equals (timesteps, neurons), p: firing rate in Hz with dt=1 ms (r/1000)
-    inp = net.create(TimedArray(rates=inputs))
+
+    # store inputs on hard drive (prevents excessive memory usage)
+    store_spike_counts_to_disk(
+        N_pre=N_pre,
+        N_post=N_post,
+        rate=rate,
+        num_bins=10000,
+        rng=rng,
+        dtype=np.int64,
+        chunk_size=1000,
+        filename="big_array.dat",
+    )
+
+    # iterator for loading data chunks from disk
+    inp_iterator = iter_memmap_spike_counts(
+        filename="big_array.dat",
+        num_bins=10000,
+        N_post=N_post,
+        dtype=np.int64,
+        chunk_size=1000,
+        copy=False,
+    )
+
+    # first 1000 ms of inputs
+    inputs = next(inp_iterator) * weight
+    print(f"initial input data: {inputs}")
+    # list for tracking all inputs
+    all_inputs = [inputs.copy()]
+
+    inp = net.create(
+        TimedArray(rates=inputs, period=inputs.shape[0], name="TimedInput")
+    )
     pop = net.create(
         geometry=N_post, neuron=receiving_neuron, name="PreDefinedReceivingPopulation"
     )
     proj = net.connect(CurrentInjection(inp, pop, "ampa"))
     proj.connect_current()
-    monitor = net.monitor(pop, variables=["g_ampa"], start=False)
+    monitor1 = net.monitor(pop, variables=["g_ampa"], start=False)
+    monitor2 = net.monitor(inp, variables=["r"], start=False)
     net.compile("bino_in_ann_pre_defined_spiking_network")
     print("Starting simulation of Pre-Defined Spiking network...")
-    net.simulate(1000)
-    monitor.start()
-    net.simulate(9000, measure_time=True)
-    data = monitor.get("g_ampa")
-    return data
+    net.simulate(1000, measure_time=True)
+    monitor1.start()
+    monitor2.start()
+    # loop over data chunks
+    for inputs in inp_iterator:
+        inputs = inputs * weight
+        all_inputs.append(inputs.copy())
+        inp.update(rates=inputs, period=inputs.shape[0])
+        net.simulate(inputs.shape[0], measure_time=True)
+    data = monitor1.get("g_ampa")
+    inp_data = monitor2.get("r")
+    # create full input data array
+    all_inputs_arr = np.vstack(all_inputs)
+    print(f"Pre-defined input data shape: {all_inputs_arr.shape}")
+    for chunk in range(1, len(all_inputs)):
+        print(
+            f"Chunk {chunk}\n data:\n{all_inputs[chunk][:10,0]}\n recorded:\n{inp_data[(chunk-1)*1000:(chunk-1)*1000+10,0]}"
+        )
+    return data, inp_data
 
 
 if __name__ == "__main__":
@@ -125,7 +211,7 @@ if __name__ == "__main__":
         )
         data_poisson = poisson_network(N_post=50)
         data_self_spiking = self_spiking_network(N_post=50)
-        data_pre_defined = pre_defined_spiking_network(N_post=50)
+        data_pre_defined, _ = pre_defined_spiking_network(N_post=50)
 
         plt.figure(figsize=(12, 8))
         plt.subplot(3, 1, 1)
@@ -145,7 +231,7 @@ if __name__ == "__main__":
     print("Running networks with 1 post neuron receiving from 1000 Poisson inputs...")
     data_poisson = poisson_network(rate=50)
     data_self_spiking = self_spiking_network(rate=50)
-    data_pre_defined = pre_defined_spiking_network(rate=50)
+    data_pre_defined, _ = pre_defined_spiking_network(rate=50)
 
     # Flatten to 1D arrays to be agnostic to (T, 1) vs (T,) shapes
     x_pois = np.ravel(data_poisson)
