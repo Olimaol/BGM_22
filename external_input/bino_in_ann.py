@@ -189,15 +189,17 @@ def pre_defined_spiking_network(N_pre=1000, N_post=1, rate=100.0, weight=0.01):
         inp.update(rates=inputs, period=inputs.shape[0])
         net.simulate(inputs.shape[0], measure_time=True)
     data = monitor1.get("g_ampa")
-    inp_data = monitor2.get("r")
+    data_r = monitor2.get("r")
     # create full input data array
     all_inputs_arr = np.vstack(all_inputs)
-    print(f"Pre-defined input data shape: {all_inputs_arr.shape}")
+    print(f"Pre-defined input data shape: {all_inputs_arr.shape}\n")
+    chunk = 0
+    print(f"Chunk {chunk}\n data:     {all_inputs[chunk][:10,0]}\n")
     for chunk in range(1, len(all_inputs)):
         print(
-            f"Chunk {chunk}\n data:\n{all_inputs[chunk][:10,0]}\n recorded:\n{inp_data[(chunk-1)*1000:(chunk-1)*1000+10,0]}"
+            f"Chunk {chunk}\n data:     {all_inputs[chunk][:10,0]}\n recorded: {data_r[(chunk-1)*1000:(chunk-1)*1000+10,0]}\n"
         )
-    return data, inp_data
+    return data, data_r
 
 
 if __name__ == "__main__":
@@ -345,8 +347,7 @@ if __name__ == "__main__":
         ks_results[(a, b)] = (float(ks_stat), float(ks_p))
         var_results[(a, b)] = (float(var_stat), float(var_p))
 
-    # Create an invisible axis to host a stats text box under the top plot area
-    # Instead of a dedicated 4th panel (to keep the figure compact), add text into ax_ts
+    # Compose text for stats box that will be positioned to the right of the subplots
     text_lines = []
     text_lines.append("Means ± SD:")
     for name, (mu, sd) in means_stds.items():
@@ -363,21 +364,23 @@ if __name__ == "__main__":
     for (a, b), (stat, p) in var_results.items():
         text_lines.append(f"  {a} vs {b}: {stat:.4g}, p={p:.2g}")
 
-    # Place the text box inside the time-series axis in the bottom-left corner
-    ax_ts.text(
-        0.01,
-        0.02,
-        "\n".join(text_lines),
-        transform=ax_ts.transAxes,
-        fontsize=9,
-        verticalalignment="bottom",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8, edgecolor="0.8"),
-    )
+    stats_text = "\n".join(text_lines)
 
     fig.suptitle(
         "g_ampa comparison: time series, histograms, ECDFs, and stats",
         y=0.98,
         fontsize=14,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+
+    # Reserve space on the right for the stats box and place it there
+    fig.tight_layout(rect=[0, 0, 0.75, 0.96])
+    fig.text(
+        0.78,
+        0.5,
+        stats_text,
+        ha="left",
+        va="center",
+        fontsize=9,
+        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8, edgecolor="0.8"),
+    )
     plt.show()
