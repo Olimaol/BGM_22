@@ -68,7 +68,7 @@ input count distributions across receivers.
 
 import numpy as np
 import math
-from typing import Tuple, Optional, Callable, Dict, List
+from typing import Tuple, Optional, Callable, Dict, List, Union
 from dataclasses import dataclass
 from tqdm import tqdm
 import os
@@ -121,7 +121,7 @@ def beta_params_from_p_rho(p: float, rho: float) -> Tuple[float, float]:
 def simulate_counts_direct(
     G: int,
     N: int,
-    rate: float,
+    rate: Union[float, np.ndarray],
     dt: float,
     rho: float,
     num_bins: int,
@@ -136,19 +136,24 @@ def simulate_counts_direct(
     ``K[g, b] ~ Binomial(N, p_b)``. This induces positive correlation across
     groups within a time bin that is controlled by ``rho``.
 
-    Special cases handled explicitly:
+    If ``rate`` is provided as a 1D array of length ``num_bins``, the per-bin
+    firing probabilities are taken directly from that time series via
+    ``p_bins = rate[t] * dt`` (clipped to ``[0, 1]``) and ``rho`` is ignored
+    (fluctuations are assumed to come from the time-varying rate itself).
+
+    Special cases handled explicitly (scalar ``rate`` only):
     - ``rho <= 0``: independent Binomial draws with fixed ``p`` (no shared variability).
-    - ``rho >= 1``: fully shared Bernoulli per bin (all-or-none across all neurons),
-      broadcast to all groups and summed to ``N``.
+    - ``rho >= 1``: fully shared Bernoulli per bin, broadcast to all groups and
+      multiplied by ``N`` (all-or-none across neurons).
 
     Args:
         G (int): Number of groups (e.g., cortical populations).
         N (int): Number of neurons per group.
-        rate (float): Firing rate in Hz.
+        rate (float | np.ndarray): Firing rate in Hz (scalar) or a time series
+            of shape ``(num_bins,)``. When a time series is provided, ``rho`` is
+            ignored and per-bin Binomial draws are used.
         dt (float): Bin width in milliseconds.
-        rho (float): Overdispersion/correlation coefficient. Values in
-            [0, 1] are meaningful; values outside this range are treated by
-            the nearest special-case branch described above.
+        rho (float): Overdispersion/correlation coefficient for scalar ``rate``.
         num_bins (int): Number of time bins to simulate.
         rng (np.random.Generator): Random number generator to use.
         dtype (Optional[np.dtype]): Desired dtype of returned array; if
@@ -164,7 +169,22 @@ def simulate_counts_direct(
         (2, 5)
     """
     dt_s = dt * 1e-3  # convert ms to seconds for rate*dt
-    p = rate * dt_s
+
+    # Time-varying firing rate: ignore rho and draw Binomial per bin.
+    if np.ndim(rate) > 0:
+        rate_arr = np.asarray(rate, dtype=np.float64)
+        if rate_arr.shape[0] != num_bins:
+            raise ValueError(
+                "rate time series must have length num_bins (got "
+                f"{rate_arr.shape[0]} vs {num_bins})"
+            )
+        p_bins = np.clip(rate_arr * dt_s, 0.0, 1.0)
+        counts = rng.binomial(N, p_bins, size=(G, num_bins))
+        if dtype is not None and counts.dtype != dtype:
+            counts = counts.astype(dtype, copy=False)
+        return counts
+
+    p = float(rate) * dt_s
     # No overdispersion: draw Binomial counts with a fixed probability p.
     if rho <= 0.0:
         arr = rng.binomial(N, p, size=(G, num_bins))
@@ -969,7 +989,7 @@ def build_distance_groups_state(
 
 def simulate_receiver_counts_distance_dependent_old(
     state: DistanceGroupsState,
-    rate: float,
+    rate: Union[float, np.ndarray],
     dt: float,
     rho: float,
     num_bins: int,
@@ -979,7 +999,8 @@ def simulate_receiver_counts_distance_dependent_old(
 
     Uses the precomputed group positions and adjacency lists based on the fitted
     Gaussian connection probability. Group spike counts are generated and then
-    aggregated to receivers.
+    aggregated to receivers. If ``rate`` is a time series (``(num_bins,)``), it is
+    used directly and ``rho`` is ignored.
     """
     group_counts = simulate_counts_direct(
         G=state.G,
@@ -1002,7 +1023,7 @@ def simulate_receiver_counts_distance_dependent_old(
 
 def simulate_receiver_counts_distance_dependent(
     state: DistanceGroupsState,
-    rate: float,
+    rate: Union[float, np.ndarray],
     dt: float,
     rho: float,
     num_bins: int,
@@ -1015,14 +1036,27 @@ def simulate_receiver_counts_distance_dependent(
     Uses the precomputed group positions and adjacency lists based on the fitted
     Gaussian connection probability. Group spike counts are generated and then
     aggregated to receivers.
+
+    If ``rate`` is a time series of length ``num_bins``, ``rho`` is ignored and
+    per-bin Binomial draws are used with probabilities ``p[t] = rate[t] * dt``.
     """
 
-    def _get_group_counts(nchunk: int) -> np.ndarray:
+    rate_is_timeseries = np.ndim(rate) > 0
+    rate_array = None
+    if rate_is_timeseries:
+        rate_array = np.asarray(rate, dtype=np.float64)
+        if rate_array.shape[0] != num_bins:
+            raise ValueError(
+                "rate time series must have length num_bins (got "
+                f"{rate_array.shape[0]} vs {num_bins})"
+            )
+
+    def _get_group_counts(rate_chunk, nchunk: int) -> np.ndarray:
         # returns array with shape (G, nchunk) with dtype state.group_dtype
         return simulate_counts_direct(
             G=state.G,
             N=state.s,
-            rate=rate,
+            rate=rate_chunk,
             dt=dt,
             rho=rho,
             num_bins=nchunk,
@@ -1070,7 +1104,10 @@ def simulate_receiver_counts_distance_dependent(
     for start in tqdm(range(0, ncols, chunk_size)):
         end = min(start + chunk_size, ncols)
         nchunk = end - start
-        group_counts_chunk = _get_group_counts(nchunk)  # returns shape (G, nchunk)
+        rate_chunk = rate_array[start:end] if rate_is_timeseries else rate
+        group_counts_chunk = _get_group_counts(
+            rate_chunk, nchunk
+        )  # returns shape (G, nchunk)
         receiver_counts_chunk = _group_counts_to_receiver_counts(
             group_counts_chunk
         )  # returns shape (R, nchunk)
@@ -1084,7 +1121,7 @@ def simulate_receiver_counts_distance_dependent(
 def simulate_receiver_counts_distance_dependent_on_drive(
     filename: str,
     state: DistanceGroupsState,
-    rate: float,
+    rate: Union[float, np.ndarray],
     dt: float,
     rho: float,
     num_bins: int,
@@ -1100,14 +1137,27 @@ def simulate_receiver_counts_distance_dependent_on_drive(
 
     The receiver counts are stored in a memory-mapped file on disk to avoid
     excessive memory usage for large simulations.
+
+    If ``rate`` is a time series of length ``num_bins``, ``rho`` is ignored and
+    per-bin Binomial draws are used with probabilities ``p[t] = rate[t] * dt``.
     """
 
-    def _get_group_counts(nchunk: int) -> np.ndarray:
+    rate_is_timeseries = np.ndim(rate) > 0
+    rate_array = None
+    if rate_is_timeseries:
+        rate_array = np.asarray(rate, dtype=np.float64)
+        if rate_array.shape[0] != num_bins:
+            raise ValueError(
+                "rate time series must have length num_bins (got "
+                f"{rate_array.shape[0]} vs {num_bins})"
+            )
+
+    def _get_group_counts(rate_chunk, nchunk: int) -> np.ndarray:
         # returns array with shape (G, nchunk) with dtype state.group_dtype
         return simulate_counts_direct(
             G=state.G,
             N=state.s,
-            rate=rate,
+            rate=rate_chunk,
             dt=dt,
             rho=rho,
             num_bins=nchunk,
@@ -1157,7 +1207,10 @@ def simulate_receiver_counts_distance_dependent_on_drive(
     for start in tqdm(range(0, ncols, chunk_size)):
         end = min(start + chunk_size, ncols)
         nchunk = end - start
-        group_counts_chunk = _get_group_counts(nchunk)  # returns shape (G, nchunk)
+        rate_chunk = rate_array[start:end] if rate_is_timeseries else rate
+        group_counts_chunk = _get_group_counts(
+            rate_chunk, nchunk
+        )  # returns shape (G, nchunk)
         receiver_counts_chunk = _group_counts_to_receiver_counts(
             group_counts_chunk
         )  # returns shape (R, nchunk)
@@ -1192,7 +1245,7 @@ def iter_memmap_spike_counts(
 
 def simulate_receiver_counts_with_groups(
     state: GroupsState,
-    rate: float,
+    rate: Union[float, np.ndarray],
     dt: float,
     rho: float,
     num_bins: int,
@@ -1205,7 +1258,9 @@ def simulate_receiver_counts_with_groups(
 
     Args:
         state (GroupsState): Prebuilt groups and dtype configuration.
-        rate (float): Firing rate of each input in Hz.
+        rate (float | np.ndarray): Firing rate in Hz (scalar or time series of
+            length ``num_bins``). When a time series is provided, ``rho`` is
+            ignored and per-bin Binomial draws are used.
         dt (float): Bin width in milliseconds.
         rho (float): Overdispersion/correlation coefficient for input correlations.
         num_bins (int): Number of time bins to simulate in this chunk.
@@ -1253,7 +1308,7 @@ def simulate_receiver_counts_homogeneous(
     N: int,
     f: float,
     s: int,
-    rate: float,
+    rate: Union[float, np.ndarray],
     dt: float,
     rho: float,
     num_bins: int,
@@ -1283,7 +1338,9 @@ def simulate_receiver_counts_homogeneous(
         f (float): Target shared-input fraction in [0, 1]. ``f=0`` means mostly
             private inputs, ``f=1`` means fully shared across receivers.
         s (int): Group size (number of inputs per group).
-        rate (float): Firing rate of each input in Hz.
+        rate (float | np.ndarray): Firing rate of each input in Hz (scalar or
+            time series of length ``num_bins``). For time-varying rates, ``rho`` is
+            ignored and per-bin Binomial draws are used.
         dt (float): Bin width in milliseconds.
         rho (float): Overdispersion/correlation coefficient for shared variability
             across groups within a time bin (see ``simulate_counts_direct``).
@@ -1468,6 +1525,49 @@ if __name__ == "__main__":
     # Show a small snippet for quick inspection
     print("receiver 0, first 10 bins:", receiver_counts[0, :10])
     print("receiver 1, first 10 bins:", receiver_counts[1, :10])
+
+    # Demonstrate time-varying rate (rho ignored for time series)
+    print("\nDemonstrating time-varying rate input:")
+    R_tv, N_tv, f_tv, s_tv = 4, 80, 0.25, 5
+    num_bins_tv, dt_tv, rho_tv = 30, 1.0, 0.9
+    t = np.arange(num_bins_tv)
+    rate_tv = 20.0 + 20.0 * np.sin(2 * np.pi * t / num_bins_tv)
+    receiver_counts_tv = simulate_receiver_counts_homogeneous(
+        R=R_tv,
+        N=N_tv,
+        f=f_tv,
+        s=s_tv,
+        rate=rate_tv,
+        dt=dt_tv,
+        rho=rho_tv,  # ignored because rate is a time series
+        num_bins=num_bins_tv,
+        rng=rng,
+    )
+    print("R (receivers):", R_tv)
+    print("Approx N (inputs/receiver):", N_tv)
+    print("f (shared fraction):", f_tv)
+    print("time-varying rate min/max (Hz):", float(rate_tv.min()), float(rate_tv.max()))
+    print("num_bins:", num_bins_tv)
+    print("receiver spike counts shape:", receiver_counts_tv.shape)
+    print("receiver 0, first 10 bins:", receiver_counts_tv[0, :10])
+    print("rate time series (first 10 bins):", rate_tv[:10])
+
+    # plot the time-varying rate and receiver counts
+    plt.figure(figsize=(10, 6))
+    plt.subplot(2, 1, 1)
+    plt.plot(t, rate_tv, label="Input Rate (Hz)")
+    plt.xlabel("Time bin")
+    plt.ylabel("Rate (Hz)")
+    plt.title("Time-varying Input Rate")
+    plt.legend()
+    plt.subplot(2, 1, 2)
+    plt.plot(t, receiver_counts_tv[0], label="Receiver 0 Spike Counts")
+    plt.xlabel("Time bin")
+    plt.ylabel("Spike Counts")
+    plt.title("Receiver 0 Spike Counts Over Time")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
     # Demonstrate the optimized no-overlap path (k == 1)
     print("\nDemonstrating no-overlap fast path (k == 1):")
