@@ -71,6 +71,7 @@ import math
 from typing import Tuple, Optional, Callable, Dict, List
 from dataclasses import dataclass
 from tqdm import tqdm
+import os
 
 # Optional plotting; demonstration will guard imports.
 try:  # pragma: no cover - demo convenience
@@ -1310,6 +1311,8 @@ def plot_empirical_and_target_distance_dependent_shared_fraction(
     dist_state: DistanceGroupsState,
     rng: np.random.Generator,
     title: Optional[str] = None,
+    save_dir: Optional[str] = None,
+    filename: Optional[str] = None,
 ) -> None:
     print("Sampling receiver pairs to estimate empirical shared fraction curve...")
     max_pairs_sample = 20000
@@ -1394,7 +1397,10 @@ def plot_empirical_and_target_distance_dependent_shared_fraction(
         fig.suptitle(title, fontsize=16)
 
     fig.tight_layout()
-    plt.show()
+    if save_dir and filename:
+        fig.savefig(os.path.join(save_dir, filename))
+    else:
+        plt.show()
 
 
 if __name__ == "__main__":

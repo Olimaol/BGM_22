@@ -308,10 +308,15 @@ class Microcircuit:
         # Loop over all input iterators and update the corresponding TimedArray populations
         for key, inp_iterator in self.inp_iterator_dict.items():
             inp_population = self.annarchy_inp_populations[key]
-            # get next chunk of inputs
+            # get next chunk of inputs (incoming spike counts)
             inputs = next(inp_iterator)
+            # reshape inputs from (n_neurons, n_steps) into (n_steps, n_neurons)
+            inputs = inputs.T
+            # if the key is for missing gaba input, scale the inputs by the mean weight for the pre-post type pair
+            if key in self.mean_weights_by_type:
+                inputs *= self.mean_weights_by_type[key]
 
-            # update the TimedArray population with new rates
+            # update the TimedArray population with weighted inputs
             inp_population.reset()
             inp_population.update(rates=inputs)
 
@@ -677,6 +682,11 @@ class Microcircuit:
         self._simulate_distance_dependent_spike_counts(dist_state_dict=dist_state_dict)
         # Store state for later ANNarchy creation in create_model()
         self.dist_state_dict = dist_state_dict
+        # create a dictionary which stores the mean of the weights per pre-post type pair
+        self.mean_weights_by_type: dict[tuple[str, str], float] = {}
+        for key in self.conn_params.keys():
+            weight_samples = self.weight_samplers[key].sample(n=10000)
+            self.mean_weights_by_type[key] = float(np.mean(weight_samples))
 
     def _create_missing_gaba_inputs_annarchy(self, dist_state_dict):
         """Create ANNarchy TimedArray input populations for distance-dependent spike
@@ -738,6 +748,7 @@ class Microcircuit:
                     rho=self.correlation_dict[pre_type],
                     num_bins=self.n_steps,
                     rng=self.rng,
+                    verbose=self.verbose,
                 )
 
     def _save_missing_input_state(self) -> None:
@@ -749,6 +760,7 @@ class Microcircuit:
             "rng_state": self.rng.bit_generator.state,
             "cell_types": self.cell_types,
             "conn_keys": [f"{pre}-{post}" for (pre, post) in self.conn_params.keys()],
+            "mean_weights_by_type": getattr(self, "mean_weights_by_type", None),
         }
         with open(self._missing_input_state_path(), "wb") as f:
             pickle.dump(payload, f)
@@ -773,6 +785,12 @@ class Microcircuit:
         if self.dist_state_dict is None:
             raise ValueError(
                 "Cached missing-input state is empty; rebuild missing inputs."
+            )
+
+        self.mean_weights_by_type = payload.get("mean_weights_by_type")
+        if self.mean_weights_by_type is None:
+            raise ValueError(
+                "Cached missing-input state is missing mean weights; rebuild missing inputs."
             )
 
         # ensure spike-count files exist for all required pairs
@@ -877,6 +895,8 @@ class Microcircuit:
                         dist_state=dist_state,
                         rng=self.rng,
                         title=f"Empirical vs Target shared input fraction: {pre_type}->{post_type}",
+                        save_dir=self.output_dir,
+                        filename=f"SharedInputFraction_{pre_type}_{post_type}.png",
                     )
 
         return dist_state_dict
