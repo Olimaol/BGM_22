@@ -1,23 +1,25 @@
 # %%
+import json
+import os
+import pickle
+
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.spatial as sp
-from scipy.sparse import lil_matrix
-import matplotlib.pyplot as plt
-import os
-import json
 from scipy import integrate
 from scipy.interpolate import interp1d
+from scipy.sparse import lil_matrix, load_npz, save_npz
 
+# ANNarchy imports
 from ANNarchy import (
-    Population,
-    Neuron,
-    compile,
-    populations,
-    TimedArray,
     CurrentInjection,
+    Population,
+    Projection,
+    TimedArray,
     simulate,
 )
 
+# Local imports
 from external_input.spike_input_cortex import (
     build_distance_groups_state,
     _periodic_distance_float,
@@ -25,14 +27,19 @@ from external_input.spike_input_cortex import (
     simulate_receiver_counts_distance_dependent_on_drive,
     iter_memmap_spike_counts,
 )
-
 from striatal_weights.get_weights import (
     components_spn_spn,
     components_fsi_spn,
     components_fsi_fsi,
 )
 
+# CompNeuroPy imports
 from CompNeuroPy import CombinedSampler
+from CompNeuroPy.neuron_models import (
+    Izhikevich2007Humphries2009SPND1,
+    Izhikevich2007Humphries2009SPND2,
+    Izhikevich2007Humphries2009FSI,
+)
 
 
 class Microcircuit:
@@ -51,6 +58,29 @@ class Microcircuit:
     - output_dir: path where plots are saved
     """
 
+    # ----------------------
+    # Storage helpers
+    # ----------------------
+    def _connectivity_state_path(self) -> str:
+        return os.path.join(self.connectivity_dir, "connectivity_state.pkl")
+
+    def _weight_matrix_path(self, pre_type: str, post_type: str) -> str:
+        return os.path.join(
+            self.connectivity_dir, f"weights_{pre_type}_{post_type}.npz"
+        )
+
+    def _missing_input_state_path(self) -> str:
+        return os.path.join(self.inputs_dir, "missing_input_state.pkl")
+
+    def _dist_state_path(self, pre_type: str, post_type: str) -> str:
+        return os.path.join(self.inputs_dir, f"dist_state_{pre_type}_{post_type}.pkl")
+
+    def _spike_counts_path(self, pre_type: str, post_type: str) -> str:
+        return os.path.join(
+            self.inputs_dir,
+            f"receiver_counts_distance_dependent_{pre_type}_{post_type}.dat",
+        )
+
     def __init__(
         self,
         name: str = "caudate",
@@ -65,7 +95,10 @@ class Microcircuit:
         seed: int = 42,
         props_delRey: np.ndarray | None = None,
         fitted_params_path: str | None = None,
+        storage_dir: str | None = None,
         output_dir: str | None = None,
+        build_connectivity: bool = True,
+        build_missing_gaba_input: bool = True,
         verbose: bool = True,
     ) -> None:
         # --- Parameters ---
@@ -106,13 +139,19 @@ class Microcircuit:
 
         # paths
         script_dir = os.path.dirname(__file__)
+        self.storage_dir = storage_dir or os.path.join(script_dir, ".microcircuit")
+        os.makedirs(self.storage_dir, exist_ok=True)
+        self.connectivity_dir = os.path.join(self.storage_dir, "connectivity")
+        self.inputs_dir = os.path.join(self.storage_dir, "inputs")
+        os.makedirs(self.connectivity_dir, exist_ok=True)
+        os.makedirs(self.inputs_dir, exist_ok=True)
         if fitted_params_path is None:
             fitted_params_path = os.path.join(
                 script_dir, "connectivity_fits", "fitted_params.json"
             )
-        if output_dir is None:
-            output_dir = os.path.join(script_dir, "connectivity_construct")
-        self.output_dir = output_dir
+        figures_subdir = output_dir if output_dir is not None else "figures"
+        figures_subdir = os.path.basename(figures_subdir)
+        self.output_dir = os.path.join(self.storage_dir, figures_subdir)
         os.makedirs(self.output_dir, exist_ok=True)
 
         # load connectivity parameters
@@ -152,8 +191,8 @@ class Microcircuit:
         self.rng.shuffle(types)
         self.types = types
 
-        # Create the annarchy populations for each cell type
-        self.create_populations_annarchy(type_counts=type_counts)
+        # store counts for delayed ANNarchy population creation
+        self.type_counts = type_counts
 
         # derived geometry
         self.d_um = self.d * 1e3
@@ -225,6 +264,11 @@ class Microcircuit:
             {}
         )  # key: (pre_type, post_type)
 
+        # container for ANNarchy populations; created lazily in create_model
+        self.annarchy_populations: dict[str, Population] = {}
+        self.model_built: bool = False
+        self.dist_state_dict = None
+
         # container to store distances (mm) for actual formed connections per pair
         self.connection_distances_by_pair: dict[tuple[str, str], list[float]] = {
             key: [] for key in self.conn_params.keys()
@@ -236,35 +280,89 @@ class Microcircuit:
             self._get_neighborhood_radii_mm()
         )
 
-        # TODO: for testing, remove
-        self._missing_local_input()
-        quit()
-
-        # build connectivity and fill per-type weight matrices
-        self._build_connectivity()
+        # build or load connectivity and fill per-type weight matrices
+        if build_connectivity:
+            self._build_connectivity()
+            self._save_connectivity_state()
+        else:
+            self._load_connectivity_state()
 
         if self.verbose:
             self.summary()
 
-        # TODO: define missing local gaba inputs (spike counts) for all neurons
-        self._missing_local_input()
+        # prepare or load missing local gaba inputs (spike counts) for all neurons
+        if build_missing_gaba_input:
+            self._missing_local_input()
+            self._save_missing_input_state()
+        else:
+            self._load_missing_input_state()
 
         # TODO: define excitatory inputs (spike counts) for all neurons
 
-    def update(self, simulate: bool = False) -> None:
+    def update(self, run_simulation: bool = False) -> None:
         """Update function to be called during simulation to update the input populations."""
+        if not self.model_built:
+            raise RuntimeError(
+                "create_model() must be called before update to build ANNarchy objects."
+            )
         # Loop over all input iterators and update the corresponding TimedArray populations
         for key, inp_iterator in self.inp_iterator_dict.items():
             inp_population = self.annarchy_inp_populations[key]
             # get next chunk of inputs
             inputs = next(inp_iterator)
+
             # update the TimedArray population with new rates
             inp_population.reset()
             inp_population.update(rates=inputs)
 
         # Optional simulation the network for the update_time
-        if simulate:
+        if run_simulation:
             simulate(self.update_time)
+
+    def create_model(self) -> None:
+        """Instantiate ANNarchy objects (populations, inputs/projections).
+
+        Call this after constructing the Microcircuit to keep heavy ANNarchy
+        objects separate from data preparation.
+        """
+        if self.model_built:
+            if self.verbose:
+                print("ANNarchy model already built; skipping create_model().")
+            return
+
+        # Create neuron populations
+        self.create_populations_annarchy(type_counts=self.type_counts)
+
+        # create projections between striatal populations
+        self.create_local_projections_annarchy()
+
+        # Ensure distance-dependent input state exists
+        if self.dist_state_dict is None:
+            self._missing_local_input()
+
+        # Build ANNarchy TimedArray inputs and projections for local gaba inputs
+        self._create_missing_gaba_inputs_annarchy(dist_state_dict=self.dist_state_dict)
+
+        self.model_built = True
+
+    def create_local_projections_annarchy(self) -> None:
+        """Create ANNarchy Projections between the striatal populations based on the
+        sampled connectivity and weights.
+        """
+        self.annarchy_projections: dict[tuple[str, str], Projection] = {}
+        for (pre_type, post_type), weight_matrix in self.weights_by_type.items():
+            pre_pop = self.annarchy_populations[pre_type]
+            post_pop = self.annarchy_populations[post_type]
+
+            # Create projection
+            proj = Projection(
+                pre=pre_pop,
+                post=post_pop,
+                target="gaba",
+                name=f"Proj_{pre_type}_{post_type}_{self.name}",
+            )
+            proj.connect_from_sparse(weight_matrix)
+            self.annarchy_projections[(pre_type, post_type)] = proj
 
     def create_populations_annarchy(self, type_counts: dict[str, int]) -> None:
         """
@@ -276,21 +374,15 @@ class Microcircuit:
 
         self.annarchy_populations = {}
         for cell_type, count in type_counts.items():
-            # Define a simple neuron model (placeholder, TODO replace with actual model)
-            neuron_model = Neuron(
-                parameters="""
-                    tau_ampa = 10.0
-                    tau_gaba = 10.0
-                """,
-                equations="""
-                    dv/dt = 0
-                    dg_ampa/dt = -g_ampa / tau_ampa
-                    dg_gaba/dt = -g_gaba / tau_gaba
-                """,
-                spike="""
-                    v>1
-                """,
-            )
+
+            if cell_type == "dSPN":
+                neuron_model = Izhikevich2007Humphries2009SPND1
+            elif cell_type == "iSPN":
+                neuron_model = Izhikevich2007Humphries2009SPND2
+            elif cell_type == "FS":
+                neuron_model = Izhikevich2007Humphries2009FSI
+            else:
+                raise ValueError(f"No neuron model for cell type: {cell_type}")
 
             population = Population(
                 geometry=count, neuron=neuron_model, name=f"{self.name}_{cell_type}"
@@ -371,6 +463,87 @@ class Microcircuit:
                     )
                     # record distance (mm)
                     self.connection_distances_by_pair[key].append(dist)
+
+    def _save_connectivity_state(self) -> None:
+        """Persist connectivity-related data for reuse without rebuilding."""
+        meta = {
+            "neighbor_sizes": self.neighbor_sizes,
+            "con_probs": {f"{k[0]}-{k[1]}": v for k, v in self.con_probs.items()},
+            "connection_distances_by_pair": {
+                f"{k[0]}-{k[1]}": v
+                for k, v in self.connection_distances_by_pair.items()
+            },
+            "adj": {
+                pre: {post: pairs for post, pairs in inner.items()}
+                for pre, inner in self.adj.items()
+            },
+            "rng_state": self.rng.bit_generator.state,
+            "types": self.types,
+            "type_counts": self.type_counts,
+            "cell_types": self.cell_types,
+            "n_total": self.n_total,
+            "nx": self.nx,
+            "b": self.b,
+            "density": self.density,
+            "conn_params": {
+                f"{pre}-{post}": vals for (pre, post), vals in self.conn_params.items()
+            },
+        }
+        with open(self._connectivity_state_path(), "wb") as f:
+            pickle.dump(meta, f)
+        for (pre_type, post_type), W in self.weights_by_type.items():
+            save_npz(self._weight_matrix_path(pre_type, post_type), W.tocsr())
+
+    def _load_connectivity_state(self) -> None:
+        """Load connectivity data from disk if available; raise if missing."""
+        state_path = self._connectivity_state_path()
+        if not os.path.exists(state_path):
+            raise FileNotFoundError(
+                f"Connectivity cache not found at {state_path}. Rebuild by setting build_connectivity=True."
+            )
+        with open(state_path, "rb") as f:
+            meta = pickle.load(f)
+
+        # basic compatibility checks
+        if meta.get("n_total") != self.n_total or meta.get("nx") != self.nx:
+            raise ValueError(
+                "Cached connectivity was generated for a different lattice; rebuild connectivity."
+            )
+        if not np.array_equal(meta.get("types"), self.types):
+            raise ValueError(
+                "Cached connectivity uses a different type assignment; rebuild connectivity or reuse the same seed/params."
+            )
+
+        self.neighbor_sizes = meta.get("neighbor_sizes", [])
+        self.con_probs = {
+            tuple(k.split("-")): v for k, v in meta.get("con_probs", {}).items()
+        }
+        self.connection_distances_by_pair = {
+            tuple(k.split("-")): v
+            for k, v in meta.get("connection_distances_by_pair", {}).items()
+        }
+        self.adj = meta.get("adj", self.adj)
+        # ensure keys exist for all defined pairs
+        for key in self.conn_params.keys():
+            self.con_probs.setdefault(key, [])
+            self.connection_distances_by_pair.setdefault(key, [])
+            pre_type, post_type = key
+            self.adj.setdefault(pre_type, {})
+            self.adj[pre_type].setdefault(post_type, [])
+        # load weights
+        self.weights_by_type = {}
+        for key in self.conn_params.keys():
+            pre_type, post_type = key
+            weight_path = self._weight_matrix_path(pre_type, post_type)
+            if not os.path.exists(weight_path):
+                raise FileNotFoundError(
+                    f"Missing cached weight matrix at {weight_path}; rebuild connectivity."
+                )
+            self.weights_by_type[key] = load_npz(weight_path).tolil()
+
+        rng_state = meta.get("rng_state")
+        if rng_state is not None:
+            self.rng.bit_generator.state = rng_state
 
     def _expected_outer(self, rho, Rin, Rout, p_func):
         """
@@ -502,9 +675,8 @@ class Microcircuit:
 
         # Simulate spike counts for these groups and assign to receivers and store them
         self._simulate_distance_dependent_spike_counts(dist_state_dict=dist_state_dict)
-
-        # Create the ANNarchy input populations which will use the spike counts to provide input to the striatal neurons
-        self._create_missing_gaba_inputs_annarchy(dist_state_dict=dist_state_dict)
+        # Store state for later ANNarchy creation in create_model()
+        self.dist_state_dict = dist_state_dict
 
     def _create_missing_gaba_inputs_annarchy(self, dist_state_dict):
         """Create ANNarchy TimedArray input populations for distance-dependent spike
@@ -535,9 +707,10 @@ class Microcircuit:
                 proj.connect_current()
 
                 # create the input iterator for the update function
+                spike_file = self._spike_counts_path(pre_type, post_type)
                 inp_iterator = iter_memmap_spike_counts(
                     state=dist_state_dict[key],
-                    filename=f"receiver_counts_distance_dependent_{pre_type}_{post_type}.dat",
+                    filename=spike_file,
                     num_bins=self.n_steps,
                     chunk_size=n_steps_input,
                     copy=False,
@@ -556,8 +729,9 @@ class Microcircuit:
                 if key not in self.conn_params:
                     continue
 
+                spike_file = self._spike_counts_path(pre_type, post_type)
                 simulate_receiver_counts_distance_dependent_on_drive(
-                    filename=f"receiver_counts_distance_dependent_{pre_type}_{post_type}.dat",
+                    filename=spike_file,
                     state=dist_state_dict[key],
                     rate=self.firing_rate_dict[pre_type],
                     dt=self.dt,
@@ -565,6 +739,53 @@ class Microcircuit:
                     num_bins=self.n_steps,
                     rng=self.rng,
                 )
+
+    def _save_missing_input_state(self) -> None:
+        """Persist distance-dependent input state to allow reloading without recomputation."""
+        if self.dist_state_dict is None:
+            return
+        payload = {
+            "dist_state_dict": self.dist_state_dict,
+            "rng_state": self.rng.bit_generator.state,
+            "cell_types": self.cell_types,
+            "conn_keys": [f"{pre}-{post}" for (pre, post) in self.conn_params.keys()],
+        }
+        with open(self._missing_input_state_path(), "wb") as f:
+            pickle.dump(payload, f)
+
+    def _load_missing_input_state(self) -> None:
+        """Load distance-dependent input state; expect spike-count files to exist."""
+        state_path = self._missing_input_state_path()
+        if not os.path.exists(state_path):
+            raise FileNotFoundError(
+                f"Missing cached missing-input state at {state_path}. Rebuild by setting build_missing_gaba_input=True."
+            )
+        with open(state_path, "rb") as f:
+            payload = pickle.load(f)
+
+        expected_keys = set(tuple(k.split("-")) for k in payload.get("conn_keys", []))
+        if expected_keys and expected_keys != set(self.conn_params.keys()):
+            raise ValueError(
+                "Cached missing-input state does not match current connectivity parameters; rebuild missing inputs."
+            )
+
+        self.dist_state_dict = payload.get("dist_state_dict")
+        if self.dist_state_dict is None:
+            raise ValueError(
+                "Cached missing-input state is empty; rebuild missing inputs."
+            )
+
+        # ensure spike-count files exist for all required pairs
+        for pre_type, post_type in self.conn_params.keys():
+            path = self._spike_counts_path(pre_type, post_type)
+            if not os.path.exists(path):
+                raise FileNotFoundError(
+                    f"Spike-count file for {pre_type}->{post_type} not found at {path}; rebuild missing inputs."
+                )
+
+        rng_state = payload.get("rng_state")
+        if rng_state is not None:
+            self.rng.bit_generator.state = rng_state
 
     def _define_distance_dependent_shared_input_groups(
         self, expected_outer_dict, f_d_interp_dict, expected_shared_dict
