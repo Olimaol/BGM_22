@@ -8,12 +8,31 @@ import json
 from scipy import integrate
 from scipy.interpolate import interp1d
 
+from ANNarchy import (
+    Population,
+    Neuron,
+    compile,
+    populations,
+    TimedArray,
+    CurrentInjection,
+    simulate,
+)
+
 from external_input.spike_input_cortex import (
     build_distance_groups_state,
     _periodic_distance_float,
     plot_empirical_and_target_distance_dependent_shared_fraction,
     simulate_receiver_counts_distance_dependent_on_drive,
+    iter_memmap_spike_counts,
 )
+
+from striatal_weights.get_weights import (
+    components_spn_spn,
+    components_fsi_spn,
+    components_fsi_fsi,
+)
+
+from CompNeuroPy import CombinedSampler
 
 
 class Microcircuit:
@@ -34,6 +53,7 @@ class Microcircuit:
 
     def __init__(
         self,
+        name: str = "caudate",
         nx: int = 10,
         b: int = 10,
         density: float = 84900.0,
@@ -41,6 +61,7 @@ class Microcircuit:
         correlation_dict: dict | None = None,
         dt: float = 0.1,
         T: float = 1000.0,
+        update_time: float = 100.0,
         seed: int = 42,
         props_delRey: np.ndarray | None = None,
         fitted_params_path: str | None = None,
@@ -48,6 +69,8 @@ class Microcircuit:
         verbose: bool = True,
     ) -> None:
         # --- Parameters ---
+        self.update_time = update_time  # ms for how long inputs are defined
+        self.name = name
         self.nx = nx
         self.b = b
         self.density = density
@@ -56,7 +79,7 @@ class Microcircuit:
 
         # firing rates per cell type (Hz)
         # default for D1 and D2 extracted from: (Liang et al., 2008) using with levodopa treatment, see experimental_data/activity_striatum/extract_from_liang_etal_2008.py
-        # default for FS: TODO
+        # default for FS: 10 Hz based on: (Yamada et al., 2016; Marche und Apicella, 2021; Adler et al., 2013; Hernandez et al., 2013; He et al., 2024)
         if firing_rate_dict is None:
             firing_rate_dict = {"FS": 10.0, "dSPN": 37.07, "iSPN": 29.07}
         self.firing_rate_dict = firing_rate_dict
@@ -129,6 +152,9 @@ class Microcircuit:
         self.rng.shuffle(types)
         self.types = types
 
+        # Create the annarchy populations for each cell type
+        self.create_populations_annarchy(type_counts=type_counts)
+
         # derived geometry
         self.d_um = self.d * 1e3
         self.dim_x_um = self.nx * self.d_um
@@ -168,12 +194,36 @@ class Microcircuit:
             ct: {g_idx: l_idx for l_idx, g_idx in enumerate(self.indices_by_type[ct])}
             for ct in self.cell_types
         }
-        # Create weight matrices only for pairs present in connectivity params
+        # Create weight matrices only for pairs present in connectivity params for later use in ANNarchy connection
         self.weights_by_type: dict[tuple[str, str], lil_matrix] = {}
         for pre_type, post_type in self.conn_params.keys():
             n_pre = len(self.indices_by_type[pre_type])
             n_post = len(self.indices_by_type[post_type])
             self.weights_by_type[(pre_type, post_type)] = lil_matrix((n_pre, n_post))
+
+        # prepare the samplers from which the values of the weights are sampled
+        self.weight_samplers: dict[tuple[str, str], CombinedSampler] = {}
+        for pre_type, post_type in self.conn_params.keys():
+            if pre_type in ("dSPN", "iSPN") and post_type in ("dSPN", "iSPN"):
+                components = components_spn_spn
+            elif pre_type == "FS" and post_type in ("dSPN", "iSPN"):
+                components = components_fsi_spn
+            elif pre_type == "FS" and post_type == "FS":
+                components = components_fsi_fsi
+            else:
+                raise ValueError(
+                    f"No weight components defined for pair {pre_type}->{post_type}"
+                )
+            sampler = CombinedSampler(components=components, rng=self.rng)
+            self.weight_samplers[(pre_type, post_type)] = sampler
+
+        # prepare the dictionaries to hold the input iterators and corresponding TimedArray populations for each pre-post type pair and the cortical inputs (from dlPFC, PM/SMA, M1) for later use in the update function
+        self.inp_iterator_dict: dict[tuple[str, str], iter] = (
+            {}
+        )  # key: (pre_type, post_type)
+        self.annarchy_inp_populations: dict[tuple[str, str], TimedArray] = (
+            {}
+        )  # key: (pre_type, post_type)
 
         # container to store distances (mm) for actual formed connections per pair
         self.connection_distances_by_pair: dict[tuple[str, str], list[float]] = {
@@ -200,6 +250,52 @@ class Microcircuit:
         self._missing_local_input()
 
         # TODO: define excitatory inputs (spike counts) for all neurons
+
+    def update(self, simulate: bool = False) -> None:
+        """Update function to be called during simulation to update the input populations."""
+        # Loop over all input iterators and update the corresponding TimedArray populations
+        for key, inp_iterator in self.inp_iterator_dict.items():
+            inp_population = self.annarchy_inp_populations[key]
+            # get next chunk of inputs
+            inputs = next(inp_iterator)
+            # update the TimedArray population with new rates
+            inp_population.reset()
+            inp_population.update(rates=inputs)
+
+        # Optional simulation the network for the update_time
+        if simulate:
+            simulate(self.update_time)
+
+    def create_populations_annarchy(self, type_counts: dict[str, int]) -> None:
+        """
+        Create ANNarchy populations for each cell type with the specified counts.
+
+        Args:
+            type_counts: Dictionary mapping cell type labels to their respective counts.
+        """
+
+        self.annarchy_populations = {}
+        for cell_type, count in type_counts.items():
+            # Define a simple neuron model (placeholder, TODO replace with actual model)
+            neuron_model = Neuron(
+                parameters="""
+                    tau_ampa = 10.0
+                    tau_gaba = 10.0
+                """,
+                equations="""
+                    dv/dt = 0
+                    dg_ampa/dt = -g_ampa / tau_ampa
+                    dg_gaba/dt = -g_gaba / tau_gaba
+                """,
+                spike="""
+                    v>1
+                """,
+            )
+
+            population = Population(
+                geometry=count, neuron=neuron_model, name=f"{self.name}_{cell_type}"
+            )
+            self.annarchy_populations[cell_type] = population
 
     # ----------------------
     # Connectivity creation
@@ -230,15 +326,18 @@ class Microcircuit:
         return radii_mm, max_sigma_mm
 
     def _neighbors_within(self, j: int, r_mm: float) -> set:
+        """Return indices of neurons within radius ``r_mm`` from neuron ``j`` under periodic boundaries."""
         idxs = self.tree.query_ball_point(self.positions[j], r=r_mm)
         return set(idx % self.n_total for idx in idxs)
 
     def _periodic_distance(self, i: int, j: int) -> float:
+        """Compute true periodic Euclidean distance (mm) between neurons ``i`` and ``j``."""
         delta = self.positions[i] - self.positions[j]
         delta = delta - self.L * np.round(delta / self.L)
         return float(np.linalg.norm(delta))
 
     def _build_connectivity(self) -> None:
+        """Instantiate probabilistic connections and sample weights for all permitted pre/post type pairs."""
         # loop over postsynaptic neurons (global indices)
         for post_global in range(self.n_total):
             post_type = self.types[post_global]
@@ -267,7 +366,9 @@ class Microcircuit:
                     # translate to local indices per type and set weight
                     pre_local = self.local_index_map[pre_type][pre_global]
                     post_local = self.local_index_map[post_type][post_global]
-                    self.weights_by_type[key][pre_local, post_local] = 1.0
+                    self.weights_by_type[key][pre_local, post_local] = (
+                        self.weight_samplers[key].sample()
+                    )
                     # record distance (mm)
                     self.connection_distances_by_pair[key].append(dist)
 
@@ -383,10 +484,7 @@ class Microcircuit:
         return P0 * np.exp(-(d**2) / (sigma**2))
 
     def _missing_local_input(self):
-        """
-        TODO It seems I tried to implement this directly here, in the meanwhile I implemented a working method in spike_input_cortex.py --> TODO use the version which create groups achieving distance dependent shared input fractions from spike_input_cortex
-        """
-        # TODO
+        """Construct distance-dependent shared input groups and simulate local inhibitory spike counts."""
         # Get distance dependent shared input curves f(d)
         (
             f_d_interp_dict,
@@ -402,11 +500,54 @@ class Microcircuit:
             expected_shared_dict=expected_shared_dict,
         )
 
-        # TODO simulate spike counts for these groups and assign to receivers
+        # Simulate spike counts for these groups and assign to receivers and store them
         self._simulate_distance_dependent_spike_counts(dist_state_dict=dist_state_dict)
 
+        # Create the ANNarchy input populations which will use the spike counts to provide input to the striatal neurons
+        self._create_missing_gaba_inputs_annarchy(dist_state_dict=dist_state_dict)
+
+    def _create_missing_gaba_inputs_annarchy(self, dist_state_dict):
+        """Create ANNarchy TimedArray input populations for distance-dependent spike
+        counts and the corresponding input iterators for setting the inputs during simulation using stored data.
+        """
+        # Loop over postsynaptic neuron type
+        for post_type in self.cell_types:
+            # get the receiver population
+            post_pop: Population = self.annarchy_populations[post_type]
+            # loop over presynaptic neuron type
+            for pre_type in self.cell_types:
+                key = (pre_type, post_type)
+                if key not in self.conn_params:
+                    continue
+                # create the input population and connect it to the receiver population
+                # the input is initialized with placeholder zeros, this needs to be updated before simulation
+                n_steps_input = int(self.update_time / self.dt)
+                inp = TimedArray(
+                    rates=np.zeros((n_steps_input, post_pop.size)),
+                    name=f"TimedInput_{pre_type}_{post_type}_{self.name}",
+                )
+                proj = CurrentInjection(
+                    inp,
+                    post_pop,
+                    "gaba",
+                    name=f"CurrentInjection_{pre_type}_{post_type}_{self.name}",
+                )
+                proj.connect_current()
+
+                # create the input iterator for the update function
+                inp_iterator = iter_memmap_spike_counts(
+                    state=dist_state_dict[key],
+                    filename=f"receiver_counts_distance_dependent_{pre_type}_{post_type}.dat",
+                    num_bins=self.n_steps,
+                    chunk_size=n_steps_input,
+                    copy=False,
+                    verbose=self.verbose,
+                )
+                self.annarchy_inp_populations[key] = inp
+                self.inp_iterator_dict[key] = inp_iterator
+
     def _simulate_distance_dependent_spike_counts(self, dist_state_dict):
-        # TODO
+        """Generate spike-count time series for each distance-dependent group configuration."""
         # Loop over postsynaptic neuron type
         for post_type in self.cell_types:
             # loop over presynaptic neuron type
@@ -428,7 +569,7 @@ class Microcircuit:
     def _define_distance_dependent_shared_input_groups(
         self, expected_outer_dict, f_d_interp_dict, expected_shared_dict
     ):
-        # TODO
+        """Create shared-input groups that match target input counts and shared-fraction curves."""
         bounding_box_width = self.L[0]  # assuming cubic box
         # Loop over postsynaptic neuron type
         dist_state_dict = {}
@@ -520,6 +661,7 @@ class Microcircuit:
         return dist_state_dict
 
     def _define_distance_dependent_shared_input_curves(self):
+        """Compute distance-dependent shared-input fraction curves f(d) for all valid type pairs."""
 
         # Get shared input fraction depending on distance f(d) considering the size of
         # the simulated volume and the distance-dependent connection probability
