@@ -160,14 +160,10 @@ def pre_defined_spiking_network(N_pre=1000, N_post=1, rate=100.0, weight=0.01):
         chunk_size=1000,
         copy=False,
     )
-
-    # first 1000 ms of inputs
-    inputs = next(inp_iterator) * weight
-    print(f"initial input data: {inputs}")
     # list for tracking all inputs
-    all_inputs = [inputs.copy()]
+    all_inputs = []
 
-    inp = net.create(TimedArray(rates=inputs, name="TimedInput"))
+    inp = net.create(TimedArray(rates=np.zeros((1000, N_post)), name="TimedInput"))
     pop = net.create(
         geometry=N_post, neuron=receiving_neuron, name="PreDefinedReceivingPopulation"
     )
@@ -195,11 +191,9 @@ def pre_defined_spiking_network(N_pre=1000, N_post=1, rate=100.0, weight=0.01):
     # create full input data array
     all_inputs_arr = np.vstack(all_inputs)
     print(f"Pre-defined input data shape: {all_inputs_arr.shape}\n")
-    chunk = 0
-    print(f"Chunk {chunk}\n data:     {all_inputs[chunk][:10,0]}\n")
-    for chunk in range(1, len(all_inputs)):
+    for chunk in range(len(all_inputs)):
         print(
-            f"Chunk {chunk}\n data:     {all_inputs[chunk][:10,0]}\n recorded: {data_r[(chunk-1)*1000:(chunk-1)*1000+10,0]}\n"
+            f"Chunk {chunk}\n data:     {all_inputs[chunk][:10,0]}\n recorded: {data_r[(chunk)*1000:(chunk)*1000+10,0]}\n"
         )
     return data, data_r
 

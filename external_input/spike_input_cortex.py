@@ -130,7 +130,7 @@ def simulate_counts_direct(
     """Simulate group spike counts via a Beta-Binomial construction.
 
     For each time bin b, draw ``p_b ~ Beta(alpha, beta)`` with mean
-    ``p = rate * dt`` and variance ``Var[P] = rho * p * (1 - p)`` when
+    ``p = rate * dt_s`` and variance ``Var[P] = rho * p * (1 - p)`` when
     ``0 < rho < 1``. Then, for each group g, draw the count
     ``K[g, b] ~ Binomial(N, p_b)``. This induces positive correlation across
     groups within a time bin that is controlled by ``rho``.
@@ -144,7 +144,7 @@ def simulate_counts_direct(
         G (int): Number of groups (e.g., cortical populations).
         N (int): Number of neurons per group.
         rate (float): Firing rate in Hz.
-        dt (float): Bin width in seconds.
+        dt (float): Bin width in milliseconds.
         rho (float): Overdispersion/correlation coefficient. Values in
             [0, 1] are meaningful; values outside this range are treated by
             the nearest special-case branch described above.
@@ -159,10 +159,11 @@ def simulate_counts_direct(
 
     Examples:
         >>> rng = np.random.default_rng(0)
-        >>> simulate_counts_direct(2, 10, 50, 0.001, 0.3, 5, rng).shape
+        >>> simulate_counts_direct(2, 10, 50, 1.0, 0.3, 5, rng).shape
         (2, 5)
     """
-    p = rate * dt
+    dt_s = dt * 1e-3  # convert ms to seconds for rate*dt
+    p = rate * dt_s
     # No overdispersion: draw Binomial counts with a fixed probability p.
     if rho <= 0.0:
         arr = rng.binomial(N, p, size=(G, num_bins))
@@ -1204,7 +1205,7 @@ def simulate_receiver_counts_with_groups(
     Args:
         state (GroupsState): Prebuilt groups and dtype configuration.
         rate (float): Firing rate of each input in Hz.
-        dt (float): Bin width in seconds.
+        dt (float): Bin width in milliseconds.
         rho (float): Overdispersion/correlation coefficient for input correlations.
         num_bins (int): Number of time bins to simulate in this chunk.
         rng (np.random.Generator): Random number generator.
@@ -1282,7 +1283,7 @@ def simulate_receiver_counts_homogeneous(
             private inputs, ``f=1`` means fully shared across receivers.
         s (int): Group size (number of inputs per group).
         rate (float): Firing rate of each input in Hz.
-        dt (float): Bin width in seconds.
+        dt (float): Bin width in milliseconds.
         rho (float): Overdispersion/correlation coefficient for shared variability
             across groups within a time bin (see ``simulate_counts_direct``).
         num_bins (int): Number of time bins to simulate.
@@ -1403,14 +1404,14 @@ if __name__ == "__main__":
     # Demonstrate spike count simulation
     print("Demonstrating spike count simulation:")
     # Demonstration: print two example count matrices for different rho values.
-    (G, N, rate, dt, rho, num_bins) = (5, 10, 200, 0.001, 0.8, 15)
+    (G, N, rate, dt, rho, num_bins) = (5, 10, 200, 1.0, 0.8, 15)
     example_spike_counts = simulate_counts_direct(
         G=G, N=N, rate=rate, dt=dt, rho=rho, num_bins=num_bins, rng=rng
     )
     print("G (total groups):", G)
     print("N (neurons per group):", N)
     print("Rate (Hz):", rate)
-    print("dt (s):", dt)
+    print("dt (ms):", dt)
     print("rho (correlation):", rho)
     print("num_bins (time bins):", num_bins)
     print("-->")
@@ -1438,7 +1439,7 @@ if __name__ == "__main__":
     # Demonstrate per-receiver incoming spike streams with overlap
     print("\nDemonstrating per-receiver spike streams with overlap:")
     R_demo, N_demo, f_demo, s_demo = 6, 100, 0.3, 5
-    rate_demo, dt_demo, rho_demo, num_bins_demo = 50.0, 0.001, 0.2, 20
+    rate_demo, dt_demo, rho_demo, num_bins_demo = 50.0, 1.0, 0.2, 20
     receiver_counts = simulate_receiver_counts_homogeneous(
         R=R_demo,
         N=N_demo,
@@ -1454,7 +1455,7 @@ if __name__ == "__main__":
     print("Approx N (inputs/receiver):", N_demo)
     print("f (shared fraction):", f_demo)
     print("s (group size):", s_demo)
-    print("rate (Hz):", rate_demo, "dt (s):", dt_demo, "rho:", rho_demo)
+    print("rate (Hz):", rate_demo, "dt (ms):", dt_demo, "rho:", rho_demo)
     print("num_bins:", num_bins_demo)
     print("-->")
     print("receiver spike counts shape:", receiver_counts.shape)
@@ -1465,7 +1466,7 @@ if __name__ == "__main__":
     # Demonstrate the optimized no-overlap path (k == 1)
     print("\nDemonstrating no-overlap fast path (k == 1):")
     R_no, N_no, f_no, s_no = 5, 120, 0.0, 4  # f=0 -> k=1 regardless of s
-    rate_no, dt_no, rho_no, num_bins_no = 30.0, 0.001, 0.1, 12
+    rate_no, dt_no, rho_no, num_bins_no = 30.0, 1.0, 0.1, 12
     receiver_counts_no = simulate_receiver_counts_homogeneous(
         R=R_no,
         N=N_no,
@@ -1481,7 +1482,7 @@ if __name__ == "__main__":
     print("N (inputs/receiver):", N_no)
     print("f (shared fraction):", f_no)
     print("s (group size, unused in fast path):", s_no)
-    print("rate (Hz):", rate_no, "dt (s):", dt_no, "rho:", rho_no)
+    print("rate (Hz):", rate_no, "dt (ms):", dt_no, "rho:", rho_no)
     print("num_bins:", num_bins_no)
     print("-->")
     print("receiver spike counts shape:", receiver_counts_no.shape)
@@ -1549,7 +1550,7 @@ if __name__ == "__main__":
     rng_int = rng.integers(0, 2**31 - 1)
     rng_normal = np.random.default_rng(rng_int)
     rng_memmap = np.random.default_rng(rng_int)
-    rate_dd, dt_dd, rho_dd, num_bins_dd = 15.0, 0.001, 0.25, 300000
+    rate_dd, dt_dd, rho_dd, num_bins_dd = 15.0, 1.0, 0.25, 300000
     receiver_counts_dd = simulate_receiver_counts_distance_dependent(
         state=dist_state,
         rate=rate_dd,
@@ -1604,21 +1605,3 @@ if __name__ == "__main__":
     )
     print(f"    memmapmed vals: {counts[0, :10]}")
     print(f"    Maximum difference between memmapmed and in-memory counts: {max_diff}")
-
-
-""" CHECK IF THIS WORKED
-
-Change the script so that the user provides a bounding box width (width, heigth, depth are all the same, it's a cube) together with the receiver positions to the build_distance_groups_state() function. The bounding box defines the periodic borders. The receiver positions are the coordinates within the bounding box.
-
-Therefore the periodic borders conditions do not need to be calculated based on the receiver positions but simply based on the bounding box dimensions everywhere.
-
-Also the way how the group positions (on an uniform grid) are obtained should be changed. The group postions should be distributed on a uniform grid within the bounding box.
-
-To fit the function p(d) a very fine grid (100x100x100) should be used for the group positions.
-
-After fitting p(d) and calculating the actual number of groups G, a new grid over the bounding box should be defined for the actual number of groups G. If it is not possible to distribute the number of groups G uniformly over a 3D grid in the bounding box, the next larger possible grid size should be used (so there are equal or more grid elements than groups). Then the groups should be randomly assigned to these grid positions, as currently after the line "if G <= Ggrid", i.e., without replacement. In the new version it should be guaranteed that "G <= Ggrid" because the grid is defined to be just as large as necessary to contain all the groups.
-
-Also update the section for the empirical shared fraction estimation according to the updated methods usig teh bounding box.
-
-
-"""
