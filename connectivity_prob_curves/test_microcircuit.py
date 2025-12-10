@@ -14,3 +14,4 @@ if __name__ == "__main__":
         compile_folder_name="microcircuit_test_compile",
     )
     print_df(model.attribute_df)
+    print(mc.mean_weights_by_type)

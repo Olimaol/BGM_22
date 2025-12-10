@@ -298,6 +298,7 @@ class Microcircuit:
             self._load_missing_input_state()
 
         # TODO: define excitatory inputs (spike counts) for all neurons
+        # my current idea: adjust the simulate spike count methods so that it doesnt use a constant firing rate and correlation to obtain the spiking probabilities but the spiking probabilities over time are obtained based on the BOLD signals
 
     def update(self, run_simulation: bool = False) -> None:
         """Update function to be called during simulation to update the input populations."""
