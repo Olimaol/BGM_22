@@ -167,9 +167,7 @@ def pre_defined_spiking_network(N_pre=1000, N_post=1, rate=100.0, weight=0.01):
     # list for tracking all inputs
     all_inputs = [inputs.copy()]
 
-    inp = net.create(
-        TimedArray(rates=inputs, period=inputs.shape[0], name="TimedInput")
-    )
+    inp = net.create(TimedArray(rates=inputs, name="TimedInput"))
     pop = net.create(
         geometry=N_post, neuron=receiving_neuron, name="PreDefinedReceivingPopulation"
     )
@@ -183,11 +181,15 @@ def pre_defined_spiking_network(N_pre=1000, N_post=1, rate=100.0, weight=0.01):
     monitor1.start()
     monitor2.start()
     # loop over data chunks
+    n = 0
     for inputs in inp_iterator:
         inputs = inputs * weight
+        if n < 5:
+            inp.reset()
+            inp.update(rates=inputs)
         all_inputs.append(inputs.copy())
-        inp.update(rates=inputs, period=inputs.shape[0])
         net.simulate(inputs.shape[0], measure_time=True)
+        n += 1
     data = monitor1.get("g_ampa")
     data_r = monitor2.get("r")
     # create full input data array
