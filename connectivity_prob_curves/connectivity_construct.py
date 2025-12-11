@@ -1,7 +1,7 @@
-# %%
 import json
 import os
 import pickle
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,9 +22,11 @@ from ANNarchy import (
 # Local imports
 from external_input.spike_input_cortex import (
     build_distance_groups_state,
+    build_groups_state,
     _periodic_distance_float,
     plot_empirical_and_target_distance_dependent_shared_fraction,
     simulate_receiver_counts_distance_dependent_on_drive,
+    simulate_receiver_counts_with_groups_on_drive,
     iter_memmap_spike_counts,
 )
 from striatal_weights.get_weights import (
@@ -89,6 +91,8 @@ class Microcircuit:
         density: float = 84900.0,
         firing_rate_dict: dict | None = None,
         correlation_dict: dict | None = None,
+        N_cortical_inputs_dict: dict | None = None,
+        cortical_proportions_dict: dict | None = None,
         dt: float = 0.1,
         T: float = 1000.0,
         update_time: float = 100.0,
@@ -100,6 +104,7 @@ class Microcircuit:
         build_connectivity: bool = True,
         build_missing_gaba_input: bool = True,
         verbose: bool = True,
+        cortical_drive_condition: str = "on",
     ) -> None:
         # --- Parameters ---
         self.update_time = update_time  # ms for how long inputs are defined
@@ -109,6 +114,13 @@ class Microcircuit:
         self.density = density
         self.seed = seed
         self.verbose = verbose
+        if cortical_drive_condition not in {"on", "off"}:
+            raise ValueError("cortical_drive_condition must be 'on' or 'off'")
+        self.cortical_drive_condition = cortical_drive_condition
+
+        # name should be either 'caudate' or 'putamen'
+        if self.name not in ("caudate", "putamen"):
+            raise ValueError("name must be either 'caudate' or 'putamen'")
 
         # firing rates per cell type (Hz)
         # default for D1 and D2 extracted from: (Liang et al., 2008) using with levodopa treatment, see experimental_data/activity_striatum/extract_from_liang_etal_2008.py
@@ -122,6 +134,40 @@ class Microcircuit:
             # default based on (Adler et al., 2013):
             correlation_dict = {"FS": 0.06, "dSPN": 0.004, "iSPN": 0.004}
         self.correlation_dict = correlation_dict
+
+        # expected number of input neurons from cortex per receiver neuron per cell type
+        # default based on my calculations (see zotero/goolge/notebooks)
+        if N_cortical_inputs_dict is None:
+            N_cortical_inputs_dict = {"FS": 2800, "dSPN": 7000, "iSPN": 7000}
+        self.N_cortical_inputs_dict = N_cortical_inputs_dict
+
+        # the cortical proportions dict for our given cortical regions from the BOLD data:
+        if cortical_proportions_dict is None:
+            proportions = {
+                "caudate": {
+                    # "dlPFC": 0.45, TODO commented because BOLD data labels do not fit
+                    "preSMA": 0.25 + 0.45,  # TODO remove the dlPFC part again
+                    "PMd": 0.15,
+                    "PMv": 0.10,
+                    "SMA": 0.04,
+                    "M1": 0.01,
+                    "S1": 0.00,
+                },
+                "putamen": {
+                    # "dlPFC": 0.05, TODO commented because BOLD data labels do not fit
+                    "preSMA": 0.10 + 0.05,  # TODO remove the dlPFC part again
+                    "PMd": 0.15,
+                    "PMv": 0.05,
+                    "SMA": 0.25,
+                    "M1": 0.30,
+                    "S1": 0.10,
+                },
+            }
+            cortical_proportions_dict = proportions[self.name]
+        self.cortical_proportions_dict = cortical_proportions_dict
+
+        # shared fraction of inputs between striatal neurons based on Kincaid et al., 1998
+        self.shared_fraction = 0.014
 
         # timestep for simulation in ms
         self.dt = dt
@@ -297,8 +343,13 @@ class Microcircuit:
         else:
             self._load_missing_input_state()
 
-        # TODO: define excitatory inputs (spike counts) for all neurons
-        # my current idea: adjust the simulate spike count methods so that it doesnt use a constant firing rate and correlation to obtain the spiking probabilities but the spiking probabilities over time are obtained based on the BOLD signals
+        # define excitatory inputs (spike counts) for all neurons
+        self._excitatory_inputs()
+
+        # TODO creating the excitatory spike counts seems to work, next:
+        # create the input projections and populations
+        # use everything in the update method to set the inputs
+        # make it optonal like the missing local input and able to load it
 
     def update(self, run_simulation: bool = False) -> None:
         """Update function to be called during simulation to update the input populations."""
@@ -661,6 +712,110 @@ class Microcircuit:
         Exponential connection probability function.
         """
         return P0 * np.exp(-(d**2) / (sigma**2))
+
+    def _excitatory_inputs(self):
+        """Define cortical excitatory inputs based on BOLD-driven firing rates."""
+        # Build input groups for dSPNs and iSPNs
+        self.cor_input_state_dict = self._define_shared_input_groups()
+
+        # Simulate and store the spike counts for the cortical inputs
+        self._simulate_cor_input_spike_counts()
+
+    def _simulate_cor_input_spike_counts(self):
+        """Simulate spike counts for cortical input groups and store them."""
+        # As rates for cortical drive, load the precomputed rates based on BOLD data
+        rate_path = (
+            Path(__file__).resolve().parent.parent
+            / "external_input"
+            / "results_cortical_drive_by_bold"
+            / f"firing_rates_matlab_condition-{self.cortical_drive_condition}.npz"
+        )
+        if not rate_path.exists():
+            raise FileNotFoundError(
+                f"Cortical drive rates not found at {rate_path}; run cortical_drive_by_bold.py first."
+            )
+
+        with np.load(rate_path) as data:
+            # print keys in the loaded data
+            if self.verbose:
+                print(f"Loaded cortical drive data keys: {list(data.keys())}")
+            # Infer dt (ms) from any region's time array to ensure consistency with the model dt
+            sample_time_key = None
+            for cortical_region in self.cortical_proportions_dict:
+                key_candidate = f"{cortical_region}_time"
+                if key_candidate in data:
+                    sample_time_key = key_candidate
+                    break
+            if sample_time_key is None:
+                raise ValueError(
+                    "No cortical time arrays found in cortical drive file."
+                )
+
+            time_arr = np.asarray(data[sample_time_key])
+            if time_arr.size < 2:
+                raise ValueError(
+                    f"Time array '{sample_time_key}' too short to determine dt."
+                )
+
+            dt_seconds = float(time_arr[1] - time_arr[0])
+            dt_ms = dt_seconds * 1000.0
+            if not np.isclose(dt_ms, self.dt, rtol=1e-6, atol=1e-9):
+                raise ValueError(
+                    f"Cortical drive dt ({dt_ms:.6f} ms) does not match Microcircuit dt ({self.dt:.6f} ms)."
+                )
+
+            # Simulate spike counts per cortical region
+            for key, state in self.cor_input_state_dict.items():
+                cortical_region, receiver_type = key
+
+                spike_file = self._spike_counts_path(cortical_region, receiver_type)
+
+                rate_key = f"{cortical_region}_rate"
+                if rate_key not in data:
+                    raise KeyError(
+                        f"Rate key '{rate_key}' missing in cortical drive file {rate_path}."
+                    )
+                rate_series = np.asarray(data[rate_key])
+                if rate_series.size < self.n_steps:
+                    raise ValueError(
+                        f"Rate series for {cortical_region} has only {rate_series.size} samples; "
+                        f"expected at least {self.n_steps}."
+                    )
+                rate_segment = rate_series[: self.n_steps]
+
+                simulate_receiver_counts_with_groups_on_drive(
+                    filename=spike_file,
+                    state=state,
+                    rate=rate_segment,
+                    dt=self.dt,
+                    rho=0.0,  # rho is ignored because fluctuations come rate time series based on BOLD
+                    num_bins=self.n_steps,
+                    rng=self.rng,
+                    verbose=self.verbose,
+                )
+
+    def _define_shared_input_groups(self):
+        """Define shared input groups from cortex to striatum based on fixed shared fraction."""
+        group_state_dict = {}
+        for receiver_type in ("dSPN", "iSPN"):
+            for cortical_region, proportion in self.cortical_proportions_dict.items():
+                # number of expected inputs from this cortical region
+                N_total = self.N_cortical_inputs_dict[receiver_type]
+                N = int(proportion * N_total)
+                if N == 0:
+                    continue
+                # number of receivers R of the receiver type
+                R = self.type_counts[receiver_type]
+                # expected shared inputs total
+                expected_shared = int(self.shared_fraction * N)
+                # s_group: group size, I use expected_shared / 2 and min 1
+                s_group = max(1, expected_shared // 2)
+                # key is (pre, post)
+                key = (cortical_region, receiver_type)
+                group_state_dict[key] = build_groups_state(
+                    R=R, N=N, f=self.shared_fraction, s=s_group, rng=self.rng
+                )
+        return group_state_dict
 
     def _missing_local_input(self):
         """Construct distance-dependent shared input groups and simulate local inhibitory spike counts."""
