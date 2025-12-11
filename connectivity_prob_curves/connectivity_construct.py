@@ -74,13 +74,16 @@ class Microcircuit:
     def _missing_input_state_path(self) -> str:
         return os.path.join(self.inputs_dir, "missing_input_state.pkl")
 
+    def _cortical_input_state_path(self) -> str:
+        return os.path.join(self.inputs_dir, "cortical_input_state.pkl")
+
     def _dist_state_path(self, pre_type: str, post_type: str) -> str:
         return os.path.join(self.inputs_dir, f"dist_state_{pre_type}_{post_type}.pkl")
 
     def _spike_counts_path(self, pre_type: str, post_type: str) -> str:
         return os.path.join(
             self.inputs_dir,
-            f"receiver_counts_distance_dependent_{pre_type}_{post_type}.dat",
+            f"receiver_counts_distance_dependent_{pre_type}_{post_type}.dat",  # TODO remove _distance_dependent
         )
 
     def __init__(
@@ -103,8 +106,9 @@ class Microcircuit:
         output_dir: str | None = None,
         build_connectivity: bool = True,
         build_missing_gaba_input: bool = True,
+        build_cortical_input: bool = True,
         verbose: bool = True,
-        cortical_drive_condition: str = "on",
+        dbs_condition: str = "on",
     ) -> None:
         # --- Parameters ---
         self.update_time = update_time  # ms for how long inputs are defined
@@ -114,9 +118,9 @@ class Microcircuit:
         self.density = density
         self.seed = seed
         self.verbose = verbose
-        if cortical_drive_condition not in {"on", "off"}:
-            raise ValueError("cortical_drive_condition must be 'on' or 'off'")
-        self.cortical_drive_condition = cortical_drive_condition
+        if dbs_condition not in {"on", "off"}:
+            raise ValueError("dbs_condition must be 'on' or 'off'")
+        self.dbs_condition = dbs_condition
 
         # name should be either 'caudate' or 'putamen'
         if self.name not in ("caudate", "putamen"):
@@ -145,8 +149,8 @@ class Microcircuit:
         if cortical_proportions_dict is None:
             proportions = {
                 "caudate": {
-                    # "dlPFC": 0.45, TODO commented because BOLD data labels do not fit
-                    "preSMA": 0.25 + 0.45,  # TODO remove the dlPFC part again
+                    "dlPFC": 0.45,
+                    "preSMA": 0.25,
                     "PMd": 0.15,
                     "PMv": 0.10,
                     "SMA": 0.04,
@@ -154,8 +158,8 @@ class Microcircuit:
                     "S1": 0.00,
                 },
                 "putamen": {
-                    # "dlPFC": 0.05, TODO commented because BOLD data labels do not fit
-                    "preSMA": 0.10 + 0.05,  # TODO remove the dlPFC part again
+                    "dlPFC": 0.05,
+                    "preSMA": 0.10,
                     "PMd": 0.15,
                     "PMv": 0.05,
                     "SMA": 0.25,
@@ -185,7 +189,9 @@ class Microcircuit:
 
         # paths
         script_dir = os.path.dirname(__file__)
-        self.storage_dir = storage_dir or os.path.join(script_dir, ".microcircuit")
+        self.storage_dir = storage_dir or os.path.join(
+            script_dir, f".microcircuit_{self.name}_{self.dbs_condition}"
+        )
         os.makedirs(self.storage_dir, exist_ok=True)
         self.connectivity_dir = os.path.join(self.storage_dir, "connectivity")
         self.inputs_dir = os.path.join(self.storage_dir, "inputs")
@@ -310,10 +316,19 @@ class Microcircuit:
             {}
         )  # key: (pre_type, post_type)
 
+        # prepare dictionary to store the weights of eternal inputs, fill it with default values for the cortical inputs
+        self.mean_weights_by_type: dict[tuple[str, str], float] = {}
+        for post_type in self.cell_types:
+            for cortical_region in self.cortical_proportions_dict.keys():
+                key = (cortical_region, post_type)
+                # default mean weight for cortical inputs, can be scaled later
+                self.mean_weights_by_type[key] = 0.001
+
         # container for ANNarchy populations; created lazily in create_model
         self.annarchy_populations: dict[str, Population] = {}
-        self.model_built: bool = False
+        self.model_created: bool = False
         self.dist_state_dict = None
+        self.cor_input_state_dict = None
 
         # container to store distances (mm) for actual formed connections per pair
         self.connection_distances_by_pair: dict[tuple[str, str], list[float]] = {
@@ -344,16 +359,15 @@ class Microcircuit:
             self._load_missing_input_state()
 
         # define excitatory inputs (spike counts) for all neurons
-        self._excitatory_inputs()
-
-        # TODO creating the excitatory spike counts seems to work, next:
-        # create the input projections and populations
-        # use everything in the update method to set the inputs
-        # make it optonal like the missing local input and able to load it
+        if build_cortical_input:
+            self._excitatory_inputs()
+            self._save_cortical_input_state()
+        else:
+            self._load_cortical_input_state()
 
     def update(self, run_simulation: bool = False) -> None:
         """Update function to be called during simulation to update the input populations."""
-        if not self.model_built:
+        if not self.model_created:
             raise RuntimeError(
                 "create_model() must be called before update to build ANNarchy objects."
             )
@@ -364,13 +378,36 @@ class Microcircuit:
             inputs = next(inp_iterator)
             # reshape inputs from (n_neurons, n_steps) into (n_steps, n_neurons)
             inputs = inputs.T
-            # if the key is for missing gaba input, scale the inputs by the mean weight for the pre-post type pair
-            if key in self.mean_weights_by_type:
-                inputs *= self.mean_weights_by_type[key]
+
+            if self.verbose and key[0] == "FS" and key[1] == "FS":
+                # plot the inputs as raster plot with time on x-axis and neuron index on y-axis
+                plt.figure(figsize=(12, 6))
+
+                # We transpose the data (.T) so that:
+                #   Rows (Y-axis) = Neurons
+                #   Columns (X-axis) = Time steps
+                # origin='lower' ensures Neuron 0 is at the bottom.
+                plt.imshow(
+                    inputs.T,
+                    aspect="auto",
+                    cmap="viridis",
+                    origin="lower",
+                    interpolation="nearest",
+                )
+
+                plt.colorbar(label="Input Count")
+                plt.xlabel("Time (steps)")
+                plt.ylabel("Neuron Index")
+                plt.title("Neuron Input Counts Over Time")
+                plt.title(
+                    f"Inputs for timed array: {inp_population.name}\nshape={inputs.shape}"
+                )
+                plt.tight_layout()
+                plt.show()
 
             # update the TimedArray population with weighted inputs
             inp_population.reset()
-            inp_population.update(rates=inputs)
+            inp_population.update(rates=inputs * self.mean_weights_by_type[key])
 
         # Optional simulation the network for the update_time
         if run_simulation:
@@ -382,7 +419,7 @@ class Microcircuit:
         Call this after constructing the Microcircuit to keep heavy ANNarchy
         objects separate from data preparation.
         """
-        if self.model_built:
+        if self.model_created:
             if self.verbose:
                 print("ANNarchy model already built; skipping create_model().")
             return
@@ -393,14 +430,23 @@ class Microcircuit:
         # create projections between striatal populations
         self.create_local_projections_annarchy()
 
-        # Ensure distance-dependent input state exists
+        # Ensure distance-dependent input state and cortical input state exist
         if self.dist_state_dict is None:
             self._missing_local_input()
+        if self.cor_input_state_dict is None:
+            self._excitatory_inputs()
 
-        # Build ANNarchy TimedArray inputs and projections for local gaba inputs
-        self._create_missing_gaba_inputs_annarchy(dist_state_dict=self.dist_state_dict)
+        # Build ANNarchy TimedArray inputs and projections for local gaba inputs, SPN neuron models have gaba as target for gaba currents
+        self._create_inputs_annarchy(
+            group_state_dict=self.dist_state_dict, target="gaba"
+        )
 
-        self.model_built = True
+        # Build ANNarchy TimedArray inputs and projections for cortical excitatory inputs, SPN neuron models have glut as target for nmda and ampa currents
+        self._create_inputs_annarchy(
+            group_state_dict=self.cor_input_state_dict, target="glut"
+        )
+
+        self.model_created = True
 
     def create_local_projections_annarchy(self) -> None:
         """Create ANNarchy Projections between the striatal populations based on the
@@ -431,7 +477,7 @@ class Microcircuit:
 
         self.annarchy_populations = {}
         for cell_type, count in type_counts.items():
-
+            # TODO maybe need to change the dopamine parameter
             if cell_type == "dSPN":
                 neuron_model = Izhikevich2007Humphries2009SPND1
             elif cell_type == "iSPN":
@@ -728,7 +774,7 @@ class Microcircuit:
             Path(__file__).resolve().parent.parent
             / "external_input"
             / "results_cortical_drive_by_bold"
-            / f"firing_rates_matlab_condition-{self.cortical_drive_condition}.npz"
+            / f"firing_rates_matlab_condition-{self.dbs_condition}.npz"
         )
         if not rate_path.exists():
             raise FileNotFoundError(
@@ -838,52 +884,51 @@ class Microcircuit:
         self._simulate_distance_dependent_spike_counts(dist_state_dict=dist_state_dict)
         # Store state for later ANNarchy creation in create_model()
         self.dist_state_dict = dist_state_dict
-        # create a dictionary which stores the mean of the weights per pre-post type pair
-        self.mean_weights_by_type: dict[tuple[str, str], float] = {}
+        # store the mean of the weights per pre-post type pair
         for key in self.conn_params.keys():
             weight_samples = self.weight_samplers[key].sample(n=10000)
             self.mean_weights_by_type[key] = float(np.mean(weight_samples))
 
-    def _create_missing_gaba_inputs_annarchy(self, dist_state_dict):
-        """Create ANNarchy TimedArray input populations for distance-dependent spike
-        counts and the corresponding input iterators for setting the inputs during simulation using stored data.
+    def _create_inputs_annarchy(self, group_state_dict, target):
+        """Create ANNarchy TimedArray input populations for spike counts and the
+        corresponding input iterators for setting the inputs during simulation using stored data.
         """
-        # Loop over postsynaptic neuron type
-        for post_type in self.cell_types:
+        # Loop over the pre/post keys of the groups state
+        for key, state in group_state_dict.items():
+            pre_type, post_type = key
+            # skip if the postsynaptic population does not exist (safety for unexpected keys)
+            if post_type not in self.annarchy_populations:
+                continue
             # get the receiver population
             post_pop: Population = self.annarchy_populations[post_type]
-            # loop over presynaptic neuron type
-            for pre_type in self.cell_types:
-                key = (pre_type, post_type)
-                if key not in self.conn_params:
-                    continue
-                # create the input population and connect it to the receiver population
-                # the input is initialized with placeholder zeros, this needs to be updated before simulation
-                n_steps_input = int(self.update_time / self.dt)
-                inp = TimedArray(
-                    rates=np.zeros((n_steps_input, post_pop.size)),
-                    name=f"TimedInput_{pre_type}_{post_type}_{self.name}",
-                )
-                proj = CurrentInjection(
-                    inp,
-                    post_pop,
-                    "gaba",
-                    name=f"CurrentInjection_{pre_type}_{post_type}_{self.name}",
-                )
-                proj.connect_current()
 
-                # create the input iterator for the update function
-                spike_file = self._spike_counts_path(pre_type, post_type)
-                inp_iterator = iter_memmap_spike_counts(
-                    state=dist_state_dict[key],
-                    filename=spike_file,
-                    num_bins=self.n_steps,
-                    chunk_size=n_steps_input,
-                    copy=False,
-                    verbose=self.verbose,
-                )
-                self.annarchy_inp_populations[key] = inp
-                self.inp_iterator_dict[key] = inp_iterator
+            # create the input population and connect it to the receiver population
+            # the input is initialized with placeholder zeros, this needs to be updated before simulation
+            n_steps_input = int(self.update_time / self.dt)
+            inp = TimedArray(
+                rates=np.zeros((n_steps_input, post_pop.size)),
+                name=f"TimedInput_{pre_type}_{post_type}_{self.name}",
+            )
+            proj = CurrentInjection(
+                pre=inp,
+                post=post_pop,
+                target=target,
+                name=f"CurrentInjection_{pre_type}_{post_type}_{self.name}",
+            )
+            proj.connect_current()
+
+            # create the input iterator for the update function
+            spike_file = self._spike_counts_path(pre_type, post_type)
+            inp_iterator = iter_memmap_spike_counts(
+                state=state,
+                filename=spike_file,
+                num_bins=self.n_steps,
+                chunk_size=n_steps_input,
+                copy=False,
+                verbose=self.verbose,
+            )
+            self.annarchy_inp_populations[key] = inp
+            self.inp_iterator_dict[key] = inp_iterator
 
     def _simulate_distance_dependent_spike_counts(self, dist_state_dict):
         """Generate spike-count time series for each distance-dependent group configuration."""
@@ -943,11 +988,13 @@ class Microcircuit:
                 "Cached missing-input state is empty; rebuild missing inputs."
             )
 
-        self.mean_weights_by_type = payload.get("mean_weights_by_type")
-        if self.mean_weights_by_type is None:
+        mean_weights_saved = payload.get("mean_weights_by_type")
+        if mean_weights_saved is None:
             raise ValueError(
                 "Cached missing-input state is missing mean weights; rebuild missing inputs."
             )
+        # merge into existing defaults instead of overwriting
+        self.mean_weights_by_type.update(mean_weights_saved)
 
         # ensure spike-count files exist for all required pairs
         for pre_type, post_type in self.conn_params.keys():
@@ -955,6 +1002,110 @@ class Microcircuit:
             if not os.path.exists(path):
                 raise FileNotFoundError(
                     f"Spike-count file for {pre_type}->{post_type} not found at {path}; rebuild missing inputs."
+                )
+
+        rng_state = payload.get("rng_state")
+        if rng_state is not None:
+            self.rng.bit_generator.state = rng_state
+
+    def _save_cortical_input_state(self) -> None:
+        """Persist cortical input group state to allow reloading without recomputation."""
+        if self.cor_input_state_dict is None:
+            return
+
+        payload = {
+            "cor_input_state_dict": self.cor_input_state_dict,
+            "rng_state": self.rng.bit_generator.state,
+            "dbs_condition": self.dbs_condition,
+            "dt": self.dt,
+            "n_steps": self.n_steps,
+            "cortical_proportions_dict": self.cortical_proportions_dict,
+            "N_cortical_inputs_dict": self.N_cortical_inputs_dict,
+            "shared_fraction": self.shared_fraction,
+            "keys": [f"{pre}-{post}" for (pre, post) in self.cor_input_state_dict],
+        }
+
+        with open(self._cortical_input_state_path(), "wb") as f:
+            pickle.dump(payload, f)
+
+    def _load_cortical_input_state(self) -> None:
+        """Load cortical input state; expect spike-count files to exist."""
+        state_path = self._cortical_input_state_path()
+        if not os.path.exists(state_path):
+            raise FileNotFoundError(
+                f"Cortical input cache not found at {state_path}. Rebuild by setting build_cortical_input=True."
+            )
+
+        with open(state_path, "rb") as f:
+            payload = pickle.load(f)
+
+        dt_saved = payload.get("dt", self.dt)
+        if not np.isclose(dt_saved, self.dt, rtol=1e-9, atol=1e-9):
+            raise ValueError(
+                f"Cached cortical-input dt ({dt_saved}) does not match current dt ({self.dt}); rebuild cortical inputs."
+            )
+
+        n_steps_saved = payload.get("n_steps", self.n_steps)
+        if n_steps_saved != self.n_steps:
+            raise ValueError(
+                f"Cached cortical-input n_steps ({n_steps_saved}) does not match current n_steps ({self.n_steps}); rebuild cortical inputs."
+            )
+
+        cond_saved = payload.get("dbs_condition", self.dbs_condition)
+        if cond_saved != self.dbs_condition:
+            raise ValueError(
+                "Cached cortical-input state was built for a different dbs_condition; rebuild cortical inputs."
+            )
+
+        proportions_saved = payload.get("cortical_proportions_dict")
+        if proportions_saved and proportions_saved != self.cortical_proportions_dict:
+            raise ValueError(
+                "Cached cortical-input state uses different cortical_proportions_dict; rebuild cortical inputs."
+            )
+
+        N_inputs_saved = payload.get("N_cortical_inputs_dict")
+        if N_inputs_saved and N_inputs_saved != self.N_cortical_inputs_dict:
+            raise ValueError(
+                "Cached cortical-input state uses different N_cortical_inputs_dict; rebuild cortical inputs."
+            )
+
+        shared_fraction_saved = payload.get("shared_fraction")
+        if (shared_fraction_saved is not None) and not np.isclose(
+            shared_fraction_saved, self.shared_fraction
+        ):
+            raise ValueError(
+                "Cached cortical-input state uses different shared_fraction; rebuild cortical inputs."
+            )
+
+        self.cor_input_state_dict = payload.get("cor_input_state_dict")
+        if self.cor_input_state_dict is None:
+            raise ValueError(
+                "Cached cortical-input state is empty; rebuild cortical inputs."
+            )
+
+        expected_keys = {
+            (region, receiver_type)
+            for receiver_type in ("dSPN", "iSPN")
+            for region, proportion in self.cortical_proportions_dict.items()
+            if int(proportion * self.N_cortical_inputs_dict[receiver_type]) > 0
+        }
+        saved_keys = set(tuple(k.split("-")) for k in payload.get("keys", []))
+
+        if saved_keys and expected_keys and saved_keys != expected_keys:
+            raise ValueError(
+                "Cached cortical-input keys do not match current configuration; rebuild cortical inputs."
+            )
+
+        if saved_keys and set(self.cor_input_state_dict.keys()) != saved_keys:
+            raise ValueError(
+                "Cached cortical-input state keys mismatch stored state; rebuild cortical inputs."
+            )
+
+        for pre_type, post_type in self.cor_input_state_dict.keys():
+            path = self._spike_counts_path(pre_type, post_type)
+            if not os.path.exists(path):
+                raise FileNotFoundError(
+                    f"Spike-count file for {pre_type}->{post_type} not found at {path}; rebuild cortical inputs."
                 )
 
         rng_state = payload.get("rng_state")
