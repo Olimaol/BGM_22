@@ -58,12 +58,30 @@ def load_time_series(filename):
 
 
 def get_cortical_indices(labels, n_cols):
-    if len(labels) != n_cols:
-        print(
-            f"Warning: labels ({len(labels)}) and columns ({n_cols}) differ; "
-            f"using first {n_cols} labels."
+    diff = len(labels) - n_cols
+    if abs(diff) > 1:
+        raise ValueError(
+            f"Mismatch between labels ({len(labels)}) and time series columns ({n_cols})."
         )
-    trimmed_labels = labels[:n_cols]
+
+    if diff == 1:
+        trimmed_labels = labels[-n_cols:]
+        print(
+            f"Warning: labels ({len(labels)}) exceed columns ({n_cols}); "
+            f"using last {n_cols} labels."
+        )
+    elif diff == 0:
+        trimmed_labels = labels
+    else:  # diff < 0
+        raise ValueError(
+            f"Labels ({len(labels)}) fewer than time series columns ({n_cols})."
+        )
+
+    # print used labels
+    print("Using labels:")
+    for lbl in trimmed_labels:
+        print(f"  {lbl}")
+
     indices = [i for i, lbl in enumerate(trimmed_labels) if lbl in CORTICAL_LABELS]
     if not indices:
         raise ValueError("No cortical labels found in dataset.")

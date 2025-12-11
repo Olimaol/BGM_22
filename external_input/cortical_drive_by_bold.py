@@ -186,11 +186,19 @@ def load_cortical_bold_timeseries(file_path, condition="on"):
         time_series = f["time_series"][condition][()]
 
     n_cols = time_series.shape[1]
-    if len(labels) != n_cols:
-        print(
-            f"Warning: number of labels ({len(labels)}) does not match time_series columns ({n_cols}); trimming labels."
+    diff = len(labels) - n_cols
+    if diff < 0 or diff > 1:
+        raise ValueError(
+            f"Mismatch between labels ({len(labels)}) and time_series columns ({n_cols})."
         )
-    trimmed_labels = labels[:n_cols]
+
+    if diff == 1:
+        trimmed_labels = labels[-n_cols:]
+        print(
+            f"Warning: labels ({len(labels)}) exceed time_series columns ({n_cols}); using last {n_cols} labels."
+        )
+    else:  # diff == 0
+        trimmed_labels = labels
     cortical_indices = [
         i for i, lbl in enumerate(trimmed_labels) if lbl in CORTICAL_LABELS
     ]
