@@ -987,40 +987,6 @@ def build_distance_groups_state(
     )
 
 
-def simulate_receiver_counts_distance_dependent_old(
-    state: DistanceGroupsState,
-    rate: Union[float, np.ndarray],
-    dt: float,
-    rho: float,
-    num_bins: int,
-    rng: np.random.Generator,
-) -> np.ndarray:
-    """Simulate receiver counts using a distance-dependent state.
-
-    Uses the precomputed group positions and adjacency lists based on the fitted
-    Gaussian connection probability. Group spike counts are generated and then
-    aggregated to receivers. If ``rate`` is a time series (``(num_bins,)``), it is
-    used directly and ``rho`` is ignored.
-    """
-    group_counts = simulate_counts_direct(
-        G=state.G,
-        N=state.s,
-        rate=rate,
-        dt=dt,
-        rho=rho,
-        num_bins=num_bins,
-        rng=rng,
-        dtype=state.group_dtype,
-    )
-    receiver_counts = np.zeros((state.R, num_bins), dtype=state.receiver_dtype)
-    for r, groups in enumerate(state.groups_by_receiver):
-        if groups.size == 0:
-            continue
-        for g in groups:
-            receiver_counts[r] += group_counts[g]
-    return receiver_counts
-
-
 def simulate_receiver_counts_distance_dependent(
     state: DistanceGroupsState,
     rate: Union[float, np.ndarray],
@@ -1223,7 +1189,7 @@ def simulate_receiver_counts_distance_dependent_on_drive(
 
 
 def iter_memmap_spike_counts(
-    state: DistanceGroupsState,
+    state: Union[DistanceGroupsState, GroupsState],
     filename,
     num_bins,
     chunk_size=1000,
@@ -1241,6 +1207,95 @@ def iter_memmap_spike_counts(
         end = min(start + chunk_size, ncols)
         chunk = mm[:, start:end]
         yield chunk.copy() if copy else chunk
+
+
+def simulate_receiver_counts_with_groups_on_drive(
+    filename: str,
+    state: GroupsState,
+    rate: Union[float, np.ndarray],
+    dt: float,
+    rho: float,
+    num_bins: int,
+    rng: np.random.Generator,
+    verbose: bool = False,
+) -> None:
+    """Simulate receiver counts for prebuilt groups and stream to disk.
+
+    Counts are written into a memory-mapped file so they can be consumed
+    incrementally with ``iter_memmap_spike_counts`` without holding the full
+    ``(R, num_bins)`` matrix in memory.
+    """
+
+    rate_is_timeseries = np.ndim(rate) > 0
+    rate_array = None
+    if rate_is_timeseries:
+        rate_array = np.asarray(rate, dtype=np.float64)
+        if rate_array.shape[0] != num_bins:
+            raise ValueError(
+                "rate time series must have length num_bins (got "
+                f"{rate_array.shape[0]} vs {num_bins})"
+            )
+
+    mm = np.memmap(
+        filename, dtype=state.receiver_dtype, mode="w+", shape=(state.R, num_bins)
+    )
+
+    target_chunk_bytes = 128 * 1024 * 1024
+    bytes_per_bin = state.R * np.dtype(state.receiver_dtype).itemsize
+    if not state.fast_path:
+        bytes_per_bin += state.G * np.dtype(state.group_dtype).itemsize
+    chunk_size = max(1, min(num_bins, target_chunk_bytes // max(1, bytes_per_bin)))
+
+    if verbose:
+        print(f"Simulating receiver counts in chunks of size {chunk_size} bins...")
+        print(f"This makes {math.ceil(num_bins / chunk_size)} chunks in total.")
+        print(
+            f"Each chunk uses up to {bytes_per_bin * chunk_size / (1024*1024):.2f} MB RAM."
+        )
+        print(
+            f"In total, receiver counts memmap size: {state.R*num_bins*np.dtype(state.receiver_dtype).itemsize/(1024*1024):.2f} MB."
+        )
+
+    for start in tqdm(range(0, num_bins, chunk_size)):
+        end = min(start + chunk_size, num_bins)
+        nchunk = end - start
+        rate_chunk = rate_array[start:end] if rate_is_timeseries else rate
+
+        if state.fast_path:
+            receiver_counts_chunk = simulate_counts_direct(
+                G=state.R,  # here instead of G=state.G we have G=R
+                N=state.N,  # here instead of N=state.s we have N=state.N
+                rate=rate_chunk,
+                dt=dt,
+                rho=rho,
+                num_bins=nchunk,
+                rng=rng,
+                dtype=state.receiver_dtype,
+            )
+        else:
+            group_counts_chunk = simulate_counts_direct(
+                G=state.G,
+                N=state.s,
+                rate=rate_chunk,
+                dt=dt,
+                rho=rho,
+                num_bins=nchunk,
+                rng=rng,
+                dtype=state.group_dtype,
+            )
+            receiver_counts_chunk = np.zeros(
+                (state.R, nchunk), dtype=state.receiver_dtype
+            )
+            for g in range(state.G):
+                gc = group_counts_chunk[g]
+                for r in state.groups[g]:
+                    receiver_counts_chunk[r] += gc
+            del group_counts_chunk
+
+        mm[:, start:end] = receiver_counts_chunk
+        del receiver_counts_chunk
+
+    mm.flush()
 
 
 def simulate_receiver_counts_with_groups(
@@ -1273,8 +1328,8 @@ def simulate_receiver_counts_with_groups(
         # Fast-path: no overlap (k == 1), simulate directly for each receiver count from
         # N inputs.
         return simulate_counts_direct(
-            G=state.R,
-            N=state.N,
+            G=state.R,  # here instead of G=state.G we have G=R
+            N=state.N,  # here instead of N=state.s we have N=state.N
             rate=rate,
             dt=dt,
             rho=rho,
