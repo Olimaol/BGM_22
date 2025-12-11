@@ -22,3 +22,4 @@ external_input/big_array.dat
 # in folder experimental_data/berlin_data/ ignore all files except investigate_data.py
 experimental_data/berlin_data/*
 !experimental_data/berlin_data/investigate_data.py
+external_input/results_cortical_drive_by_bold/*
