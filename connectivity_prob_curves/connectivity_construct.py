@@ -409,7 +409,16 @@ class Microcircuit:
             inp_population.reset()
             inp_population.update(rates=inputs * self.mean_weights_by_type[key])
 
-        # Optional simulation the network for the update_time
+            # set schedule and period in c by my own (prevent ANNarchy bug)
+            schedule = self.dt
+            value = [float(schedule * i) for i in range(inputs.shape[0])]
+            val_int = np.rint(np.atleast_1d(value) / self.dt).astype(np.int64)
+            inp_population.cyInstance.set_schedule(val_int)
+            value = -1
+            period_steps = int(np.rint(value / self.dt))
+            inp_population.cyInstance.set_period(period_steps)
+
+        # Optional simulate the network for the update_time
         if run_simulation:
             simulate(self.update_time)
 
