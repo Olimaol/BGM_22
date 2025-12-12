@@ -72,12 +72,7 @@ from typing import Tuple, Optional, Callable, Dict, List, Union
 from dataclasses import dataclass
 from tqdm import tqdm
 import os
-
-# Optional plotting; demonstration will guard imports.
-try:  # pragma: no cover - demo convenience
-    import matplotlib.pyplot as plt  # type: ignore
-except Exception:  # pragma: no cover
-    plt = None
+import matplotlib.pyplot as plt
 
 
 def beta_params_from_p_rho(p: float, rho: float) -> Tuple[float, float]:
@@ -118,7 +113,7 @@ def beta_params_from_p_rho(p: float, rho: float) -> Tuple[float, float]:
     return alpha, beta
 
 
-def simulate_counts_direct(
+def simulate_counts_direct_old(
     G: int,
     N: int,
     rate: Union[float, np.ndarray],
@@ -205,6 +200,183 @@ def simulate_counts_direct(
     counts = rng.binomial(N, p_bins, size=(G, num_bins))
     if dtype is not None and counts.dtype != dtype:
         counts = counts.astype(dtype, copy=False)
+    return counts
+
+
+def simulate_counts_direct(
+    G: int,
+    N: int,
+    rate: Union[float, np.ndarray],
+    dt: float,
+    rho: float,
+    num_bins: int,
+    rng: np.random.Generator,
+    dtype: Optional[np.dtype] = None,
+    receiver_concentration: float = 1.0,
+    variance_inflation_factor: float = 1.0,
+) -> np.ndarray:
+    """Wrapper for the new hierarchical version which controls correlations better."""
+    return simulate_counts_hierarchical(
+        G=G,
+        N=N,
+        rate=rate,
+        dt=dt,
+        rho=rho,
+        num_bins=num_bins,
+        rng=rng,
+        dtype=dtype,
+        receiver_concentration=receiver_concentration,
+        variance_inflation_factor=variance_inflation_factor,
+    )
+
+
+def simulate_counts_hierarchical(
+    G: int,
+    N: int,
+    rate: Union[float, np.ndarray],
+    dt: float,
+    rho: float,
+    num_bins: int,
+    rng: np.random.Generator,
+    receiver_concentration: float = 1.0,
+    variance_inflation_factor: float = 1.0,
+    dtype: Optional[np.dtype] = None,
+) -> np.ndarray:
+    """
+    Simulate group spike counts using a Hierarchical Beta-Beta-Binomial model.
+
+    This method simulates a population of inputs with "sparse" or clustered correlations.
+    It uses a two-stage stochastic process to decouple the global population rhythm
+    from the specific input pool of each receiver.
+
+    The Process:
+    1. Global Rhythm (Population Synchrony):
+       A global probability trace `p_global[t]` is generated.
+       - If `rate` is scalar: `p_global[t]` is drawn from Beta(alpha, beta) based on `rho`.
+       - If `rate` is array: `p_global[t]` is taken directly from the input array.
+
+    2. Receiver Variability (Sparseness/Clustering):
+       Each receiver `g` draws its own specific probability trace `p_g[t]` from a
+       Beta distribution centered at `p_global[t]`. The variance of this draw is
+       controlled by `receiver_concentration`.
+
+    3. Spike Generation:
+       Final counts are drawn from Binomial(N, p_g[t]).
+
+     4. Variance Inflation (optional):
+         The receiver counts can be inflated relative to the global mean to compensate
+         for variance reductions introduced by grouping. For each receiver and time bin,
+         counts are transformed via `C_new = mean + factor * (C_old - mean)`, where
+         `mean = p_global[t] * N` and `factor = variance_inflation_factor`. A factor > 1
+         amplifies deviations from the mean, factor = 1 leaves counts unchanged.
+
+    Args:
+        G (int): Number of receiver groups.
+        N (int): Number of input neurons per receiver.
+        rate (float | np.ndarray): Firing rate in Hz (scalar) or a time series
+            of shape ``(num_bins,)``.
+        dt (float): Bin width in milliseconds.
+        rho (float): Global overdispersion coefficient in (0, 1). Controls the
+            synchrony of the global population (Step 1).
+            - ``rho -> 0``: Global rate is constant (no population synchrony).
+            - ``rho -> 1``: Global rate fluctuates wildly.
+            (Ignored if ``rate`` is an array).
+        num_bins (int): Number of time bins to simulate.
+        rng (np.random.Generator): Random number generator instance.
+        receiver_concentration (float): Controls the similarity between receivers (Step 2).
+            - High values (>1000): Receivers are nearly identical (Dense correlation).
+              They all track `p_global` perfectly.
+            - Low values (10-100): Receivers vary independently around `p_global`
+              (Sparse/Clustered input).
+        variance_inflation_factor (float): Multiplier for deviations from the global
+                mean (Step 4). Use values >1 to restore variance when grouping reduces it;
+                1 leaves counts unchanged.
+        dtype (Optional[np.dtype]): Desired dtype of returned array.
+
+    Returns:
+        np.ndarray: Array of shape ``(G, num_bins)`` containing integer
+        spike counts.
+    """
+    dt_s = dt * 1e-3
+
+    if dtype is not None:
+        dtype = np.float64
+
+    # --- Step 1: Determine Global Probability Trace (p_global) ---
+
+    if np.ndim(rate) > 0:
+        # Case A: Rate is a time series provided by user
+        rate_arr = np.asarray(rate, dtype=np.float64)
+        if rate_arr.shape[0] != num_bins:
+            raise ValueError(f"rate length {rate_arr.shape[0]} != num_bins {num_bins}")
+        p_global = rate_arr * dt_s
+    else:
+        # Case B: Scalar rate + rho (Beta Process)
+        p_mean = float(rate) * dt_s
+
+        # Handle edge cases for rho
+        if rho <= 0.0:
+            # Independent binomials (skip hierarchical steps)
+            arr = rng.binomial(N, p_mean, size=(G, num_bins))
+            return arr.astype(dtype, copy=False) if dtype else arr
+        if rho >= 1.0:
+            # Fully locked (all neurons fire together)
+            all_fire = rng.binomial(1, p_mean, size=num_bins)
+            arr = N * np.broadcast_to(all_fire, (G, num_bins))
+            return arr.astype(dtype, copy=False) if dtype else arr
+
+        # Draw the global fluctuation
+        alpha_global, beta_global = beta_params_from_p_rho(p_mean, rho)
+        p_global = rng.beta(alpha_global, beta_global, size=num_bins)
+
+    # --- Step 2: Draw Receiver-Specific Probabilities ---
+
+    # Clip to avoid numerical instability (0.0 or 1.0 breaks the next Beta step)
+    epsilon = 1e-6
+    p_global = np.clip(p_global, epsilon, 1.0 - epsilon)
+
+    # Calculate Beta parameters for the receivers based on p_global and concentration
+    # alpha = mean * s, beta = (1-mean) * s
+    alpha_rcv = p_global * receiver_concentration
+    beta_rcv = (1.0 - p_global) * receiver_concentration
+
+    # Draw specific p for each receiver (G x num_bins)
+    # This broadcasts alpha_rcv/beta_rcv (size num_bins) across G receivers
+    p_receiver_specific = rng.beta(alpha_rcv, beta_rcv, size=(G, num_bins))
+
+    # plot p_global over time and the p_receiver_specific over time averaged over receivers
+    plt.figure(figsize=(8, 4))
+    for idx in range(G):
+        plt.plot(
+            p_receiver_specific[idx],
+            color="gray",
+            alpha=0.1,
+        )
+    plt.plot(p_global, label="p_global", alpha=0.8)
+    plt.plot(
+        p_receiver_specific.mean(axis=0), label="mean p_receiver_specific", alpha=0.8
+    )
+    plt.title(f"rho={rho}, receiver_conc={receiver_concentration}")
+    plt.xlabel("time bin")
+    plt.ylabel("probability")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    # --- Step 3: Draw Spike Counts ---
+
+    counts = rng.binomial(N, p_receiver_specific).astype(dtype)
+
+    # --- Step 4: Apply Variance Inflation ---
+    if variance_inflation_factor != 1.0:
+        # The expected count due to global signal alone
+        # Shape (1, num_bins) to broadcast
+        expected_mean = (p_global * N)[np.newaxis, :]
+
+        # Inflate the deviation from the global mean
+        # C_new = Mean + Factor * (C_old - Mean)
+        counts = expected_mean + variance_inflation_factor * (counts - expected_mean)
+
     return counts
 
 
@@ -322,6 +494,7 @@ class GroupsState:
     groups: Optional[np.ndarray]
     group_dtype: np.dtype
     receiver_dtype: np.dtype
+    average_groups_per_receiver: Optional[float] = None
 
 
 def build_groups_state(
@@ -358,6 +531,7 @@ def build_groups_state(
             groups=None,
             group_dtype=group_dtype,
             receiver_dtype=receiver_dtype,
+            average_groups_per_receiver=1.0,
         )
 
     # General case: build overlapping groups once and compute receiver dtype.
@@ -366,6 +540,7 @@ def build_groups_state(
     max_degree = int(degrees.max()) if degrees.size else 0
     receiver_cap = int(s) * max_degree
     receiver_dtype = _smallest_unsigned_dtype(receiver_cap)
+    average_groups_per_receiver = degrees.mean() if degrees.size else None
     return GroupsState(
         fast_path=False,
         R=R,
@@ -374,8 +549,9 @@ def build_groups_state(
         k=k,
         G=G,
         groups=groups,
-        group_dtype=group_dtype,
-        receiver_dtype=receiver_dtype,
+        group_dtype=np.float64,  # if we use groups, we use varaince inflation, so we need float
+        receiver_dtype=receiver_dtype,  # receiver counts are still integers
+        average_groups_per_receiver=average_groups_per_receiver,
     )
 
 
@@ -1336,9 +1512,17 @@ def simulate_receiver_counts_with_groups(
             num_bins=num_bins,
             rng=rng,
             dtype=state.receiver_dtype,
+            receiver_concentration=1,
+            variance_inflation_factor=1,
         )
 
     # With overlap --> Per-group counts.
+    # Now a receivers count is not a sum over a large sample but over multiple groups
+    # which are by themselfs small samples.
+    # This causes a reduction in variance between the receivers counts.
+    # To compensate for this, we inflate the variance of the per-group counts
+    # by a factor of sqrt(average_groups_per_receiver).
+    # Due to this, the group counts can get negative!
     group_counts = simulate_counts_direct(
         G=state.G,
         N=state.s,
@@ -1348,13 +1532,19 @@ def simulate_receiver_counts_with_groups(
         num_bins=num_bins,
         rng=rng,
         dtype=state.group_dtype,
+        receiver_concentration=1,
+        variance_inflation_factor=np.sqrt(state.average_groups_per_receiver),
     )
+
     # Aggregate per-group counts into per-receiver counts.
-    receiver_counts = np.zeros((state.R, num_bins), dtype=state.receiver_dtype)
+    receiver_counts = np.zeros((state.R, num_bins), dtype=np.float64)
     for g in range(state.G):
         gc = group_counts[g]
         for r in state.groups[g]:
             receiver_counts[r] += gc
+    # The inflation can create negative partial sums, but the total should be positive
+    receiver_counts = np.maximum(receiver_counts, 0).astype(state.receiver_dtype)
+
     return receiver_counts
 
 
@@ -1414,6 +1604,7 @@ def simulate_receiver_counts_homogeneous(
     """
     # Backward-compatible wrapper: build groups once, then simulate for one chunk.
     state = build_groups_state(R=R, N=N, f=f, s=s, rng=rng)
+
     return simulate_receiver_counts_with_groups(
         state=state, rate=rate, dt=dt, rho=rho, num_bins=num_bins, rng=rng
     )
@@ -1648,6 +1839,75 @@ if __name__ == "__main__":
     print("-->")
     print("receiver spike counts shape:", receiver_counts_no.shape)
     print("receiver 0, first 10 bins:", receiver_counts_no[0, :10])
+
+    # Demonstration: 20% shared inputs with zero correlation
+    print("\nDemonstration: 20% shared inputs, uncorrelated across groups:")
+    R_share, N_share, f_share, s_share = 500, 550, 0.2, 5
+    rate_share, dt_share, rho_share, num_bins_share = 25.0, 1.0, 0.06, 200
+    receiver_counts_share = simulate_receiver_counts_homogeneous(
+        R=R_share,
+        N=N_share,
+        f=f_share,
+        s=s_share,
+        rate=rate_share,
+        dt=dt_share,
+        rho=rho_share,
+        num_bins=num_bins_share,
+        rng=rng,
+    )
+    print("R (receivers):", R_share)
+    print("Approx N (inputs/receiver):", N_share)
+    print("f (shared fraction):", f_share)
+    print("s (group size):", s_share)
+    print(
+        "rate (Hz):", rate_share, "dt (ms):", dt_share, "rho (correlation):", rho_share
+    )
+    print("num_bins:", num_bins_share)
+    print("receiver spike counts shape:", receiver_counts_share.shape)
+
+    # print the mean, std, min and max of the correlations between all receivers
+    # Drop receivers with zero variance to avoid NaNs in corrcoef.
+    std_per_receiver = receiver_counts_share.std(axis=1)
+    valid_mask = std_per_receiver > 0
+    num_dropped = int(np.count_nonzero(~valid_mask))
+    if num_dropped:
+        print(
+            f"Skipping {num_dropped} receivers with zero variance when computing correlations."
+        )
+
+    receiver_counts_for_corr = receiver_counts_share[valid_mask]
+    if receiver_counts_for_corr.size == 0:
+        print(
+            "Receiver correlation stats: all receivers had zero variance; cannot compute correlations."
+        )
+    else:
+        R_valid = receiver_counts_for_corr.shape[0]
+        receiver_corr = np.corrcoef(receiver_counts_for_corr)
+        upper = receiver_corr[np.triu_indices(R_valid, k=1)]
+        mean_corr = float(np.mean(upper))
+        std_corr = float(np.std(upper))
+        min_corr = float(np.min(upper))
+        max_corr = float(np.max(upper))
+        print("Receiver correlation stats:")
+        print(f"  mean: {mean_corr:.4f}, std: {std_corr:.4f}")
+        print(f"  min: {min_corr:.4f}, max: {max_corr:.4f}")
+
+    # plot the receiver counts as an image
+    fig, ax = plt.subplots(figsize=(10, 4))
+    img = ax.imshow(
+        receiver_counts_share,
+        aspect="auto",
+        origin="lower",
+        cmap="viridis",
+    )
+    ax.set_xlabel("Time bin")
+    ax.set_ylabel("Receiver index")
+    ax.set_title("Uncorrelated inputs with 20% shared sources")
+    fig.colorbar(img, ax=ax, label="Spike count")
+    fig.tight_layout()
+    plt.show()
+
+    quit()
 
     # ------------------------------------------------------------------
     # Distance-dependent shared fraction demonstration (updated)
