@@ -111,6 +111,7 @@ class Microcircuit:
         dbs_condition: str = "on",
     ) -> None:
         # --- Parameters ---
+        self.debug = True
         self.update_time = update_time  # ms for how long inputs are defined
         self.name = name
         self.nx = nx
@@ -379,7 +380,7 @@ class Microcircuit:
             # reshape inputs from (n_neurons, n_steps) into (n_steps, n_neurons)
             inputs = inputs.T
 
-            if self.verbose and key[0] == "FS" and key[1] == "FS":
+            if self.verbose and key[0] == "FS" and key[1] == "dSPN" and self.debug:
                 # plot the inputs as raster plot with time on x-axis and neuron index on y-axis
                 plt.figure(figsize=(12, 6))
 
@@ -388,12 +389,14 @@ class Microcircuit:
                 #   Columns (X-axis) = Time steps
                 # origin='lower' ensures Neuron 0 is at the bottom.
                 plt.imshow(
-                    inputs.T,
+                    inputs.T * self.mean_weights_by_type[key],
                     aspect="auto",
                     cmap="viridis",
                     origin="lower",
                     interpolation="nearest",
                 )
+                # neuron with idx zero should be at the top
+                plt.gca().invert_yaxis()
 
                 plt.colorbar(label="Input Count")
                 plt.xlabel("Time (steps)")

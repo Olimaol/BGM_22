@@ -7,13 +7,12 @@ if __name__ == "__main__":
     TIMESTEP = 0.1  # ms
     TMAX = 1000.0  # ms
     setup(dt=TIMESTEP)
-    rebuild = False
     mc = Microcircuit(
         name="caudate",
         dbs_condition="off",
-        build_connectivity=rebuild,
-        build_missing_gaba_input=rebuild,
-        build_cortical_input=rebuild,
+        build_connectivity=False,
+        build_missing_gaba_input=False,
+        build_cortical_input=False,
         dt=TIMESTEP,
         T=TMAX,
         update_time=100.0,
@@ -37,7 +36,6 @@ if __name__ == "__main__":
     monitors = CompNeuroMonitors(monitor_dictionary)
     monitors.start()
     mc.update(run_simulation=True)
-    mc.update(run_simulation=True)
     recordings = monitors.get_recordings()
     recording_times = monitors.get_recording_times()
 
@@ -45,29 +43,50 @@ if __name__ == "__main__":
         figname="microcircuit_test_recordings.png",
         recordings=recordings,
         recording_times=recording_times,
-        shape=(5, 1),
+        shape=(3, 4),
         plan={
-            "position": [1, 2, 3, 4, 5],
+            "position": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             "compartment": [
                 "caudate_FS",
                 "caudate_FS",
                 "caudate_FS",
                 "caudate_FS",
-                "TimedInput_FS_FS_caudate",
+                "caudate_dSPN",
+                "caudate_dSPN",
+                "caudate_dSPN",
+                "caudate_dSPN",
+                "caudate_iSPN",
+                "caudate_iSPN",
+                "caudate_iSPN",
+                "caudate_iSPN",
             ],
             "variable": [
                 "spike",
                 "v",
                 "g_ampa",
                 "g_gaba",
-                "r",
+                "spike",
+                "v",
+                "g_ampa",
+                "g_gaba",
+                "spike",
+                "v",
+                "g_ampa",
+                "g_gaba",
             ],
             "format": [
                 "raster",
                 "line",
                 "line",
                 "line",
-                "matrix",
+                "raster",
+                "line",
+                "line",
+                "line",
+                "raster",
+                "line",
+                "line",
+                "line",
             ],
         },
     )
