@@ -21,12 +21,8 @@ from ANNarchy import (
 
 # Local imports
 from external_input.spike_input_cortex import (
-    build_distance_groups_state,
-    build_groups_state,
-    _periodic_distance_float,
-    plot_empirical_and_target_distance_dependent_shared_fraction,
-    simulate_receiver_counts_distance_dependent_on_drive,
-    simulate_receiver_counts_with_groups_on_drive,
+    simulate_receiver_counts_homogeneous_to_memmap,
+    simulate_receiver_counts_distance_dependent_to_memmap,
     iter_memmap_spike_counts,
 )
 from striatal_weights.get_weights import (
@@ -77,13 +73,10 @@ class Microcircuit:
     def _cortical_input_state_path(self) -> str:
         return os.path.join(self.inputs_dir, "cortical_input_state.pkl")
 
-    def _dist_state_path(self, pre_type: str, post_type: str) -> str:
-        return os.path.join(self.inputs_dir, f"dist_state_{pre_type}_{post_type}.pkl")
-
     def _spike_counts_path(self, pre_type: str, post_type: str) -> str:
         return os.path.join(
             self.inputs_dir,
-            f"receiver_counts_distance_dependent_{pre_type}_{post_type}.dat",  # TODO remove _distance_dependent
+            f"receiver_counts_{pre_type}_{post_type}.dat",  # TODO remove _distance_dependent
         )
 
     def __init__(
@@ -323,13 +316,13 @@ class Microcircuit:
             for cortical_region in self.cortical_proportions_dict.keys():
                 key = (cortical_region, post_type)
                 # default mean weight for cortical inputs, can be scaled later
-                self.mean_weights_by_type[key] = 0.001
+                self.mean_weights_by_type[key] = 6  # 0.001
 
         # container for ANNarchy populations; created lazily in create_model
         self.annarchy_populations: dict[str, Population] = {}
         self.model_created: bool = False
-        self.dist_state_dict = None
-        self.cor_input_state_dict = None
+        self.local_input_memmap_dict: dict | None = None
+        self.cor_input_memmap_dict: dict | None = None
 
         # container to store distances (mm) for actual formed connections per pair
         self.connection_distances_by_pair: dict[tuple[str, str], list[float]] = {
@@ -372,6 +365,7 @@ class Microcircuit:
             raise RuntimeError(
                 "create_model() must be called before update to build ANNarchy objects."
             )
+        dSPN_inputs_sum = []
         # Loop over all input iterators and update the corresponding TimedArray populations
         for key, inp_iterator in self.inp_iterator_dict.items():
             inp_population = self.annarchy_inp_populations[key]
@@ -380,7 +374,7 @@ class Microcircuit:
             # reshape inputs from (n_neurons, n_steps) into (n_steps, n_neurons)
             inputs = inputs.T
 
-            if self.verbose and key[0] == "FS" and key[1] == "dSPN" and self.debug:
+            if self.verbose and self.debug and key[0] == "dlPFC" and key[1] == "dSPN":
                 # plot the inputs as raster plot with time on x-axis and neuron index on y-axis
                 plt.figure(figsize=(12, 6))
 
@@ -403,10 +397,14 @@ class Microcircuit:
                 plt.ylabel("Neuron Index")
                 plt.title("Neuron Input Counts Over Time")
                 plt.title(
-                    f"Inputs for timed array: {inp_population.name}\nshape={inputs.shape}"
+                    f"Inputs for timed array: {inp_population.name}\nshape={inputs.shape}, weight={self.mean_weights_by_type[key]}, max input={np.max(inputs)}"
                 )
                 plt.tight_layout()
                 plt.show()
+
+            # sum up all cortical inputs of dSPN receiver 0
+            if key[0] in self.cortical_proportions_dict.keys() and key[1] == "dSPN":
+                dSPN_inputs_sum.append(inputs[:, 0])
 
             # update the TimedArray population with weighted inputs
             inp_population.reset()
@@ -420,6 +418,22 @@ class Microcircuit:
             value = -1
             period_steps = int(np.rint(value / self.dt))
             inp_population.cyInstance.set_period(period_steps)
+
+        if self.verbose and self.debug and dSPN_inputs_sum:
+            # plot the summed cortical inputs to dSPN neuron 0 over time
+            plt.figure(figsize=(12, 6))
+            total_inputs = np.sum(dSPN_inputs_sum, axis=0)
+            plt.plot(
+                np.arange(len(total_inputs)) * self.dt,
+                total_inputs,
+            )
+            plt.xlabel("Time (ms)")
+            plt.ylabel("Total Cortical Input Count to dSPN Neuron 0")
+            plt.title(
+                "Total Cortical Inputs to dSPN Neuron 0 Over Time (summed over regions)"
+            )
+            plt.tight_layout()
+            plt.show()
 
         # Optional simulate the network for the update_time
         if run_simulation:
@@ -442,20 +456,20 @@ class Microcircuit:
         # create projections between striatal populations
         self.create_local_projections_annarchy()
 
-        # Ensure distance-dependent input state and cortical input state exist
-        if self.dist_state_dict is None:
+        # Ensure the input memmap dicts exist
+        if self.local_input_memmap_dict is None:
             self._missing_local_input()
-        if self.cor_input_state_dict is None:
+        if self.cor_input_memmap_dict is None:
             self._excitatory_inputs()
 
         # Build ANNarchy TimedArray inputs and projections for local gaba inputs, SPN neuron models have gaba as target for gaba currents
         self._create_inputs_annarchy(
-            group_state_dict=self.dist_state_dict, target="gaba"
+            memmap_dict=self.local_input_memmap_dict, target="gaba"
         )
 
         # Build ANNarchy TimedArray inputs and projections for cortical excitatory inputs, SPN neuron models have glut as target for nmda and ampa currents
         self._create_inputs_annarchy(
-            group_state_dict=self.cor_input_state_dict, target="glut"
+            memmap_dict=self.cor_input_memmap_dict, target="glut"
         )
 
         self.model_created = True
@@ -491,11 +505,17 @@ class Microcircuit:
         for cell_type, count in type_counts.items():
             # TODO maybe need to change the dopamine parameter
             if cell_type == "dSPN":
-                neuron_model = Izhikevich2007Humphries2009SPND1
+                neuron_model = Izhikevich2007Humphries2009SPND1(
+                    current_based_excitation=True
+                )
             elif cell_type == "iSPN":
-                neuron_model = Izhikevich2007Humphries2009SPND2
+                neuron_model = Izhikevich2007Humphries2009SPND2(
+                    current_based_excitation=True
+                )
             elif cell_type == "FS":
-                neuron_model = Izhikevich2007Humphries2009FSI
+                neuron_model = Izhikevich2007Humphries2009FSI(
+                    current_based_excitation=True
+                )
             else:
                 raise ValueError(f"No neuron model for cell type: {cell_type}")
 
@@ -773,14 +793,12 @@ class Microcircuit:
 
     def _excitatory_inputs(self):
         """Define cortical excitatory inputs based on BOLD-driven firing rates."""
-        # Build input groups for dSPNs and iSPNs
-        self.cor_input_state_dict = self._define_shared_input_groups()
 
         # Simulate and store the spike counts for the cortical inputs
-        self._simulate_cor_input_spike_counts()
+        self.cor_input_memmap_dict = self._simulate_cor_input_spike_counts()
 
     def _simulate_cor_input_spike_counts(self):
-        """Simulate spike counts for cortical input groups and store them."""
+        """Simulate spike counts for cortical input streams and store them."""
         # As rates for cortical drive, load the precomputed rates based on BOLD data
         rate_path = (
             Path(__file__).resolve().parent.parent
@@ -822,61 +840,137 @@ class Microcircuit:
                     f"Cortical drive dt ({dt_ms:.6f} ms) does not match Microcircuit dt ({self.dt:.6f} ms)."
                 )
 
-            # Simulate spike counts per cortical region
-            for key, state in self.cor_input_state_dict.items():
-                cortical_region, receiver_type = key
+            # Simulate spike counts per cortical region for dSPN and iSPN receivers
+            cor_input_memmap_dict = {}
+            for receiver_type in ("dSPN", "iSPN"):
+                for (
+                    cortical_region,
+                    proportion,
+                ) in self.cortical_proportions_dict.items():
 
-                spike_file = self._spike_counts_path(cortical_region, receiver_type)
+                    if self.verbose:
+                        print(
+                            f"Simulating cortical input spike counts for region '{cortical_region}' to receiver type '{receiver_type}'."
+                        )
 
-                rate_key = f"{cortical_region}_rate"
-                if rate_key not in data:
-                    raise KeyError(
-                        f"Rate key '{rate_key}' missing in cortical drive file {rate_path}."
+                    spike_file = self._spike_counts_path(cortical_region, receiver_type)
+
+                    rate_key = f"{cortical_region}_rate"
+                    if rate_key not in data:
+                        raise KeyError(
+                            f"Rate key '{rate_key}' missing in cortical drive file {rate_path}."
+                        )
+                    rate_series = np.asarray(data[rate_key])
+                    if rate_series.size < self.n_steps:
+                        raise ValueError(
+                            f"Rate series for {cortical_region} has only {rate_series.size} samples; "
+                            f"expected at least {self.n_steps}."
+                        )
+                    rate_segment = rate_series[: self.n_steps]
+
+                    # number of expected inputs from this cortical region
+                    N_total = self.N_cortical_inputs_dict[receiver_type]
+                    N = proportion * N_total
+                    N_eff = int(np.round(N))
+                    if N_eff == 0:
+                        continue
+                    # number of receivers R of the receiver type
+                    R = self.type_counts[receiver_type]
+                    # key is (pre, post)
+                    key = (cortical_region, receiver_type)
+
+                    simulate_receiver_counts_homogeneous_to_memmap(
+                        filename=spike_file,
+                        R=R,
+                        N=N_eff,
+                        shared_input=self.shared_fraction,
+                        rate=rate_segment,
+                        dt=self.dt,
+                        rho=0.0,  # rho is ignored because fluctuations come rate time series based on BOLD
+                        num_bins=self.n_steps,
+                        receiver_dtype=np.float64,
+                        rng=self.rng,
+                        # concentration=1000.0,
+                        verbose=self.verbose,
                     )
-                rate_series = np.asarray(data[rate_key])
-                if rate_series.size < self.n_steps:
-                    raise ValueError(
-                        f"Rate series for {cortical_region} has only {rate_series.size} samples; "
-                        f"expected at least {self.n_steps}."
-                    )
-                rate_segment = rate_series[: self.n_steps]
 
-                simulate_receiver_counts_with_groups_on_drive(
-                    filename=spike_file,
-                    state=state,
-                    rate=rate_segment,
-                    dt=self.dt,
-                    rho=0.0,  # rho is ignored because fluctuations come rate time series based on BOLD
-                    num_bins=self.n_steps,
-                    rng=self.rng,
-                    verbose=self.verbose,
-                )
+                    # Debugging check for dlPFC -> dSPN inputs: compare expected vs simulated counts in first chunk
+                    if cortical_region == "dlPFC" and receiver_type == "dSPN":
+                        chunk_steps = int(self.update_time / self.dt)
+                        if chunk_steps > 0:
+                            rate_chunk = rate_segment[:chunk_steps]
+                            dt_seconds = self.dt / 1000.0
+                            # Expected count per input neuron over the first chunk
+                            expected_per_input = float(np.sum(rate_chunk) * dt_seconds)
+                            expected_total = expected_per_input * N_eff
 
-    def _define_shared_input_groups(self):
-        """Define shared input groups from cortex to striatum based on fixed shared fraction."""
-        group_state_dict = {}
-        for receiver_type in ("dSPN", "iSPN"):
-            for cortical_region, proportion in self.cortical_proportions_dict.items():
-                # number of expected inputs from this cortical region
-                N_total = self.N_cortical_inputs_dict[receiver_type]
-                N = int(proportion * N_total)
-                if N == 0:
-                    continue
-                # number of receivers R of the receiver type
-                R = self.type_counts[receiver_type]
-                # expected shared inputs total
-                expected_shared = int(self.shared_fraction * N)
-                # s_group: group size, I use expected_shared / 2 and min 1
-                s_group = max(1, expected_shared // 2)
-                # key is (pre, post)
-                key = (cortical_region, receiver_type)
-                group_state_dict[key] = build_groups_state(
-                    R=R, N=N, f=self.shared_fraction, s=s_group, rng=self.rng
-                )
-        return group_state_dict
+                            # Load first chunk of simulated counts from memmap
+                            first_chunk_iter = iter_memmap_spike_counts(
+                                filename=spike_file,
+                                R=R,
+                                num_bins=self.n_steps,
+                                receiver_dtype=np.float64,
+                                chunk_size=chunk_steps,
+                                copy=False,
+                                verbose=False,
+                            )
+                            first_chunk = next(first_chunk_iter)
+                            simulated_sum_per_receiver = np.sum(first_chunk, axis=1)
+                            sim_mean = float(np.mean(simulated_sum_per_receiver))
+                            sim_std = float(np.std(simulated_sum_per_receiver))
+
+                            if self.verbose:
+                                print("[dlPFC->dSPN debug] First chunk diagnostics:")
+                                print(
+                                    f"  chunk_steps={chunk_steps}, dt_ms={self.dt}, chunk_time_ms={chunk_steps * self.dt}"
+                                )
+                                print(
+                                    f"  N_eff (inputs)={N_eff}, rate_chunk_mean_Hz={np.mean(rate_chunk):.4f}, rate_chunk_sum_Hz={np.sum(rate_chunk):.4f}"
+                                )
+                                print(
+                                    f"  expected_per_input_count={expected_per_input:.4f}, expected_total_count={expected_total:.4f}"
+                                )
+                                print(
+                                    f"  simulated_sum_per_receiver: mean={sim_mean:.4f}, std={sim_std:.4f} (over {len(simulated_sum_per_receiver)} receivers)"
+                                )
+                        else:
+                            if self.verbose:
+                                print(
+                                    "[dlPFC->dSPN debug] Skipped diagnostics because chunk_steps computed as 0."
+                                )
+
+                    # store infos in cor_input_memmap_dict
+                    cor_input_memmap_dict[key] = {
+                        "R": R,
+                        "receiver_dtype": np.float64,
+                    }
+
+        return cor_input_memmap_dict
+
+    def _build_distance_dependent_shared_fraction_matrices(self, f_d_interp_dict):
+        """Build distance-dependent shared fraction matrices for all pre/post type pairs."""
+        f_d_matrices_dict = {}
+        for key, f_d_interp in f_d_interp_dict.items():
+            _, post_type = key
+            R = self.type_counts[post_type]
+            # initialize shared fraction matrix
+            f_d_matrix = np.zeros((R, R), dtype=np.float32)
+            # loop over all receiver pairs
+            for i_local, i_global in enumerate(self.indices_by_type[post_type]):
+                for j_local, j_global in enumerate(self.indices_by_type[post_type]):
+                    if i_global == j_global:
+                        f_d_matrix[i_local, j_local] = 1.0
+                    else:
+                        d = self._periodic_distance(i_global, j_global)
+                        f_d_matrix[i_local, j_local] = f_d_interp(d)
+            # keep correlation/shared-fraction values within [0, 1]
+            np.fill_diagonal(f_d_matrix, 1.0)
+            np.clip(f_d_matrix, 0.0, 1.0, out=f_d_matrix)
+            f_d_matrices_dict[key] = f_d_matrix
+        return f_d_matrices_dict
 
     def _missing_local_input(self):
-        """Construct distance-dependent shared input groups and simulate local inhibitory spike counts."""
+        """Construct distance-dependent shared input matrices and simulate local inhibitory spike counts."""
         # Get distance dependent shared input curves f(d)
         (
             f_d_interp_dict,
@@ -885,28 +979,31 @@ class Microcircuit:
             expected_shared_dict,
         ) = self._define_distance_dependent_shared_input_curves()
 
-        # Build input groups based on f(d)
-        dist_state_dict = self._define_distance_dependent_shared_input_groups(
-            expected_outer_dict=expected_outer_dict,
-            f_d_interp_dict=f_d_interp_dict,
-            expected_shared_dict=expected_shared_dict,
+        # Given the shared input curves f(d) combined with receiver positions obtain shared fraction matrices
+        f_d_matrices_dict = self._build_distance_dependent_shared_fraction_matrices(
+            f_d_interp_dict=f_d_interp_dict
         )
 
-        # Simulate spike counts for these groups and assign to receivers and store them
-        self._simulate_distance_dependent_spike_counts(dist_state_dict=dist_state_dict)
-        # Store state for later ANNarchy creation in create_model()
-        self.dist_state_dict = dist_state_dict
+        # Simulate spike counts for these matrices and assign to receivers and store them
+        self.local_input_memmap_dict = self._simulate_distance_dependent_spike_counts(
+            f_d_matrices_dict=f_d_matrices_dict, expected_outer_dict=expected_outer_dict
+        )
+
         # store the mean of the weights per pre-post type pair
         for key in self.conn_params.keys():
             weight_samples = self.weight_samplers[key].sample(n=10000)
             self.mean_weights_by_type[key] = float(np.mean(weight_samples))
 
-    def _create_inputs_annarchy(self, group_state_dict, target):
+    def _create_inputs_annarchy(self, memmap_dict, target):
         """Create ANNarchy TimedArray input populations for spike counts and the
         corresponding input iterators for setting the inputs during simulation using stored data.
         """
-        # Loop over the pre/post keys of the groups state
-        for key, state in group_state_dict.items():
+        if memmap_dict is None:
+            raise ValueError(
+                "memmap_dict is None; build or load spike-count inputs before creating ANNarchy inputs."
+            )
+        # Loop over the pre/post keys of the memmap-backed spike count files
+        for key, memmap_info in memmap_dict.items():
             pre_type, post_type = key
             # skip if the postsynaptic population does not exist (safety for unexpected keys)
             if post_type not in self.annarchy_populations:
@@ -932,9 +1029,10 @@ class Microcircuit:
             # create the input iterator for the update function
             spike_file = self._spike_counts_path(pre_type, post_type)
             inp_iterator = iter_memmap_spike_counts(
-                state=state,
                 filename=spike_file,
+                R=memmap_info["R"],
                 num_bins=self.n_steps,
+                receiver_dtype=memmap_info["receiver_dtype"],
                 chunk_size=n_steps_input,
                 copy=False,
                 verbose=self.verbose,
@@ -942,8 +1040,11 @@ class Microcircuit:
             self.annarchy_inp_populations[key] = inp
             self.inp_iterator_dict[key] = inp_iterator
 
-    def _simulate_distance_dependent_spike_counts(self, dist_state_dict):
-        """Generate spike-count time series for each distance-dependent group configuration."""
+    def _simulate_distance_dependent_spike_counts(
+        self, f_d_matrices_dict, expected_outer_dict
+    ):
+        """Generate spike-count time series for each f_d matrix."""
+        local_input_memmap_dict = {}
         # Loop over postsynaptic neuron type
         for post_type in self.cell_types:
             # loop over presynaptic neuron type
@@ -953,27 +1054,45 @@ class Microcircuit:
                     continue
 
                 spike_file = self._spike_counts_path(pre_type, post_type)
-                simulate_receiver_counts_distance_dependent_on_drive(
+
+                # use an integer number of effective presynaptic sources; avoid fractional trials that can yield NaNs
+                N_eff = int(round(expected_outer_dict[key]))
+                if N_eff == 0:
+                    continue
+
+                simulate_receiver_counts_distance_dependent_to_memmap(
                     filename=spike_file,
-                    state=dist_state_dict[key],
+                    correlation_matrix=f_d_matrices_dict[key],
+                    N=N_eff,
                     rate=self.firing_rate_dict[pre_type],
                     dt=self.dt,
                     rho=self.correlation_dict[pre_type],
                     num_bins=self.n_steps,
+                    receiver_dtype=np.float64,
                     rng=self.rng,
+                    # concentration=1000.0,
                     verbose=self.verbose,
                 )
 
+                # store infos in local_input_memmap_dict
+                R = self.type_counts[post_type]
+                local_input_memmap_dict[key] = {
+                    "R": R,
+                    "receiver_dtype": np.float64,
+                }
+        return local_input_memmap_dict
+
     def _save_missing_input_state(self) -> None:
-        """Persist distance-dependent input state to allow reloading without recomputation."""
-        if self.dist_state_dict is None:
+        """Persist distance-dependent input metadata to allow reloading without recomputation."""
+        if self.local_input_memmap_dict is None:
             return
         payload = {
-            "dist_state_dict": self.dist_state_dict,
+            "local_input_memmap_dict": self.local_input_memmap_dict,
             "rng_state": self.rng.bit_generator.state,
-            "cell_types": self.cell_types,
             "conn_keys": [f"{pre}-{post}" for (pre, post) in self.conn_params.keys()],
-            "mean_weights_by_type": getattr(self, "mean_weights_by_type", None),
+            "mean_weights_by_type": dict(self.mean_weights_by_type),
+            "dt": self.dt,
+            "n_steps": self.n_steps,
         }
         with open(self._missing_input_state_path(), "wb") as f:
             pickle.dump(payload, f)
@@ -994,10 +1113,22 @@ class Microcircuit:
                 "Cached missing-input state does not match current connectivity parameters; rebuild missing inputs."
             )
 
-        self.dist_state_dict = payload.get("dist_state_dict")
-        if self.dist_state_dict is None:
+        dt_saved = payload.get("dt", self.dt)
+        if not np.isclose(dt_saved, self.dt, rtol=1e-9, atol=1e-9):
             raise ValueError(
-                "Cached missing-input state is empty; rebuild missing inputs."
+                f"Cached missing-input dt ({dt_saved}) does not match current dt ({self.dt}); rebuild missing inputs."
+            )
+
+        n_steps_saved = payload.get("n_steps", self.n_steps)
+        if n_steps_saved != self.n_steps:
+            raise ValueError(
+                f"Cached missing-input n_steps ({n_steps_saved}) does not match current n_steps ({self.n_steps}); rebuild missing inputs."
+            )
+
+        self.local_input_memmap_dict = payload.get("local_input_memmap_dict")
+        if self.local_input_memmap_dict is None:
+            raise ValueError(
+                "Cached missing-input memmap info dict is empty; rebuild missing inputs."
             )
 
         mean_weights_saved = payload.get("mean_weights_by_type")
@@ -1005,11 +1136,12 @@ class Microcircuit:
             raise ValueError(
                 "Cached missing-input state is missing mean weights; rebuild missing inputs."
             )
-        # merge into existing defaults instead of overwriting
-        self.mean_weights_by_type.update(mean_weights_saved)
+        # merge local conectivity weights into existing defaults
+        for key in self.conn_params.keys():
+            self.mean_weights_by_type[key] = mean_weights_saved[key]
 
-        # ensure spike-count files exist for all required pairs
-        for pre_type, post_type in self.conn_params.keys():
+        # ensure spike-count files exist for all required pairs in the cached state
+        for pre_type, post_type in self.local_input_memmap_dict.keys():
             path = self._spike_counts_path(pre_type, post_type)
             if not os.path.exists(path):
                 raise FileNotFoundError(
@@ -1021,12 +1153,12 @@ class Microcircuit:
             self.rng.bit_generator.state = rng_state
 
     def _save_cortical_input_state(self) -> None:
-        """Persist cortical input group state to allow reloading without recomputation."""
-        if self.cor_input_state_dict is None:
+        """Persist cortical input state to allow reloading without recomputation."""
+        if self.cor_input_memmap_dict is None:
             return
 
         payload = {
-            "cor_input_state_dict": self.cor_input_state_dict,
+            "cor_input_memmap_dict": self.cor_input_memmap_dict,
             "rng_state": self.rng.bit_generator.state,
             "dbs_condition": self.dbs_condition,
             "dt": self.dt,
@@ -1034,7 +1166,7 @@ class Microcircuit:
             "cortical_proportions_dict": self.cortical_proportions_dict,
             "N_cortical_inputs_dict": self.N_cortical_inputs_dict,
             "shared_fraction": self.shared_fraction,
-            "keys": [f"{pre}-{post}" for (pre, post) in self.cor_input_state_dict],
+            "keys": [f"{pre}-{post}" for (pre, post) in self.cor_input_memmap_dict],
         }
 
         with open(self._cortical_input_state_path(), "wb") as f:
@@ -1089,10 +1221,10 @@ class Microcircuit:
                 "Cached cortical-input state uses different shared_fraction; rebuild cortical inputs."
             )
 
-        self.cor_input_state_dict = payload.get("cor_input_state_dict")
-        if self.cor_input_state_dict is None:
+        self.cor_input_memmap_dict = payload.get("cor_input_memmap_dict")
+        if self.cor_input_memmap_dict is None:
             raise ValueError(
-                "Cached cortical-input state is empty; rebuild cortical inputs."
+                "Cached cortical-input memmap info dict is empty; rebuild cortical inputs."
             )
 
         expected_keys = {
@@ -1108,12 +1240,12 @@ class Microcircuit:
                 "Cached cortical-input keys do not match current configuration; rebuild cortical inputs."
             )
 
-        if saved_keys and set(self.cor_input_state_dict.keys()) != saved_keys:
+        if saved_keys and set(self.cor_input_memmap_dict.keys()) != saved_keys:
             raise ValueError(
                 "Cached cortical-input state keys mismatch stored state; rebuild cortical inputs."
             )
 
-        for pre_type, post_type in self.cor_input_state_dict.keys():
+        for pre_type, post_type in self.cor_input_memmap_dict.keys():
             path = self._spike_counts_path(pre_type, post_type)
             if not os.path.exists(path):
                 raise FileNotFoundError(
@@ -1123,102 +1255,6 @@ class Microcircuit:
         rng_state = payload.get("rng_state")
         if rng_state is not None:
             self.rng.bit_generator.state = rng_state
-
-    def _define_distance_dependent_shared_input_groups(
-        self, expected_outer_dict, f_d_interp_dict, expected_shared_dict
-    ):
-        """Create shared-input groups that match target input counts and shared-fraction curves."""
-        bounding_box_width = self.L[0]  # assuming cubic box
-        # Loop over postsynaptic neuron type
-        dist_state_dict = {}
-        for post_type in self.cell_types:
-            # loop over presynaptic neuron type
-            for pre_type in self.cell_types:
-                key = (pre_type, post_type)
-                if key not in self.conn_params:
-                    continue
-                # get receiver positions of this post type
-                receiver_positions = self.positions[self.types == post_type]
-                # N_target: expeted inputs from outer shell per receiver neuron
-                N_target = expected_outer_dict[key]
-                # f_target: distance-dependent shared input fraction f(d)
-                f_target = f_d_interp_dict[key]
-                # the given f_d expects distances in mm, but creating the groups uses grid coordinates
-                f_target_grid = lambda d_grid: f_target(d_grid * self.d)
-                # s_group: group size, I use max(expected shared) / 2 and min 1
-                s_group = max(int(expected_shared_dict[key][1].max() / 2), 1)
-                # create groups and distribute them over receiver neurons
-                if self.verbose:
-                    print(
-                        f"{pre_type}->{post_type} - Defining distance-dependent shared input groups for..."
-                    )
-                    print(f"Number of receivers: {len(receiver_positions)}")
-                    print(f"minimum distance between receivers: {self.d:.3f}")
-                    print(
-                        f"maximum possible periodic distance within bounding box: {np.sqrt(3) * (bounding_box_width / 2):.3f}"
-                    )
-                    print(f"receiver positions (first 5): {receiver_positions[:5]}")
-                    print(f"N_target: {N_target}")
-                    print(f"s_group: {s_group}")
-                    print("\n")
-
-                dist_state = build_distance_groups_state(
-                    receiver_positions=receiver_positions,
-                    bounding_box_width=bounding_box_width,
-                    N_target=N_target,
-                    s=s_group,
-                    f_target=f_target_grid,
-                    rng=self.rng,
-                    fine_grid_resolution=10,
-                )
-                dist_state_dict[key] = dist_state
-
-                if self.verbose:
-                    # loop over all receiver positions pairs and calculate their periodic distances
-                    distance_matrix = np.zeros((dist_state.R, dist_state.R))
-                    for i in range(dist_state.R):
-                        for j in range(i + 1, dist_state.R):
-                            if i == j:
-                                continue
-                            pos_i = dist_state.receiver_positions[i]
-                            pos_j = dist_state.receiver_positions[j]
-                            d = _periodic_distance_float(pos_i, pos_j, dist_state.L)
-                            distance_matrix[i, j] = d
-                            distance_matrix[j, i] = d
-                    print(
-                        f"dist_state.L: {dist_state.L} and bounding_box_width: {bounding_box_width}"
-                    )
-                    print(
-                        f"minimum distance in distance matrix: {distance_matrix.min()}"
-                    )
-                    print(
-                        f"maximum distance in distance matrix: {distance_matrix.max()}"
-                    )
-
-                    print(
-                        f"Optimized p(d)=p0*exp(-d^2/(2*sigma^2)) parameters: p0={dist_state.p0:.4f}, sigma={dist_state.sigma:.3f}"
-                    )
-                    mean_inputs_empirical = np.mean(
-                        [len(g) * s_group for g in dist_state.groups_by_receiver]
-                    )
-                    print(
-                        f"Empirical mean distinct inputs per receiver (groups * s): {mean_inputs_empirical:.2f} (target {N_target})"
-                    )
-                    print(f"Total groups G: {dist_state.G}")
-
-                    # Empirical shared fraction estimation (sampled pairs for efficiency).
-                    print(
-                        f"{pre_type}->{post_type} - Sampling receiver pairs to estimate empirical shared fraction curve..."
-                    )
-                    plot_empirical_and_target_distance_dependent_shared_fraction(
-                        dist_state=dist_state,
-                        rng=self.rng,
-                        title=f"Empirical vs Target shared input fraction: {pre_type}->{post_type}",
-                        save_dir=self.output_dir,
-                        filename=f"SharedInputFraction_{pre_type}_{post_type}.png",
-                    )
-
-        return dist_state_dict
 
     def _define_distance_dependent_shared_input_curves(self):
         """Compute distance-dependent shared-input fraction curves f(d) for all valid type pairs."""
