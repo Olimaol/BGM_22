@@ -1,6 +1,6 @@
 from ANNarchy import setup, get_population
 from CompNeuroPy.full_models import BGM
-from CompNeuroPy import Monitors, generate_simulation, plot_recordings, print_df
+from CompNeuroPy import CompNeuroMonitors, CompNeuroSim, PlotRecordings, print_df
 from tqdm import tqdm
 
 ### local
@@ -54,8 +54,8 @@ if __name__ == "__main__":
     print("model paramters:")
     print_df(model.attribute_df)
 
-    ### INIT MONITORS ###
-    mon = Monitors(
+    ### INIT CompNeuroMonitors ###
+    mon = CompNeuroMonitors(
         {
             "gpe_arky": ["spike", "g_ampa", "g_gaba"],
             "str_d1": ["spike", "g_ampa", "g_gaba"],
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     )
 
     ### GENERATE TRIAL SIMULATION ###
-    SST_trial = generate_simulation(
+    SST_trial = CompNeuroSim(
         simulation_function=SST_trial_function,
         simulation_kwargs={"params": params, "paramsS": paramsS},
         name="SST_trial",
@@ -103,39 +103,70 @@ if __name__ == "__main__":
     recording_times = mon.get_recording_times()
 
     ### QUICK PLOT ###
-    plot_list = [
-        "1;gpe_arky;spike;hybrid",
-        "2;str_d1;spike;hybrid",
-        "3;str_d2;spike;hybrid",
-        "4;stn;spike;hybrid",
-        "5;cor_go;spike;hybrid",
-        "6;gpe_cp;spike;hybrid",
-        "7;gpe_proto;spike;hybrid",
-        "8;snr;spike;hybrid",
-        "9;thal;spike;hybrid",
-        "10;cor_stop;spike;hybrid",
-        "11;str_fsi;spike;hybrid",
-        "12;integrator_stop;g_ampa;line",
-    ]
+    plan = {
+        "position": list(range(1, 13)),
+        "compartment": [
+            "gpe_arky",
+            "str_d1",
+            "str_d2",
+            "stn",
+            "cor_go",
+            "gpe_cp",
+            "gpe_proto",
+            "snr",
+            "thal",
+            "cor_stop",
+            "str_fsi",
+            "integrator_stop",
+        ],
+        "variable": [
+            "spike",
+            "spike",
+            "spike",
+            "spike",
+            "spike",
+            "spike",
+            "spike",
+            "spike",
+            "spike",
+            "spike",
+            "spike",
+            "g_ampa",
+        ],
+        "format": [
+            "hybrid",
+            "hybrid",
+            "hybrid",
+            "hybrid",
+            "hybrid",
+            "hybrid",
+            "hybrid",
+            "hybrid",
+            "hybrid",
+            "hybrid",
+            "hybrid",
+            "line",
+        ],
+    }
 
     ### 1st trial
     chunk = 0
-    plot_recordings(
+    PlotRecordings(
         figname=f"results/test_trial/{model.name}/overview1.png",
         recordings=recordings,
         recording_times=recording_times,
         chunk=chunk,
         shape=(2, 6),
-        plan=plot_list,
+        plan=plan,
     )
 
     ### 2nd trial
     chunk = 1
-    plot_recordings(
+    PlotRecordings(
         figname=f"results/test_trial/{model.name}/overview2.png",
         recordings=recordings,
         recording_times=recording_times,
         chunk=chunk,
         shape=(2, 6),
-        plan=plot_list,
+        plan=plan,
     )

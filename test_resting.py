@@ -1,8 +1,8 @@
 from ANNarchy import setup, simulate
-from CompNeuroPy.models import BGM
+from CompNeuroPy.full_models import BGM
 from CompNeuroPy import (
-    Monitors,
-    plot_recordings,
+    CompNeuroMonitors,
+    PlotRecordings,
     print_df,
 )
 
@@ -25,18 +25,18 @@ if __name__ == "__main__":
     print("model paramters:")
     print_df(model.attribute_df)
 
-    ### INIT MONITORS ###
-    mon = Monitors(
+    ### INIT CompNeuroMonitors ###
+    mon = CompNeuroMonitors(
         {
-            # "pop;cor_go": ["spike"],
-            # "pop;cor_stop": ["spike"],
-            # "pop;cor_pause": ["spike"],
-            # "pop;str_d1": ["spike"],
-            "pop;str_d2": ["spike"],
-            "pop;str_fsi": ["spike"],
-            "pop;gpe_proto": ["spike", "I_base"],
-            # "pop;gpe_arky": ["spike", "u"],
-            # "pop;gpe_cp": ["spike"],
+            # "cor_go": ["spike"],
+            # "cor_stop": ["spike"],
+            # "cor_pause": ["spike"],
+            # "str_d1": ["spike"],
+            "str_d2": ["spike"],
+            "str_fsi": ["spike"],
+            "gpe_proto": ["spike", "I_base"],
+            # "gpe_arky": ["spike", "u"],
+            # "gpe_cp": ["spike"],
         }
     )
 
@@ -53,24 +53,18 @@ if __name__ == "__main__":
     ### QUICK PLOTS ###
 
     ### some populations activity
-    plot_list = [
-        # "1;cor_go;spike;hybrid",
-        # "2;cor_stop;spike;hybrid",
-        # "3;cor_pause;spike;hybrid",
-        # "4;str_d1;spike;hybrid",
-        "1;str_d2;spike;hybrid",
-        "2;str_fsi;spike;hybrid",
-        "3;gpe_proto;spike;hybrid",
-        # "3;gpe_arky;spike;hybrid",
-        # "9;gpe_cp;spike;hybrid",
-        "4;gpe_proto;I_base;line",
-    ]
+    plan = {
+        "position": [1, 2, 3, 4],
+        "compartment": ["str_d2", "str_fsi", "gpe_proto", "gpe_proto"],
+        "variable": ["spike", "spike", "spike", "I_base"],
+        "format": ["hybrid", "hybrid", "hybrid", "line"],
+    }
     chunk = 0
-    plot_recordings(
+    PlotRecordings(
         figname=f"results/test_resting/{model.name}/overview1.png",
         recordings=recordings,
         recording_times=recording_times,
         chunk=chunk,
         shape=(1, 4),
-        plan=plot_list,
+        plan=plan,
     )
