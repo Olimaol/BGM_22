@@ -1108,7 +1108,7 @@ class Microcircuit:
         """Simulate spike counts for cortical input streams and store them."""
         # As rates for cortical drive, load the precomputed rates based on BOLD data
         rate_path = (
-            Path(__file__).resolve().parent.parent
+            Path(__file__).resolve().parent
             / "external_input"
             / "results_cortical_drive_by_bold"
             / f"firing_rates_matlab_condition-{self.dbs_condition}.npz"

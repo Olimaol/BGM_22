@@ -12,14 +12,14 @@ loss_results.txt
 *.json
 *dataRaw/
 *.~lock*
-external_input/bino_in_ann_poisson_network/*
-external_input/bino_in_ann_self_spiking_network/*
-external_input/bino_in_ann_pre_defined_spiking_network/*
-external_input/big_array.dat
+striatal_microcircuit/external_input/bino_in_ann_poisson_network/*
+striatal_microcircuit/external_input/bino_in_ann_self_spiking_network/*
+striatal_microcircuit/external_input/bino_in_ann_pre_defined_spiking_network/*
+striatal_microcircuit/external_input/big_array.dat
 *.dat
 # all hidden files
 .*
 # in folder experimental_data/berlin_data/ ignore all files except investigate_data.py
 experimental_data/berlin_data/*
 !experimental_data/berlin_data/investigate_data.py
-external_input/results_cortical_drive_by_bold/*
+striatal_microcircuit/external_input/results_cortical_drive_by_bold/*
