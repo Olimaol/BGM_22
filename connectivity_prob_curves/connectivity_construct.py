@@ -367,6 +367,12 @@ class Microcircuit:
             raise RuntimeError(
                 "create_model() must be called before update to build ANNarchy objects."
             )
+        fs_debug_cache: dict[str, dict[str, np.ndarray]] | None = (
+            {} if self.verbose and self.debug else None
+        )
+        fs_scaling_factors = None
+        if self.verbose and self.debug:
+            fs_scaling_factors = self._compute_fs_scaling_factors()
         dSPN_inputs_sum = []
         # Loop over all input iterators and update the corresponding TimedArray populations
         for key, inp_iterator in self.inp_iterator_dict.items():
@@ -408,6 +414,11 @@ class Microcircuit:
             if key[0] in self.cortical_proportions_dict.keys() and key[1] == "dSPN":
                 dSPN_inputs_sum.append(inputs[:, 0])
 
+            # collect cortical chunks for FS validation
+            if fs_debug_cache is not None and key[0] in self.cortical_proportions_dict:
+                if key[1] in {"dSPN", "iSPN", "FS"}:
+                    fs_debug_cache.setdefault(key[0], {})[key[1]] = inputs
+
             # update the TimedArray population with weighted inputs
             inp_population.reset()
             inp_population.update(rates=inputs * self.mean_weights_by_type[key])
@@ -437,9 +448,307 @@ class Microcircuit:
             plt.tight_layout()
             plt.show()
 
+        if (
+            self.verbose
+            and self.debug
+            and fs_debug_cache
+            and fs_scaling_factors is not None
+        ):
+            self._debug_validate_fs_inputs(
+                fs_debug_cache=fs_debug_cache,
+                scaling_factors=fs_scaling_factors,
+            )
+
         # Optional simulate the network for the update_time
         if run_simulation:
             simulate(self.update_time)
+
+    def _compute_fs_scaling_factors(self) -> np.ndarray | None:
+        """Recompute the FS scaling factors used during FS input generation."""
+        if ("FS", "dSPN") not in self.weights_by_type or (
+            "FS",
+            "iSPN",
+        ) not in self.weights_by_type:
+            if self.verbose:
+                print(
+                    "[FS debug] Missing FS->dSPN or FS->iSPN weights; cannot validate FS inputs."
+                )
+            return None
+
+        W_fs_dspn = self.weights_by_type[("FS", "dSPN")]
+        W_fs_ispn = self.weights_by_type[("FS", "iSPN")]
+
+        N_spn_total = self.N_cortical_inputs_dict.get("dSPN", 0)
+        N_fs_total = self.N_cortical_inputs_dict.get("FS", 0)
+        if N_spn_total <= 0 or N_fs_total <= 0:
+            if self.verbose:
+                print(
+                    "[FS debug] Invalid cortical input expectations for SPN/FS; cannot validate."
+                )
+            return None
+
+        sum_w_dspn = np.array(W_fs_dspn.sum(axis=1)).flatten()
+        sum_w_ispn = np.array(W_fs_ispn.sum(axis=1)).flatten()
+        total_weighted_capacity = (sum_w_dspn * N_spn_total) + (
+            sum_w_ispn * N_spn_total
+        )
+
+        scaling_factors = np.zeros_like(total_weighted_capacity, dtype=np.float64)
+        mask = total_weighted_capacity > 0
+        scaling_factors[mask] = N_fs_total / total_weighted_capacity[mask]
+        return scaling_factors
+
+    def _debug_validate_fs_inputs(
+        self,
+        fs_debug_cache: dict[str, dict[str, np.ndarray]],
+        scaling_factors: np.ndarray,
+    ) -> None:
+        """Validate that FS inputs follow from dSPN/iSPN inputs and visualize the relation."""
+
+        W_fs_dspn = self.weights_by_type[("FS", "dSPN")].tocsr()
+        W_fs_ispn = self.weights_by_type[("FS", "iSPN")].tocsr()
+
+        for region, region_chunks in fs_debug_cache.items():
+            dspn_chunk = region_chunks.get("dSPN")
+            ispn_chunk = region_chunks.get("iSPN")
+            fs_chunk = region_chunks.get("FS")
+
+            if dspn_chunk is None or ispn_chunk is None or fs_chunk is None:
+                if self.verbose:
+                    print(
+                        f"[FS debug] {region}: missing chunks for validation. Have keys {list(region_chunks.keys())}."
+                    )
+                continue
+
+            # inputs are stored as (steps, neurons); transpose for matrix multiplication
+            dspn_inputs = dspn_chunk.T
+            ispn_inputs = ispn_chunk.T
+            fs_inputs_actual = fs_chunk.T
+
+            expected_mean = (W_fs_dspn @ dspn_inputs) + (W_fs_ispn @ ispn_inputs)
+            expected_mean = expected_mean * scaling_factors[:, None]
+
+            if expected_mean.shape != fs_inputs_actual.shape:
+                if self.verbose:
+                    print(
+                        f"[FS debug] {region}: shape mismatch expected {expected_mean.shape} vs actual {fs_inputs_actual.shape}."
+                    )
+                continue
+
+            total_expected = float(expected_mean.sum())
+            total_actual = float(fs_inputs_actual.sum())
+            ratio_total = (
+                total_actual / total_expected if total_expected > 0 else np.nan
+            )
+
+            flat_expected = expected_mean.ravel()
+            flat_actual = fs_inputs_actual.ravel()
+            corr = np.nan
+            if flat_expected.std() > 0 and flat_actual.std() > 0:
+                corr = float(np.corrcoef(flat_expected, flat_actual)[0, 1])
+
+            per_neuron_expected_mean = expected_mean.mean(axis=1)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                per_neuron_ratio = np.divide(
+                    fs_inputs_actual.mean(axis=1),
+                    per_neuron_expected_mean,
+                    out=np.full_like(per_neuron_expected_mean, np.nan),
+                    where=per_neuron_expected_mean > 0,
+                )
+
+            corr_display = "nan" if np.isnan(corr) else f"{corr:.3f}"
+            mean_ratio = float(np.nanmean(per_neuron_ratio))
+            std_ratio = float(np.nanstd(per_neuron_ratio))
+
+            if self.verbose:
+                print(
+                    f"[FS debug] {region}: steps={fs_inputs_actual.shape[1]}, FS neurons={fs_inputs_actual.shape[0]}, "
+                    f"total_expected={total_expected:.2f}, total_actual={total_actual:.2f}, "
+                    f"total_ratio={ratio_total:.3f}, corr={corr_display}, "
+                    f"mean_neuron_ratio={mean_ratio:.3f}+/-{std_ratio:.3f}"
+                )
+
+            time_axis = np.arange(fs_inputs_actual.shape[1]) * self.dt
+            fig, axes = plt.subplots(2, 2, figsize=(12, 8), constrained_layout=True)
+
+            axes[0, 0].plot(
+                time_axis, expected_mean.sum(axis=0), label="expected (from SPNs)"
+            )
+            axes[0, 0].plot(
+                time_axis,
+                fs_inputs_actual.sum(axis=0),
+                label="actual (FS memmap)",
+                alpha=0.7,
+            )
+            axes[0, 0].set_xlabel("Time (ms)")
+            axes[0, 0].set_ylabel("Input count")
+            axes[0, 0].set_title(f"{region}: total FS input per timestep")
+            axes[0, 0].legend()
+
+            sample_size = min(3000, flat_expected.size)
+            sample_idx = (
+                np.linspace(0, flat_expected.size - 1, num=sample_size, dtype=int)
+                if sample_size > 0
+                else np.array([], dtype=int)
+            )
+            axes[0, 1].scatter(
+                flat_expected[sample_idx],
+                flat_actual[sample_idx],
+                s=6,
+                alpha=0.6,
+                label="samples",
+            )
+            if sample_size > 0:
+                max_val = max(
+                    flat_expected[sample_idx].max(), flat_actual[sample_idx].max()
+                )
+                axes[0, 1].plot([0, max_val], [0, max_val], "r--", lw=1, label="y=x")
+            axes[0, 1].set_xlabel("Expected (Poisson mean)")
+            axes[0, 1].set_ylabel("Actual (sampled)")
+            axes[0, 1].set_title("Expected vs actual (sampled points)")
+            axes[0, 1].legend()
+
+            axes[1, 0].hist(
+                per_neuron_ratio[~np.isnan(per_neuron_ratio)],
+                bins=30,
+                color="steelblue",
+                edgecolor="black",
+            )
+            axes[1, 0].axvline(1.0, color="red", linestyle="--", label="ideal")
+            axes[1, 0].set_xlabel("Mean(actual)/Mean(expected)")
+            axes[1, 0].set_ylabel("FS neuron count")
+            axes[1, 0].set_title("FS neuron-wise ratio")
+            axes[1, 0].legend()
+
+            n_show = min(3, fs_inputs_actual.shape[0])
+            for idx in range(n_show):
+                axes[1, 1].plot(
+                    time_axis,
+                    expected_mean[idx],
+                    label=f"expected n{idx}",
+                    linestyle="--",
+                    alpha=0.8,
+                )
+                axes[1, 1].plot(
+                    time_axis,
+                    fs_inputs_actual[idx],
+                    label=f"actual n{idx}",
+                    alpha=0.8,
+                )
+            axes[1, 1].set_xlabel("Time (ms)")
+            axes[1, 1].set_ylabel("Input count")
+            axes[1, 1].set_title("Example FS neurons")
+            axes[1, 1].legend()
+
+            plt.suptitle(f"FS input validation for {region}")
+            plt.show()
+
+            # Detailed per-neuron view: one FS neuron and its connected SPNs
+            fs_idx = None
+            for candidate in range(fs_inputs_actual.shape[0]):
+                if (
+                    W_fs_dspn.getrow(candidate).nnz > 0
+                    or W_fs_ispn.getrow(candidate).nnz > 0
+                ):
+                    fs_idx = candidate
+                    break
+
+            if fs_idx is None:
+                if self.verbose:
+                    print(
+                        f"[FS debug] {region}: no FS neuron with SPN connections found for detailed plot."
+                    )
+                continue
+
+            w_dspn_row = np.array(W_fs_dspn.getrow(fs_idx).toarray()).ravel()
+            w_ispn_row = np.array(W_fs_ispn.getrow(fs_idx).toarray()).ravel()
+
+            conn_list = []
+            for idx, w in enumerate(w_dspn_row):
+                if w > 0:
+                    conn_list.append(("dSPN", idx, w))
+            for idx, w in enumerate(w_ispn_row):
+                if w > 0:
+                    conn_list.append(("iSPN", idx, w))
+
+            if not conn_list:
+                if self.verbose:
+                    print(
+                        f"[FS debug] {region}: FS neuron {fs_idx} has no SPN connections for detailed plot."
+                    )
+                continue
+
+            # Keep plot readable: show strongest connections first
+            conn_list.sort(key=lambda x: x[2], reverse=True)
+            max_traces = 6
+            conn_list = conn_list[:max_traces]
+
+            colors = plt.cm.tab10(np.linspace(0, 1, len(conn_list)))
+            fig_detail, axes_detail = plt.subplots(
+                1, 3, figsize=(15, 4), constrained_layout=True
+            )
+
+            # FS neuron spikes
+            axes_detail[0].plot(
+                time_axis,
+                fs_inputs_actual[fs_idx],
+                color="black",
+                label=f"FS {fs_idx} actual",
+            )
+            axes_detail[0].plot(
+                time_axis,
+                expected_mean[fs_idx],
+                color="gray",
+                linestyle="--",
+                label="expected",
+            )
+            axes_detail[0].set_title(f"FS neuron {fs_idx} input counts")
+            axes_detail[0].set_xlabel("Time (ms)")
+            axes_detail[0].set_ylabel("Input count")
+            axes_detail[0].legend()
+
+            # SPN spike counts (raw)
+            for color, (ctype, idx, w) in zip(colors, conn_list):
+                if ctype == "dSPN":
+                    axes_detail[1].plot(
+                        time_axis,
+                        dspn_inputs[idx],
+                        color=color,
+                        label=f"dSPN {idx} (w={w:.3f})",
+                    )
+                else:
+                    axes_detail[1].plot(
+                        time_axis,
+                        ispn_inputs[idx],
+                        color=color,
+                        label=f"iSPN {idx} (w={w:.3f})",
+                    )
+            axes_detail[1].set_title("Connected SPN spike counts")
+            axes_detail[1].set_xlabel("Time (ms)")
+            axes_detail[1].set_ylabel("Spike count")
+            axes_detail[1].legend()
+
+            # Weighted SPN spike counts
+            for color, (ctype, idx, w) in zip(colors, conn_list):
+                if ctype == "dSPN":
+                    weighted = dspn_inputs[idx] * w
+                else:
+                    weighted = ispn_inputs[idx] * w
+                axes_detail[2].plot(
+                    time_axis,
+                    weighted,
+                    color=color,
+                    label=f"{ctype} {idx} (w={w:.3f})",
+                )
+            axes_detail[2].set_title("Weighted SPN spike counts")
+            axes_detail[2].set_xlabel("Time (ms)")
+            axes_detail[2].set_ylabel("Weighted count")
+            axes_detail[2].legend()
+
+            fig_detail.suptitle(
+                f"FS {fs_idx} and connected SPNs ({region})", fontsize=12
+            )
+            plt.show()
 
     def create_model(self) -> None:
         """Instantiate ANNarchy objects (populations, inputs/projections).
