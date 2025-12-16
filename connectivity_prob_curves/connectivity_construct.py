@@ -336,11 +336,13 @@ class Microcircuit:
         )
 
         # build or load connectivity and fill per-type weight matrices
+        self.built_connectivity = False
         if build_connectivity:
             self._build_connectivity()
             self._save_connectivity_state()
         else:
             self._load_connectivity_state()
+        self.built_connectivity = True
 
         if self.verbose:
             self.summary()
@@ -1497,6 +1499,10 @@ class Microcircuit:
             plt.close()
 
     def plot_neighbor_candidate_counts(self, show: bool = False) -> None:
+        if not self.built_connectivity:
+            raise RuntimeError(
+                "Connectivity not yet built; cannot plot neighbor candidate counts."
+            )
         plt.figure()
         plt.plot(sorted(self.neighbor_sizes))
         plt.title("Number of neighbor candidates per neuron")
@@ -1511,6 +1517,10 @@ class Microcircuit:
             plt.close()
 
     def plot_connection_probability_boxplots(self, show: bool = False) -> None:
+        if not self.built_connectivity:
+            raise RuntimeError(
+                "Connectivity not yet built; cannot plot connection probability boxplots."
+            )
         for (pre_type, post_type), probs in self.con_probs.items():
             if not probs:
                 continue
@@ -1539,6 +1549,10 @@ class Microcircuit:
                 plt.close()
 
     def analyze_degree_distributions(self, show: bool = False) -> dict:
+        if not self.built_connectivity:
+            raise RuntimeError(
+                "Connectivity not yet built; cannot analyze degree distributions."
+            )
         hist_data: dict[str, dict[str, np.ndarray]] = {}
         for pre_type in self.cell_types:
             hist_data[pre_type] = {}
@@ -1636,6 +1650,10 @@ class Microcircuit:
         markersize : float
             Marker size for plt.spy.
         """
+        if not self.built_connectivity:
+            raise RuntimeError(
+                "Connectivity not yet built; cannot plot weight matrices."
+            )
         key = (pre_type, post_type)
         if key not in self.weights_by_type:
             raise KeyError(f"No weight matrix for {pre_type}->{post_type}")
@@ -1702,6 +1720,10 @@ class Microcircuit:
         figsize_per : float
             Base size per subplot (width & height scale).
         """
+        if not self.built_connectivity:
+            raise RuntimeError(
+                "Connectivity not yet built; cannot plot weight matrices."
+            )
         keys = list(self.weights_by_type.keys())
         if not keys:
             print("No weight matrices to plot.")
@@ -1793,6 +1815,10 @@ class Microcircuit:
         -------
         dict mapping (pre_type, post_type) to {'bin_edges','counts','centers'} arrays (aggregated key 'ALL' if per_pair=False).
         """
+        if not self.built_connectivity:
+            raise RuntimeError(
+                "Connectivity not yet built; cannot plot connection distance distributions."
+            )
         # Prepare data
         scale = 1e3 if micrometers else 1.0
         label_unit = "µm" if micrometers else "mm"
@@ -1883,7 +1909,16 @@ class Microcircuit:
 
 if __name__ == "__main__":
     # Example usage: build microcircuit and reproduce main analyses, saving to output_dir
-    mc = Microcircuit(nx=10, b=10, verbose=True)
+    mc = Microcircuit(
+        name="caudate",
+        dbs_condition="off",
+        nx=10,
+        b=10,
+        build_cortical_input=False,
+        build_missing_gaba_input=False,
+        build_connectivity=False,
+        verbose=True,
+    )
     mc.plot_ext_kdtree_points(show=False)
     mc.plot_neighborhood(show=False)
     mc.plot_neighbor_candidate_counts(show=False)
