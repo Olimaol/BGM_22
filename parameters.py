@@ -55,3 +55,14 @@ parameters_test_resting["timestep"] = 0.1
 parameters_test_resting["seed"] = 1
 ### simulation time
 parameters_test_resting["t.duration"] = 3000
+
+
+### parameters for test_microcircuit
+parameters_test_microcircuit = {}
+### general
+parameters_test_microcircuit["timestep"] = 0.1
+parameters_test_microcircuit["seed"] = 1
+### simulation time
+parameters_test_microcircuit["t.duration"] = 3000
+## dbs parameter
+parameters_test_microcircuit["dbs"] = "off"
