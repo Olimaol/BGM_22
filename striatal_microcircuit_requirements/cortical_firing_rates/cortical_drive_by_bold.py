@@ -371,10 +371,11 @@ if __name__ == "__main__":
     TR = 2.31  # TR in seconds
     TARGET_MEAN_HZ = 5.0  # Target mean firing rate in Hz for scaling
     condition = args.condition
-    results_dir = Path(__file__).resolve().parent / "results_cortical_drive_by_bold"
+    base_dir = Path(__file__).resolve().parents[2]
+    results_dir = Path(__file__).resolve().parent / "cortical_firing_rates_data"
     results_dir.mkdir(parents=True, exist_ok=True)
     data_file = (
-        Path(__file__).resolve().parent.parent
+        base_dir
         / "experimental_data/berlin_data/bold_data_roi/sub-01/sub-01_subdiv_results.h5"
     )
 

@@ -198,7 +198,7 @@ def plot_connectivity(datasets, sigma, A, group_label, output_dir):
 
 
 if __name__ == "__main__":
-    # Datasets from Connectivity_intrinsic_striatum/connectivity_probabilities.ods
+    # Datasets from experimental_data/Connectivity_intrinsic_striatum/connectivity_probabilities.ods
     """
     Some datasets were for SPN-SPN --> I use them for all combinations
     (dSPN-dSPN, dSPN-iSPN, iSPN-dSPN, iSPN-iSPN) but divide the counts by 4
@@ -292,7 +292,7 @@ if __name__ == "__main__":
         ],
     }
 
-    output_dir = "connectivity_fits"
+    output_dir = "connectivity_fit_data"
     os.makedirs(output_dir, exist_ok=True)
 
     params = {}  # initialize dict to collect fitted parameters

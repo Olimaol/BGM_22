@@ -61,8 +61,20 @@ parameters_test_resting["t.duration"] = 3000
 parameters_test_microcircuit = {}
 ### general
 parameters_test_microcircuit["timestep"] = 0.1
-parameters_test_microcircuit["seed"] = 1
+parameters_test_microcircuit["seed"] = 42
 ### simulation time
-parameters_test_microcircuit["t.duration"] = 3000
+parameters_test_microcircuit["t.duration"] = 200
 ## dbs parameter
 parameters_test_microcircuit["dbs"] = "off"
+# microcircuit parameters
+parameters_test_microcircuit["mc.nx"] = 10
+parameters_test_microcircuit["mc.b"] = 10
+parameters_test_microcircuit["update_time"] = 100.0
+
+parameters_test_microcircuit["mc.fitted_params_path"] = (
+    "striatal_microcircuit_requirements/connectivity_parameters/connectivity_fit_data/fitted_params.json"
+)
+parameters_test_microcircuit["mc.cortical_rate_path"] = {
+    "on": "striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data/firing_rates_matlab_condition-on.npz",
+    "off": "striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data/firing_rates_matlab_condition-off.npz",
+}
