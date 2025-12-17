@@ -750,11 +750,31 @@ class Microcircuit:
             )
             plt.show()
 
-    def create_model(self) -> None:
+    def get_input_receiver_populations(self) -> dict[str, Population]:
+        """
+        Return the ANNarchy populations that receive external inputs.
+
+        Returns
+        -------
+        dict
+            Mapping {"dSPN": Population, "iSPN": Population, "FS": Population}
+        """
+        return {
+            ct: self.annarchy_populations[ct]
+            for ct in ("dSPN", "iSPN", "FS")
+            if ct in self.annarchy_populations
+        }
+
+    def create_model(self) -> dict[str, Population]:
         """Instantiate ANNarchy objects (populations, inputs/projections).
 
         Call this after constructing the Microcircuit to keep heavy ANNarchy
         objects separate from data preparation.
+
+        Returns
+        -------
+        dict
+            Mapping {"dSPN": Population, "iSPN": Population, "FS": Population}
         """
         if self.model_created:
             if self.verbose:
@@ -780,6 +800,8 @@ class Microcircuit:
         self._create_inputs_annarchy(memmap_dict=self.cor_input_memmap_dict)
 
         self.model_created = True
+
+        return self.get_input_receiver_populations()
 
     def create_local_projections_annarchy(self) -> None:
         """Create ANNarchy Projections between the striatal populations based on the
