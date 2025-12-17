@@ -53,6 +53,7 @@ class CorticalInputs:
         T: float,
         name: str,
         dbs_condition: str = "on",
+        cortical_rate_path: Optional[str] = None,
         storage_dir: Optional[str] = None,
         build_cortical_input: bool = True,
         seed: int = 42,
@@ -64,6 +65,15 @@ class CorticalInputs:
         if dbs_condition not in {"on", "off"}:
             raise ValueError("dbs_condition must be 'on' or 'off'")
         self.dbs_condition = dbs_condition
+
+        self.cortical_rate_path = (
+            Path(cortical_rate_path).expanduser()
+            if cortical_rate_path is not None
+            else Path(__file__).resolve().parent
+            / "external_input"
+            / "results_cortical_drive_by_bold"
+            / f"firing_rates_matlab_condition-{self.dbs_condition}.npz"
+        )
 
         self.dt = float(dt)
         self.update_time = float(update_time)
@@ -242,6 +252,7 @@ class CorticalInputs:
             "cortical_proportions_dict": self.cortical_proportions_dict,
             "N_cortical_inputs_dict": self.N_cortical_inputs_dict,
             "name": self.name,
+            "cortical_rate_path": str(self.cortical_rate_path),
             "keys": [f"{pre}-{post}" for (pre, post) in self.cor_input_memmap_dict],
         }
 
@@ -281,6 +292,14 @@ class CorticalInputs:
                 "Cached cortical-input state was built for a different dbs_condition; rebuild cortical inputs."
             )
 
+        rate_path_saved = payload.get("cortical_rate_path")
+        if rate_path_saved is not None:
+            current_rate_path = str(Path(self.cortical_rate_path))
+            if rate_path_saved != current_rate_path:
+                raise ValueError(
+                    "Cached cortical-input state uses different cortical_rate_path; rebuild cortical inputs."
+                )
+
         proportions_saved = payload.get("cortical_proportions_dict")
         if proportions_saved and proportions_saved != self.cortical_proportions_dict:
             raise ValueError(
@@ -319,12 +338,7 @@ class CorticalInputs:
             self.rng.bit_generator.state = rng_state
 
     def _simulate_cortical_spike_counts(self) -> None:
-        rate_path = (
-            Path(__file__).resolve().parent
-            / "external_input"
-            / "results_cortical_drive_by_bold"
-            / f"firing_rates_matlab_condition-{self.dbs_condition}.npz"
-        )
+        rate_path = Path(self.cortical_rate_path)
         if not rate_path.exists():
             raise FileNotFoundError(
                 f"Cortical drive rates not found at {rate_path}; run cortical_drive_by_bold.py first."

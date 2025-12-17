@@ -89,6 +89,7 @@ class Microcircuit:
         correlation_dict: dict | None = None,
         N_cortical_inputs_dict: dict | None = None,
         cortical_proportions_dict: dict | None = None,
+        cortical_rate_path: str | Path | None = None,
         dt: float = 0.1,
         T: float = 1000.0,
         update_time: float = 100.0,
@@ -178,6 +179,14 @@ class Microcircuit:
         if props_delRey is None:
             props_delRey = np.array([0.026, 0.86 / 2, 0.86 / 2])
         props = props_delRey / np.sum(props_delRey)
+        self.cortical_rate_path = (
+            Path(cortical_rate_path).expanduser()
+            if cortical_rate_path is not None
+            else Path(__file__).resolve().parent
+            / "external_input"
+            / "results_cortical_drive_by_bold"
+            / f"firing_rates_matlab_condition-{self.dbs_condition}.npz"
+        )
         self.props = {"FS": props[0], "dSPN": props[1], "iSPN": props[2]}
         self.cell_types = list(self.props.keys())
 
@@ -1129,12 +1138,7 @@ class Microcircuit:
     def _simulate_cor_input_spike_counts(self):
         """Simulate spike counts for cortical input streams and store them."""
         # As rates for cortical drive, load the precomputed rates based on BOLD data
-        rate_path = (
-            Path(__file__).resolve().parent
-            / "external_input"
-            / "results_cortical_drive_by_bold"
-            / f"firing_rates_matlab_condition-{self.dbs_condition}.npz"
-        )
+        rate_path = Path(self.cortical_rate_path)
         if not rate_path.exists():
             raise FileNotFoundError(
                 f"Cortical drive rates not found at {rate_path}; run cortical_drive_by_bold.py first."
@@ -1681,6 +1685,7 @@ class Microcircuit:
             "cortical_proportions_dict": self.cortical_proportions_dict,
             "N_cortical_inputs_dict": self.N_cortical_inputs_dict,
             "shared_fraction": self.shared_fraction,
+            "cortical_rate_path": str(self.cortical_rate_path),
             "keys": [f"{pre}-{post}" for (pre, post) in self.cor_input_memmap_dict],
         }
 
@@ -1735,6 +1740,14 @@ class Microcircuit:
             raise ValueError(
                 "Cached cortical-input state uses different shared_fraction; rebuild cortical inputs."
             )
+
+        rate_path_saved = payload.get("cortical_rate_path")
+        if rate_path_saved is not None:
+            current_rate_path = str(Path(self.cortical_rate_path))
+            if rate_path_saved != current_rate_path:
+                raise ValueError(
+                    "Cached cortical-input state uses different cortical_rate_path; rebuild cortical inputs."
+                )
 
         self.cor_input_memmap_dict = payload.get("cor_input_memmap_dict")
         if self.cor_input_memmap_dict is None:
