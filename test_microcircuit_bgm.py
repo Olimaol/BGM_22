@@ -40,6 +40,10 @@ if __name__ == "__main__":
             "mc.cortical_rate_path": paramsS["mc.cortical_rate_path"][paramsS["dbs"]],
             "ci.storage_dir": f"mc_ci_cache/ci_{loop}_cache_{paramsS['dbs']}",
             "ci.seed": paramsS.get("seed", 42),
+            "ci.n_thal": paramsS["ci.n_thal"],
+            "ci.n_gpe_arky": paramsS["ci.n_gpe_arky"],
+            "ci.n_gpe_cp": paramsS["ci.n_gpe_cp"],
+            "ci.n_stn": paramsS["ci.n_stn"],
         }
 
         ### Create model for the current loop

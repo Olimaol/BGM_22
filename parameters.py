@@ -78,3 +78,8 @@ parameters_test_microcircuit["mc.cortical_rate_path"] = {
     "on": "striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data/firing_rates_matlab_condition-on.npz",
     "off": "striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data/firing_rates_matlab_condition-off.npz",
 }
+# cortical inputs parameters TODO use lit motivated values
+parameters_test_microcircuit["ci.n_thal"] = 1000
+parameters_test_microcircuit["ci.n_gpe_arky"] = 500
+parameters_test_microcircuit["ci.n_gpe_cp"] = 500
+parameters_test_microcircuit["ci.n_stn"] = 500
