@@ -63,7 +63,7 @@ parameters_test_microcircuit = {}
 parameters_test_microcircuit["timestep"] = 0.1
 parameters_test_microcircuit["seed"] = 42
 ### simulation time
-parameters_test_microcircuit["t.duration"] = 200
+parameters_test_microcircuit["t.duration"] = 1200
 ## dbs parameter
 parameters_test_microcircuit["dbs"] = "off"
 # microcircuit parameters
