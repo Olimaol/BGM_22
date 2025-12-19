@@ -19,3 +19,4 @@ parameters_test_microcircuit["mc.cortical_rate_path"] = {
 parameters_test_microcircuit["deap_cma.run.max_evals"] = (
     2000  # should be approx 14 days
 )
+parameters_test_microcircuit["deap_cma.lambda"] = 12

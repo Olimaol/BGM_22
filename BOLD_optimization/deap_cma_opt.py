@@ -142,14 +142,12 @@ deap_cma = DeapCma(
     hard_bounds=True,
     plot_file=paramsS["data_folder"] + "/deap_cma_plot.png",
     cma_params_dict={
-        "lambda_": 10
+        "lambda_": paramsS["deap_cma.lambda"]
     },  # TODO set this depending on how many parallel jobs we can run
 )
 
 # run the get_loss script the number of individuals times to compile the models
 number_of_individuals = deap_cma.deap_dict["strategy"].lambda_
-print(f"Number of individuals: {number_of_individuals}")
-quit()
 
 run_script_parallel(
     script_path="get_loss.py",
