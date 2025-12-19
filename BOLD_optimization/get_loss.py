@@ -29,11 +29,6 @@ def set_opt_params(param_list, model_dict):
     with the fixed driving force of 50 mV (current based excitation in the model)
         --> 10 * 50 = 500 max base current for snr and gpe_proto
     """
-    # catch wrong number of parameters
-    if len(param_list) != 21:
-        raise ValueError(
-            f"Expected 21 parameters, got {len(param_list)} parameters: {param_list}"
-        )
 
     ### FIRING RATE PARAMETERS ###
     # parameters which influence the firing rates of the populations:
@@ -104,45 +99,6 @@ def set_opt_params(param_list, model_dict):
     # thal__str_d1
     # thal__str_d2
     # thal__str_fsi
-
-    # get the projections whose weights should be optimized
-    # proj_weights_dict = {
-    #     "str_d1__snr": param_list[9],  # [0, 10]
-    #     "str_d1__gpe_cp": param_list[10],  # [0, 10]
-    #     "str_d1__str_d1": param_list[11],  # [0, 500]
-    #     "str_d1__str_d2": param_list[12],  # [0, 500]
-    #     "str_d2__gpe_proto": param_list[13],  # [0, 10]
-    #     "str_d2__gpe_arky": param_list[14],  # [0, 10]
-    #     "str_d2__gpe_cp": param_list[15],  # [0, 10]
-    #     "str_d2__str_d1": param_list[16],  # [0, 500]
-    #     "str_d2__str_d2": param_list[17],  # [0, 500]
-    #     "str_fsi__str_d1": param_list[18],  # [0, 500]
-    #     "str_fsi__str_d2": param_list[19],  # [0, 500]
-    #     "str_fsi__str_fsi": param_list[20],  # [0, 800]
-    #     "stn__snr": param_list[21],  # [0, 10]
-    #     "stn__gpe_proto": param_list[22],  # [0, 10]
-    #     "stn__gpe_arky": param_list[23],  # [0, 10]
-    #     "stn__gpe_cp": param_list[24],  # [0, 10]
-    #     "gpe_proto__stn": param_list[25],  # [0, 10]
-    #     "gpe_proto__snr": param_list[26],  # [0, 10]
-    #     "gpe_proto__gpe_arky": param_list[27],  # [0, 10]
-    #     "gpe_proto__gpe_cp": param_list[28],  # [0, 10]
-    #     "gpe_proto__str_fsi": param_list[29],  # [0, 800]
-    #     "gpe_arky__str_d1": param_list[30],  # [0, 500]
-    #     "gpe_arky__str_d2": param_list[31],  # [0, 500]
-    #     "gpe_arky__str_fsi": param_list[32],  # [0, 500]
-    #     "gpe_arky__gpe_proto": param_list[33],  # [0, 10]
-    #     "gpe_arky__gpe_cp": param_list[34],  # [0, 10]
-    #     "gpe_cp__str_d1": param_list[35],  # [0, 500]
-    #     "gpe_cp__str_d2": param_list[36],  # [0, 500]
-    #     "gpe_cp__str_fsi": param_list[37],  # [0, 500]
-    #     "gpe_cp__gpe_proto": param_list[38],  # [0, 10]
-    #     "gpe_cp__gpe_arky": param_list[39],  # [0, 10]
-    #     "snr__thal": param_list[40],  # [0, 10]
-    #     "thal__str_d1": param_list[41],  # [0, 500]
-    #     "thal__str_d2": param_list[42],  # [0, 500]
-    #     "thal__str_fsi": param_list[43],  # [0, 800]
-    # }
 
     # instad of setting all the weights indvidually, use the already defined weights of BGM and scale groups of them, we scale the origianl values by a factor between 0 and 5
     proj_clusters = {
