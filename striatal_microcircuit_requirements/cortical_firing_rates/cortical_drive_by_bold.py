@@ -12,7 +12,6 @@ import scipy.stats as stats
 from scipy.fft import fft, ifft
 import matlab.engine
 import os
-from scipy.interpolate import CubicSpline
 
 CORTICAL_LABELS = (
     "M1",
@@ -23,6 +22,28 @@ CORTICAL_LABELS = (
     "S1",
     "dlPFC",
 )
+
+# Mixing coefficients to build composite corticostriatal drives
+MIXING_FACTORS = {
+    "caudate": {
+        "dlPFC": 0.45,
+        "preSMA": 0.25,
+        "PMd": 0.15,
+        "PMv": 0.10,
+        "SMA": 0.04,
+        "M1": 0.01,
+        "S1": 0.00,
+    },
+    "putamen": {
+        "dlPFC": 0.05,
+        "preSMA": 0.10,
+        "PMd": 0.15,
+        "PMv": 0.05,
+        "SMA": 0.25,
+        "M1": 0.30,
+        "S1": 0.10,
+    },
+}
 
 
 def spm_hrf(tr, oversampling=1):
@@ -211,7 +232,7 @@ def load_cortical_bold_timeseries(file_path, condition="on"):
 def plot_bold_neuronal_and_rate(
     bold_data, neuronal_results, rate_results, tr, condition, output_path
 ):
-    """Save plots of BOLD, neuronal drive (z) and upsampled firing rate for each cortical region."""
+    """Save plots of BOLD, neuronal drive (z) and firing rate for each cortical region."""
 
     regions = list(bold_data.keys())
     n_regions = len(regions)
@@ -224,8 +245,8 @@ def plot_bold_neuronal_and_rate(
         bold_ts = bold_data[region]
         neuronal_ts = neuronal_results[region]
         firing_data = rate_results[region]
-        fine_time = firing_data["time"]
-        fine_rate = firing_data["rate"]
+        rate_time = firing_data["time"]
+        rate_series = firing_data["rate"]
 
         axes[row, 0].plot(coarse_time, stats.zscore(bold_ts), color="tab:blue")
         axes[row, 0].set_ylabel(f"{region} (z)")
@@ -236,9 +257,9 @@ def plot_bold_neuronal_and_rate(
         if row == 0:
             axes[row, 1].set_title("Neuronal drive (z)")
 
-        axes[row, 2].plot(fine_time, fine_rate, color="tab:red")
+        axes[row, 2].plot(rate_time, rate_series, color="tab:red")
         if row == 0:
-            axes[row, 2].set_title("Firing rate (Hz, upsampled)")
+            axes[row, 2].set_title("Firing rate (Hz)")
 
     axes[-1, 0].set_xlabel("Time (s)")
     axes[-1, 1].set_xlabel("Time (s)")
@@ -285,73 +306,35 @@ def convert_to_firing_rate(neuronal_drive, target_mean_hz):
     return firing_rate
 
 
-def upsample_time_series(
-    coarse_rate, tr, dt_target=0.0001, add_noise=False, noise_level=0.05
-):
-    """
-    Upsamples a coarse firing rate time series (e.g. TR=2s) to a fine resolution (e.g. 0.1ms)
-    using Cubic Spline Interpolation.
+def mix_cortical_rates(rate_results):
+    """Create mixed cortical firing rates for caudate and putamen using predefined weights."""
 
-    Parameters:
-    -----------
-    coarse_rate : array
-        The firing rate time series at TR resolution.
-    tr : float
-        The original Repetition Time in seconds (e.g., 2.0).
-    dt_target : float
-        The desired time step in seconds (e.g., 0.0001 for 0.1ms).
-    add_noise : bool
-        If True, adds Ornstein-Uhlenbeck (colored) noise to mimic synaptic fluctuations.
-    noise_level : float
-        Amplitude of the noise (relative to signal standard deviation).
+    if not rate_results:
+        raise ValueError("rate_results is empty; cannot build mixed rates.")
 
-    Returns:
-    --------
-    fine_time : array
-        The new time vector.
-    fine_rate : array
-        The upsampled firing rate.
-    """
-    n_coarse = len(coarse_rate)
-    duration = n_coarse * tr
+    # All regions are sampled on the same TR grid; pick the first as reference
+    sample_region = next(iter(rate_results.values()))
+    base_time = sample_region["time"]
+    base_length = len(sample_region["rate"])
 
-    # Create the original time grid (0, 2, 4...)
-    t_coarse = np.arange(0, duration, tr)
+    mixed = {}
+    for target, weights in MIXING_FACTORS.items():
+        mixed_rate = np.zeros(base_length)
+        for region, weight in weights.items():
+            if region not in rate_results:
+                raise KeyError(
+                    f"Region '{region}' missing in rate_results; cannot mix for '{target}'."
+                )
+            region_rate = rate_results[region]["rate"]
+            if len(region_rate) != base_length:
+                raise ValueError(
+                    f"Length mismatch for region '{region}' in '{target}' mix: expected {base_length}, got {len(region_rate)}."
+                )
+            mixed_rate += weight * region_rate
 
-    # Create the target fine time grid (0, 0.0001, 0.0002...)
-    t_fine = np.arange(0, duration, dt_target)
+        mixed[target] = {"time": base_time, "rate": mixed_rate}
 
-    # --- A. Cubic Spline Interpolation ---
-    # This fits a smooth curve through the coarse points
-    # bc_type='natural' ensures 2nd derivative is zero at endpoints (prevents wild oscillations at edges)
-    cs = CubicSpline(t_coarse, coarse_rate, bc_type="natural")
-
-    fine_rate = cs(t_fine)
-
-    # --- B. Optional: Add Synaptic Noise (Ornstein-Uhlenbeck) ---
-    if add_noise:
-        # Simple implementation of colored noise
-        # This adds "texture" so the signal isn't perfectly smooth at 0.1ms
-        num_steps = len(t_fine)
-        noise = np.zeros(num_steps)
-        sigma = np.std(fine_rate) * noise_level  # Scale noise to signal amplitude
-        tau = 0.01  # Time constant of synaptic noise (10ms)
-
-        # Euler-Maruyama integration for OU process
-        dt_sqrt = np.sqrt(dt_target)
-        for i in range(1, num_steps):
-            noise[i] = (
-                noise[i - 1]
-                - (noise[i - 1] / tau) * dt_target
-                + sigma * np.random.normal() * dt_sqrt
-            )
-
-        fine_rate += noise
-
-    # Ensure rate doesn't go below zero due to spline undershoot or noise
-    fine_rate = np.maximum(fine_rate, 0.0)
-
-    return t_fine, fine_rate
+    return mixed
 
 
 # --- Main Execution Example ---
@@ -397,28 +380,35 @@ if __name__ == "__main__":
         neuronal_drive = deconvolve_neuronal_signal(bold_timeseries, TR)
         neuronal_drive_results[region_name] = neuronal_drive
 
-        # Convert to Firing Rate (Hz)
+        # Convert to Firing Rate (Hz) on the native TR grid
         rate = convert_to_firing_rate(neuronal_drive, TARGET_MEAN_HZ)
-        fine_time, fine_rate = upsample_time_series(rate, TR, dt_target=0.0001)
-        rate_results[region_name] = {"time": fine_time, "rate": fine_rate}
+        coarse_time = np.arange(len(rate)) * TR
+        rate_results[region_name] = {"time": coarse_time, "rate": rate}
 
         # Report summary statistics for the three signals
         bold_z = stats.zscore(bold_timeseries)
         print(
             f"{region_name} (scipy HRF): BOLD z-mean={np.mean(bold_z):.3f}, z-std={np.std(bold_z):.3f}; "
             f"Neuronal drive z-mean={np.mean(neuronal_drive):.3f}, z-std={np.std(neuronal_drive):.3f}; "
-            f"Firing rate mean={np.mean(fine_rate):.3f} Hz, std={np.std(fine_rate):.3f} Hz"
-            f"Shape of BOLD: {bold_timeseries.shape}, Neuronal drive: {neuronal_drive.shape}, Firing rate: {fine_rate.shape}\n"
+            f"Firing rate mean={np.mean(rate):.3f} Hz, std={np.std(rate):.3f} Hz"
+            f"Shape of BOLD: {bold_timeseries.shape}, Neuronal drive: {neuronal_drive.shape}, Firing rate: {rate.shape}\n"
         )
 
     print("-" * 30)
     print("Done.\n\n")
 
-    # Save fine firing rate time series for scipy HRF
+    # Build mixed rates (caudate, putamen)
+    mixed_rate_results = mix_cortical_rates(rate_results)
+
+    # Save firing rate time series for scipy HRF
     scipy_payload = {}
     for region, data in rate_results.items():
         scipy_payload[f"{region}_time"] = data["time"]
         scipy_payload[f"{region}_rate"] = data["rate"]
+
+    for target, data in mixed_rate_results.items():
+        scipy_payload[f"{target}_time"] = data["time"]
+        scipy_payload[f"{target}_rate"] = data["rate"]
 
     np.savez_compressed(
         results_dir / f"firing_rates_scipy_condition-{condition}.npz", **scipy_payload
@@ -440,30 +430,34 @@ if __name__ == "__main__":
         neuronal_drive_results_matlab[region_name] = neuronal_drive_matlab
 
         rate_matlab = convert_to_firing_rate(neuronal_drive_matlab, TARGET_MEAN_HZ)
-        fine_time_matlab, fine_rate_matlab = upsample_time_series(
-            rate_matlab, TR, dt_target=0.0001
-        )
+        coarse_time_matlab = np.arange(len(rate_matlab)) * TR
         rate_results_matlab[region_name] = {
-            "time": fine_time_matlab,
-            "rate": fine_rate_matlab,
+            "time": coarse_time_matlab,
+            "rate": rate_matlab,
         }
 
         bold_z = stats.zscore(bold_timeseries)
         print(
             f"{region_name} (MATLAB HRF): BOLD z-mean={np.mean(bold_z):.3f}, z-std={np.std(bold_z):.3f}; "
             f"Neuronal drive z-mean={np.mean(neuronal_drive_matlab):.3f}, z-std={np.std(neuronal_drive_matlab):.3f}; "
-            f"Firing rate mean={np.mean(fine_rate_matlab):.3f} Hz, std={np.std(fine_rate_matlab):.3f} Hz"
-            f"Shape of BOLD: {bold_timeseries.shape}, Neuronal drive: {neuronal_drive_matlab.shape}, Firing rate: {fine_rate_matlab.shape}\n"
+            f"Firing rate mean={np.mean(rate_matlab):.3f} Hz, std={np.std(rate_matlab):.3f} Hz"
+            f"Shape of BOLD: {bold_timeseries.shape}, Neuronal drive: {neuronal_drive_matlab.shape}, Firing rate: {rate_matlab.shape}\n"
         )
 
     print("-" * 30)
     print("Done.")
 
-    # Save fine firing rate time series for MATLAB HRF
+    mixed_rate_results_matlab = mix_cortical_rates(rate_results_matlab)
+
+    # Save firing rate time series for MATLAB HRF
     matlab_payload = {}
     for region, data in rate_results_matlab.items():
         matlab_payload[f"{region}_time"] = data["time"]
         matlab_payload[f"{region}_rate"] = data["rate"]
+
+    for target, data in mixed_rate_results_matlab.items():
+        matlab_payload[f"{target}_time"] = data["time"]
+        matlab_payload[f"{target}_rate"] = data["rate"]
 
     np.savez_compressed(
         results_dir / f"firing_rates_matlab_condition-{condition}.npz",
