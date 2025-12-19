@@ -1,16 +1,13 @@
-from ANNarchy import setup, get_population, Uniform, set_seed, reset, get_time, simulate
+from ANNarchy import setup, get_population, set_seed, reset, simulate, get_projection
 from ANNarchy.extensions.bold import BoldMonitor
 from CompNeuroPy.full_models import BGM
-from CompNeuroPy import (
-    CompNeuroMonitors,
-    PlotRecordings,
-    Microcircuit,
-    CorticalInputs,
-    print_df,
-    CompNeuroExp,
-)
+from CompNeuroPy import CompNeuroMonitors, CompNeuroExp, DBSstimulator
+import argparse
+import json
 import numpy as np
-from time import time
+from pathlib import Path
+import h5py
+import sys
 
 ### local
 from parameters import parameters_test_microcircuit as paramsS
@@ -325,7 +322,7 @@ class Spikes10s(CompNeuroExp):
         set_opt_params(param_list, self.model_dict)
 
         # calculate the update steps for 10 s
-        duration_ms = 200  # TODO currently for testing set to 200 ms
+        duration_ms = 10000
         simulate(duration_ms)
 
         self.data["duration"] = duration_ms
@@ -370,7 +367,7 @@ def get_firing_rate_10s(param_list: list, experiment: Spikes10s):
 
 
 def get_BOLD_full(model_dict, seed, bold_monitor_dict, param_list: list):
-    ### RESETS AND PREPARE ### TODO: how to reset BOLD monitor
+    ### RESETS AND PREPARE ### TODO: how to reset BOLD monitor - skipped this just run scripts separately
     # reset ANNarchy and seed
     reset()
     set_seed(seed)
@@ -385,8 +382,8 @@ def get_BOLD_full(model_dict, seed, bold_monitor_dict, param_list: list):
     set_opt_params(param_list, model_dict)
 
     ### RAMP UP ###
-    # initial 1s ramp up
-    ramp_up_duration_ms = 1000
+    # initial ramp up
+    ramp_up_duration_ms = paramsS["t.rampup"]
     simulate(ramp_up_duration_ms)
 
     # start each bold monitor
@@ -405,7 +402,312 @@ def get_BOLD_full(model_dict, seed, bold_monitor_dict, param_list: list):
     return bold_signals
 
 
+def load_experimental_bold_timeseries(
+    condition: str = "on",
+    data_file: str | Path | None = None,
+    target_labels: list[str] | None = None,
+):
+    """Load experimental BOLD time series.
+
+    The helper mirrors the loader in
+    striatal_microcircuit_requirements/cortical_firing_rates/cortical_drive_by_bold.py
+    but keeps all labels unless ``target_labels`` filters them.
+    """
+
+    base_dir = Path(__file__).resolve().parents[1]
+    if data_file is None:
+        data_file = (
+            base_dir
+            / "experimental_data/berlin_data/bold_data_roi/sub-01/sub-01_subdiv_results.h5"
+        )
+    data_file = Path(data_file)
+
+    with h5py.File(data_file, "r") as f:
+        labels = np.array([label.decode("UTF-8") for label in f["labels"][()]])
+        if condition not in f["time_series"]:
+            raise KeyError(
+                f"Condition '{condition}' not found; available: {list(f['time_series'].keys())}"
+            )
+        time_series = f["time_series"][condition][()]
+
+    n_cols = time_series.shape[1]
+    diff = len(labels) - n_cols
+    if diff < 0 or diff > 1:
+        raise ValueError(
+            f"Mismatch between labels ({len(labels)}) and time_series columns ({n_cols})."
+        )
+    trimmed_labels = labels[-n_cols:] if diff == 1 else labels
+
+    bold_dict = {lbl: time_series[:, idx] for idx, lbl in enumerate(trimmed_labels)}
+
+    if target_labels:
+        missing = [lbl for lbl in target_labels if lbl not in bold_dict]
+        if missing:
+            print(
+                f"Warning: missing experimental BOLD labels {missing} in file {data_file.name}."
+            )
+        bold_dict = {lbl: bold_dict[lbl] for lbl in target_labels if lbl in bold_dict}
+
+    return bold_dict
+
+
+def downsample_bold_to_tr(
+    sim_signal: np.ndarray, dt_ms: float, tr_s: float
+) -> np.ndarray:
+    """Downsample a simulated BOLD trace (dt in ms) to the TR grid."""
+
+    step = int(np.rint((tr_s * 1000.0) / dt_ms))
+    step = max(step, 1)
+    return sim_signal[::step]
+
+
+def compute_bold_correlation_loss(
+    sim_bold: dict[str, np.ndarray],
+    condition: str = "on",
+    tr_s: float = 2.31,
+    ramp_up_ms: float = paramsS["t.rampup"],
+    data_file: str | Path | None = None,
+    region_map: dict[str, str] | None = None,
+    dt_ms: float = paramsS["timestep"],
+):
+    """Compare simulated BOLD to experimental data via mean correlation.
+
+    Parameters
+    ----------
+    sim_bold : dict
+        Simulated BOLD signals keyed by region name.
+    condition : str
+        Experimental condition to load from the HDF5 file.
+    tr_s : float
+        Repetition time (seconds) of the experimental data.
+    ramp_up_ms : float
+        Ramp-up duration in the simulation to remove from experimental data.
+    data_file : str or Path, optional
+        Optional custom path to the experimental HDF5 file.
+    region_map : dict, optional
+        Mapping from simulated region names to experimental labels.
+    dt_ms : float
+        Simulation timestep in milliseconds.
+
+    Returns
+    -------
+    loss : float
+        1 - mean correlation across matched regions (higher is worse).
+    per_region_corr : dict
+        Correlation per region for inspection.
+    """
+
+    region_map = region_map or {}
+    target_labels = [region_map.get(region, region) for region in sim_bold.keys()]
+    exp_bold = load_experimental_bold_timeseries(
+        condition=condition, data_file=data_file, target_labels=target_labels
+    )
+
+    ramp_up_steps = int(np.ceil(ramp_up_ms / (tr_s * 1000.0)))
+    correlations = {}
+
+    def _safe_corr(x: np.ndarray, y: np.ndarray) -> float:
+        # Flatten and trim to the shared length to avoid shape mismatches (e.g., column vectors)
+        x_flat = np.asarray(x).ravel()
+        y_flat = np.asarray(y).ravel()
+        n_shared = min(len(x_flat), len(y_flat))
+
+        if n_shared < 2:
+            return float("nan")
+
+        x_use = x_flat[:n_shared]
+        y_use = y_flat[:n_shared]
+
+        x_std = np.std(x_use)
+        y_std = np.std(y_use)
+        if x_std == 0.0 or y_std == 0.0:
+            return float("nan")
+
+        return float(np.corrcoef(x_use, y_use)[0, 1])
+
+    for sim_region, exp_label in zip(sim_bold.keys(), target_labels):
+        if exp_label not in exp_bold:
+            continue
+
+        sim_series = np.asarray(sim_bold[sim_region])
+        exp_series = np.asarray(exp_bold[exp_label])
+
+        sim_coarse = downsample_bold_to_tr(sim_series, dt_ms=dt_ms, tr_s=tr_s)
+        exp_trimmed = exp_series[ramp_up_steps:] if ramp_up_steps > 0 else exp_series
+
+        if sim_region == "GPi":
+            print(
+                f"size of sim_series: {len(sim_series)}, size of exp_series: {len(exp_series)}"
+            )
+            print(
+                f"size of sim_coarse: {len(sim_coarse)}, size of exp_trimmed: {len(exp_trimmed)}"
+            )
+
+        n = min(len(sim_coarse), len(exp_trimmed))
+        if n < 2:
+            correlations[sim_region] = float("nan")
+            continue
+
+        correlations[sim_region] = _safe_corr(sim_coarse[:n], exp_trimmed[:n])
+
+    valid_corrs = [c for c in correlations.values() if not np.isnan(c)]
+    if not valid_corrs:
+        return 1.0, correlations
+
+    # Map mean correlation in [-1, 1] to goodness in [0, 1], then convert to loss.
+    mean_corr = float(np.mean(valid_corrs))
+    goodness = float(np.clip((mean_corr + 1.0) / 2.0, 0.0, 1.0))
+    loss = 1.0 - goodness  # loss=0 at perfect (1.0), loss=1 at worst (-1.0)
+    return loss, correlations
+
+
+def get_firing_rate_loss(firing_rate_dict: dict[str, float]) -> float:
+    """
+    Calculate a loss based on how far the firing rates are from plausible ranges.
+    Goodness is smooth and bounded in [0, 1] using a logistic on relative deviation
+    from the center of the plausible band; loss is 1 - mean_goodness.
+
+    Parameters
+    ----------
+    firing_rate_dict : dict
+        Dictionary mapping population names to their firing rates in Hz.
+
+    Returns
+    -------
+    float
+        The calculated loss value.
+    """
+    # D1 and D2 extracted from: (Liang et al., 2008) using with levodopa treatment, see experimental_data/activity_striatum/extract_from_liang_etal_2008.py
+    # FS: 10 Hz based on: (Yamada et al., 2016; Marche und Apicella, 2021; Adler et al., 2013; Hernandez et al., 2013; He et al., 2024)
+    # stn and snr (gpi): from [Li et al., 2015]
+    plausible_ranges = {
+        "str_d1": (20.45, 53.69),
+        "str_d2": (12.99, 45.15),
+        "str_fsi": (5.0, 15.0),
+        "gpe_proto": (75.0, 85.0),
+        "gpe_arky": (15.0, 20.0),
+        "gpe_cp": (75.0, 85.0),
+        "stn": (28.0, 80.0),
+        "snr": (21.0, 93.0),
+        "thal": (15.0, 30.0),
+    }
+    loop_plausible_ranges = {}
+    for loop in ["caudate", "putamen"]:
+        for pop_name, bounds in plausible_ranges.items():
+            loop_plausible_ranges[f"{pop_name}:{loop}"] = bounds
+
+    goodness_scores = []
+    k_sharpness = 4.0  # larger = steeper penalty once outside the band
+    for pop_name, (lower, upper) in loop_plausible_ranges.items():
+        fr = firing_rate_dict[pop_name]  # crashes if pop_name not found
+
+        center = 0.5 * (lower + upper)
+        half_width = max(0.5 * (upper - lower), 1e-6)
+        rel_dev = abs(fr - center) / half_width  # =1 at band edge
+
+        x = k_sharpness * (rel_dev - 1.0)
+        # Logistic goodness: stable evaluation avoids overflow for large x
+        goodness = float(np.exp(-np.logaddexp(0.0, x)))
+        goodness_scores.append(goodness)
+
+    mean_goodness = float(np.mean(goodness_scores))
+    # loss in [0, 1]; 0 when all within range, increasing as rates drift away
+    return 1.0 - mean_goodness
+
+
+def plot_firing_rate_loss(
+    lower: float,
+    upper: float,
+    k_sharpness: float = 4.0,
+    fr_min: float | None = None,
+    fr_max: float | None = None,
+    n_points: int = 400,
+):
+    """Visualize loss vs. firing rate for a plausible range.
+
+    Uses the same logistic goodness as ``get_firing_rate_loss`` (per-pop),
+    plotting loss = 1 - goodness across a rate grid.
+    """
+
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError as exc:  # pragma: no cover - optional dependency
+        print("matplotlib is required for plotting this demo:", exc)
+        return
+
+    center = 0.5 * (lower + upper)
+    half_width = max(0.5 * (upper - lower), 1e-6)
+
+    if fr_min is None:
+        fr_min = max(0.0, lower - 1.5 * half_width)
+    if fr_max is None:
+        fr_max = upper + 1.5 * half_width
+
+    x = np.linspace(fr_min, fr_max, n_points)
+    rel_dev = np.abs(x - center) / half_width
+    goodness = 1.0 / (1.0 + np.exp(k_sharpness * (rel_dev - 1.0)))
+    loss = 1.0 - goodness
+
+    plt.figure(figsize=(6, 4))
+    plt.plot(x, loss, label="loss (1 - goodness)")
+    plt.axvspan(lower, upper, color="green", alpha=0.15, label="plausible range")
+    plt.axvline(lower, color="green", linestyle="--", linewidth=1)
+    plt.axvline(upper, color="green", linestyle="--", linewidth=1)
+    plt.xlabel("Firing rate (Hz)")
+    plt.ylabel("Loss")
+    plt.ylim(-0.05, 1.05)
+    plt.title("Firing-rate loss vs. rate")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
+    # example usage:
+    # first only do compilation with appendix:
+    #  python get_loss.py --dbs on --compile --compile-appendix test
+    # then run with 21 parameters using the same appendix:
+    #  python get_loss.py --dbs on --compile-appendix test 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 3.1
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run BOLD optimization with 21 optimization parameters supplied on the command line "
+            "(values mapped in order to set_opt_params)."
+        )
+    )
+    parser.add_argument(
+        "--dbs",
+        type=str,
+        default=paramsS.get("dbs", "on"),
+        help="DBS condition string (e.g., 'on' or 'off').",
+    )
+    parser.add_argument(
+        "params",
+        metavar="P",
+        nargs="*",
+        type=float,
+        help="21 parameter values in the exact order expected by set_opt_params.",
+    )
+    parser.add_argument(
+        "--compile",
+        action="store_true",
+        help="Compile the model and exit without running simulations.",
+    )
+    parser.add_argument(
+        "--compile-appendix",
+        type=str,
+        default="",
+        help="Optional suffix for the ANNarchy compile folder (e.g., run tag).",
+    )
+    args = parser.parse_args()
+    dbs_condition = args.dbs
+    param_list = args.params
+
+    # print(f"DBS condition: {dbs_condition}")
+    # if param_list:
+    #     print(f"Parameter list: {param_list}")
+    # print(f"compile only: {args.compile}")
+    # if args.compile_appendix:
+    #     print(f"compile folder appendix: {args.compile_appendix}")
 
     ### SETUP TIMESTEP + SEED ###
     if paramsS["seed"] == None:
@@ -416,19 +718,24 @@ if __name__ == "__main__":
     ### Obtain the maximum simulation time from the cortical rate files if needed
     if "t.duration" not in paramsS or paramsS["t.duration"] is None:
         paramsS["t.duration"], mixed_rates = infer_max_sim_time_ms(
-            dbs_condition=paramsS["dbs"],
+            dbs_condition=dbs_condition,
             cortical_rate_path=paramsS["mc.cortical_rate_path"],
             dt_ms=paramsS["timestep"],
         )
     else:
         _, mixed_rates = infer_max_sim_time_ms(
-            dbs_condition=paramsS["dbs"],
+            dbs_condition=dbs_condition,
             cortical_rate_path=paramsS["mc.cortical_rate_path"],
             dt_ms=paramsS["timestep"],
         )
 
     ### CREATE THE TWO LOOP MODEL ###
     # loop for BG loops
+    compilation_appendix = args.compile_appendix
+    if compilation_appendix:
+        compile_folder = f"bgm_v08_{dbs_condition}_{compilation_appendix}"
+    else:
+        compile_folder = f"bgm_v08_{dbs_condition}"
     model_dict = {}
     for loop in ["caudate", "putamen"]:
         ### Prepare the model_creation kwargs for the current dbs condition
@@ -446,10 +753,45 @@ if __name__ == "__main__":
             name="BGM_v08_p01",
             model_creation_kwargs=model_creation_kwargs,
             seed=paramsS["seed"],
-            compile_folder_name=f"bgm_v08_{paramsS['dbs']}",
+            compile_folder_name=compile_folder,
             name_appendix=loop,
             do_create=True,
             do_compile=False,
+        )
+
+    ### DBS SIMULATOR ###
+    # parameters 21, 22, 23 are used for DBS if dbs_condition is "on"
+    if dbs_condition == "on":
+        dbs_stimulator = DBSstimulator(
+            stimulated_population="stn:putamen",
+            # VTA from berlin data subject 1:
+            population_proportion=(35 + 23) / (70 + 75),
+            # exclude all populations containing "TimedInput" in their name:
+            excluded_populations_list=[
+                "TimedInput_cortex:caudate",
+                "TimedInput_cortex:putamen",
+            ],
+            # the dbs_depolarization parameter actually reduces the membrane potential
+            # so its actually a hyperpolarization
+            dbs_depolarization=param_list[21],  # [0,10] like weight/conductance in stn
+            orthodromic=True,
+            antidromic=True,
+            efferents=True,
+            afferents=True,
+            passing_fibres=True,
+            # snr__thal is actually gpi__thal, pasing fibre based on Miocinovic et al. 2006
+            passing_fibres_list=[get_projection("snr__thal:putamen")],
+            passing_fibres_strength=param_list[22],  # [0,1] scale between 0 and 1
+            dbs_pulse_frequency_Hz=125,  # from berlin data subject 1
+            # pulse width needs to be multiple of timestep (0.1 ms --> min 100 us)
+            # pulse width in berlin data is 60 us but we use 100 us here
+            dbs_pulse_width_us=100,
+            axon_spikes_per_pulse=param_list[
+                23
+            ],  # [0,1] max 1 spike per pulse(=timestep)
+            seed=paramsS["seed"],
+            auto_implement=True,
+            model=model_dict["putamen"],
         )
 
     ### BOLD MONITORING ###
@@ -515,7 +857,7 @@ if __name__ == "__main__":
         bold_monitor_dict[bold_region] = BoldMonitor(
             populations=populations,
             mapping={"I_CBF": input_var},
-            normalize_input=500,  # 2000, TODO change back to 2000
+            normalize_input=2000,
             scale_factor=scale_factors,
             start=False,
         )
@@ -523,6 +865,14 @@ if __name__ == "__main__":
     ### COMPILE ###
     ### Compile model (i.e. both loops in a single model) afterwards we are ready to simulate
     model_dict["caudate"].compile()
+
+    if args.compile:
+        print("Compilation completed; skipping simulations (--compile).")
+        sys.exit(0)
+
+    ### ACTIVATE DBS ###
+    if dbs_condition == "on":
+        dbs_stimulator.on()
 
     ### MONITORS ###
     ### create monitors to record the spikes from all populations
@@ -543,203 +893,40 @@ if __name__ == "__main__":
         monitors=monitors, model_dict=model_dict, seed=paramsS["seed"]
     )
 
-    ### TEST SIMULATIONS ###
-    print("First run:")
-    param_list = [1.0] * 21
+    ### SIMULATIONS ###
+
+    ### SIMULATION FOR RATES: ###
     firing_rate_dict = get_firing_rate_10s(param_list=param_list, experiment=experiment)
-    print("Firing rates:")
-    for pop_name, fr in firing_rate_dict.items():
-        print(f"{pop_name}: {fr:.2f} Hz")
+    # obtain loss based on firing rates, between 0 and 1
+    firing_rate_loss = get_firing_rate_loss(firing_rate_dict)
 
-    # print("\nSecond run:")
-    # param_list = [0.0] * 21
-    # param_list[3] = 0.0  # increase cor-thal weight to 10.0
-    # # param_list[33] = 10.0  # increase snr-thal weight to 10.0
-    # firing_rate_dict = get_firing_rate_10s(param_list=param_list, experiment=experiment)
-    # print("Firing rates:")
-    # for pop_name, fr in firing_rate_dict.items():
-    #     print(f"{pop_name}: {fr:.2f} Hz")
-
-    # print("\nThird run:")
-    # param_list = [0.0] * 21
-    # param_list[3] = 10.0  # increase cor-thal weight to 10.0
-    # # param_list[33] = 15.0  # increase snr-thal weight to 15.0
-    # firing_rate_dict = get_firing_rate_10s(param_list=param_list, experiment=experiment)
-    # print("Firing rates:")
-    # for pop_name, fr in firing_rate_dict.items():
-    #     print(f"{pop_name}: {fr:.2f} Hz")
-
-    # print("\nFourth run:")
-    # param_list = [0.0] * 21
-    # param_list[3] = 20.0  # increase cor-thal weight to 10.0
-    # # param_list[33] = 20.0  # increase snr-thal weight to 20.0
-    # firing_rate_dict = get_firing_rate_10s(param_list=param_list, experiment=experiment)
-    # print("Firing rates:")
-    # for pop_name, fr in firing_rate_dict.items():
-    #     print(f"{pop_name}: {fr:.2f} Hz")
-
-    ### TEST BOLD SIMULATION ###
-    print("\nFirst BOLD run:")
-    start_time = time()
-    param_list = [1.0] * 21
-    param_list[0] = 0.5
-    param_list[1] = 0.5
-    param_list[2] = 0.8
-    param_list[3] = 0.01
-    param_list[4] = 0.01
-    param_list[5] = 0.01
-    param_list[6] = 0.01
-    bold_data_1 = get_BOLD_full(
+    ### SIMULATION FOR BOLD: ###
+    bold_data = get_BOLD_full(
         model_dict=model_dict,
         seed=paramsS["seed"],
         bold_monitor_dict=bold_monitor_dict,
         param_list=param_list,
     )
-    print(f"BOLD simulation took {time() - start_time:.1f} seconds.")
-
-    print("\nSecond BOLD run:")
-    start_time = time()
-    param_list = [1.0] * 21
-    param_list[0] = 0.5
-    param_list[1] = 0.5
-    param_list[2] = 0.8
-    param_list[3] = 0.01
-    param_list[4] = 0.01
-    param_list[5] = 0.01
-    param_list[6] = 0.01
-    bold_data_2 = get_BOLD_full(
-        model_dict=model_dict,
-        seed=paramsS["seed"],
-        bold_monitor_dict=bold_monitor_dict,
-        param_list=param_list,
+    # obtain loss based on BOLD correlation, between 0 and 1
+    bold_loss, per_region_corr = compute_bold_correlation_loss(
+        sim_bold=bold_data,
+        condition=dbs_condition,
+        tr_s=2.31,
+        ramp_up_ms=paramsS["t.rampup"],
+        data_file=None,
+        region_map=None,
+        dt_ms=paramsS["timestep"],
     )
-    print(f"BOLD simulation took {time() - start_time:.1f} seconds.")
 
-    # compare if the two bold data are identical
-    for bold_region in bold_region_dict.keys():
-        bold_signal_1 = bold_data_1[bold_region]
-        bold_signal_2 = bold_data_2[bold_region]
-        if not np.array_equal(bold_signal_1, bold_signal_2):
-            print(f"BOLD signals for region {bold_region} are different between runs!")
-        else:
-            print(f"BOLD signals for region {bold_region} are identical between runs.")
-        # plot the bold signals
-        import matplotlib.pyplot as plt
+    ### TOTAL LOSS ###
+    total_loss = float(firing_rate_loss + bold_loss)
+    loss_payload = {
+        "total_loss": total_loss,
+    }
 
-        plt.figure(figsize=(10, 4))
-        plt.plot(bold_signal_1, label="Run 1")
-        plt.plot(bold_signal_2, label="Run 2", linestyle="--")
-        plt.title(f"BOLD signal in region {bold_region}")
-        plt.xlabel("Time (a.u.)")
-        plt.ylabel("BOLD signal (a.u.)")
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-
-    # ### PLOT RECORDINGS ###
-    # # use plot recordings to generate a figure for each loop and experiment run showing spikes of all recorded populations
-    # for i, results in enumerate([results_1, results_2], start=1):
-    #     for loop in ["caudate", "putamen"]:
-    #         # get recordings and recording times
-    #         recordings = results.recordings
-    #         recording_times = results.recording_times
-    #         # create plan for plotting all populations in the loop
-    #         pops_to_monitor_loop = [
-    #             pop_name for pop_name in pops_to_monitor if loop in pop_name
-    #         ]
-    #         plan = {
-    #             "position": list(range(1, len(pops_to_monitor_loop) + 1)),
-    #             "compartment": pops_to_monitor_loop,
-    #             "variable": ["spike"] * len(pops_to_monitor_loop),
-    #             "format": ["hybrid"] * len(pops_to_monitor_loop),
-    #         }
-    #         # plot recordings, make the shape more square-like
-    #         n_pops = len(pops_to_monitor_loop)
-    #         n_rows = int(n_pops**0.5)
-    #         n_cols = (n_pops + n_rows - 1) // n_rows
-    #         PlotRecordings(
-    #             figname=f"results/test_microcircuit_bgm/{loop}_experiment_run_{i}.png",
-    #             recordings=recordings,
-    #             recording_times=recording_times,
-    #             shape=(n_rows, n_cols),
-    #             plan=plan,
-    #         )
-
-    # use plot recordings to generate a figure for each loop and experiment run showing offset_base of all recorded populations
-    # for i, results in enumerate([results_1, results_2], start=1):
-    #     for loop in ["caudate", "putamen"]:
-    #         # get recordings and recording times
-    #         recordings = results.recordings
-    #         recording_times = results.recording_times
-    #         # create plan for plotting all populations in the loop
-    #         pops_to_monitor_loop = [
-    #             pop_name for pop_name in pops_to_monitor_offset if loop in pop_name
-    #         ]
-    #         plan = {
-    #             "position": list(range(1, len(pops_to_monitor_loop) + 1)),
-    #             "compartment": pops_to_monitor_loop,
-    #             "variable": ["offset_base"] * len(pops_to_monitor_loop),
-    #             "format": ["line"] * len(pops_to_monitor_loop),
-    #         }
-    #         # plot recordings, make the shape more square-like
-    #         n_pops = len(pops_to_monitor_loop)
-    #         n_rows = int(n_pops**0.5)
-    #         n_cols = (n_pops + n_rows - 1) // n_rows
-    #         PlotRecordings(
-    #             figname=f"results/test_microcircuit_bgm/{loop}_experiment_run_{i}_offset_base.png",
-    #             recordings=recordings,
-    #             recording_times=recording_times,
-    #             shape=(n_rows, n_cols),
-    #             plan=plan,
-    #         )
-
-    # ### Print parameters
-    # print("\nmodel attributes caudate:")
-    # print_df(model_dict["caudate"].attribute_df)
-
-    # collect the parameters to change to change firing rates
-    # for both loops caudate/putamen:
-
-    # ### INIT CompNeuroMonitors ###
-    # mon = CompNeuroMonitors(
-    #     {
-    #         # "cor_go": ["spike"],
-    #         # "cor_stop": ["spike"],
-    #         # "cor_pause": ["spike"],
-    #         # "str_d1": ["spike"],
-    #         "str_d2": ["spike"],
-    #         "str_fsi": ["spike"],
-    #         "gpe_proto": ["spike", "I_base"],
-    #         # "gpe_arky": ["spike", "u"],
-    #         # "gpe_cp": ["spike"],
-    #     }
-    # )
-
-    # ### SIMULATION ###
-    # mon.start()
-
-    # ### simulate some time
-    # simulate(paramsS["t.duration"])
-
-    # ### GET RECORDINGS ###
-    # recordings = mon.get_recordings()
-    # recording_times = mon.get_recording_times()
-
-    # ### QUICK PLOTS ###
-
-    # ### some populations activity
-    # plan = {
-    #     "position": [1, 2, 3, 4],
-    #     "compartment": ["str_d2", "str_fsi", "gpe_proto", "gpe_proto"],
-    #     "variable": ["spike", "spike", "spike", "I_base"],
-    #     "format": ["hybrid", "hybrid", "hybrid", "line"],
-    # }
-    # chunk = 0
-    # PlotRecordings(
-    #     figname=f"results/test_resting/{model.name}/overview1.png",
-    #     recordings=recordings,
-    #     recording_times=recording_times,
-    #     chunk=chunk,
-    #     shape=(1, 4),
-    #     plan=plan,
-    # )
+    loss_folder = Path(__file__).resolve().parent / paramsS["data_folder"]
+    loss_folder.mkdir(parents=True, exist_ok=True)
+    appendix_tag = compilation_appendix if compilation_appendix else "default"
+    loss_file = loss_folder / f"loss_{appendix_tag}.json"
+    with open(loss_file, "w", encoding="ascii") as f:
+        json.dump(loss_payload, f, ensure_ascii=True, indent=2)
