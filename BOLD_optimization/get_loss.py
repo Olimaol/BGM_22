@@ -1,4 +1,14 @@
-from ANNarchy import setup, get_population, set_seed, reset, simulate, get_projection
+from ANNarchy import (
+    setup,
+    get_population,
+    set_seed,
+    reset,
+    simulate,
+    get_projection,
+    populations,
+    TimedArray,
+    CurrentInjection,
+)
 from ANNarchy.extensions.bold import BoldMonitor
 from CompNeuroPy.full_models import BGM
 from CompNeuroPy import CompNeuroMonitors, CompNeuroExp, DBSstimulator
@@ -618,12 +628,55 @@ def plot_firing_rate_loss(
     plt.show()
 
 
+def add_TimedInputs(model_creation_kwargs, params, loop_name):
+
+    ### TimedInputs + CurrentÜrojections ###
+    inputs = model_creation_kwargs["input.rates"]
+    # inputs is currently shaped (steps,) and needs to be reshaped into (steps, post_pop_size) so post_pop_size times the same input
+    inputs = np.repeat(
+        inputs[:, np.newaxis], repeats=params[f"str_d1:{loop_name}.size"], axis=1
+    )
+    schedule = model_creation_kwargs["input.schedule"]
+    inp = TimedArray(
+        rates=inputs,
+        schedule=schedule,
+        name=f"TimedInput_cortex:{loop_name}",
+    )
+    # # set schedule and period in c by my own (prevent ANNarchy bug) TODO this only works after compile... so do the update!
+    # value = [float(schedule * i) for i in range(inputs.shape[0])]
+    # val_int = np.rint(
+    #     np.atleast_1d(value) / self.model_creation_kwargs["timestep"]
+    # ).astype(np.int64)
+    # inp.cyInstance.set_schedule(val_int)
+    # value = -1
+    # period_steps = int(np.rint(value / self.model_creation_kwargs["timestep"]))
+    # inp.cyInstance.set_period(period_steps)
+    # create current projections
+    for pop_name in [
+        f"str_d1:{loop_name}",
+        f"str_d2:{loop_name}",
+        f"str_fsi:{loop_name}",
+        f"thal:{loop_name}",
+        f"gpe_arky:{loop_name}",
+        f"gpe_cp:{loop_name}",
+        f"stn:{loop_name}",
+    ]:
+        proj = CurrentInjection(
+            pre=inp,
+            post=get_population(pop_name),
+            target="cor",
+            name=f"{inp.name}__{pop_name}",
+        )
+        proj.connect_current()
+
+
 if __name__ == "__main__":
     # example usage:
     # first only do compilation with appendix:
     #  python get_loss.py --dbs on --compile --compile-appendix test
     # then run with 21 parameters using the same appendix:
     #  python get_loss.py --dbs on --compile-appendix test 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 3.1
+    # python get_loss.py --compile --dbs on --compile-appendix test 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
     parser = argparse.ArgumentParser(
         description=(
             "Run BOLD optimization with 21 optimization parameters supplied on the command line "
@@ -722,10 +775,10 @@ if __name__ == "__main__":
             stimulated_population=get_population("stn:putamen"),
             # VTA from berlin data subject 1:
             population_proportion=(35 + 23) / (70 + 75),
-            # exclude all populations containing "TimedInput" in their name:
+            # exclude all populations from caudate loop
             excluded_populations_list=[
-                get_population("TimedInput_cortex:caudate"),
-                get_population("TimedInput_cortex:putamen"),
+                get_population(pop_name)
+                for pop_name in model_dict["caudate"].populations
             ],
             # the dbs_depolarization parameter actually reduces the membrane potential
             # so its actually a hyperpolarization
@@ -747,7 +800,17 @@ if __name__ == "__main__":
             ],  # [0,1] max 1 spike per pulse(=timestep)
             seed=paramsS["seed"],
             auto_implement=True,
-            model=model_dict["putamen"],
+        )
+        # because we use two cnp models we have to manually set created to true after DBS creation
+        for loop_name, bgm_model in model_dict.items():
+            bgm_model.created = True
+
+    ### ADD TIMED INPUTS TO BOTH LOOPS AFTER DBS ###
+    for loop in ["caudate", "putamen"]:
+        add_TimedInputs(
+            model_creation_kwargs=model_creation_kwargs,
+            params=model_dict[loop].params,
+            loop_name=loop,
         )
 
     ### BOLD MONITORING ###
