@@ -159,7 +159,7 @@ run_script_parallel(
             f"run_{optimization_run}_ind{i}",
             "--dbs",
             dbs_condition,
-        ]
+        ]+["0"]*24
         for i in range(number_of_individuals)
     ],
 )
