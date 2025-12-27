@@ -719,7 +719,7 @@ if __name__ == "__main__":
     # parameters 21, 22, 23 are used for DBS if dbs_condition is "on"
     if dbs_condition == "on":
         dbs_stimulator = DBSstimulator(
-            stimulated_population="stn:putamen",
+            stimulated_population=get_population("stn:putamen"),
             # VTA from berlin data subject 1:
             population_proportion=(35 + 23) / (70 + 75),
             # exclude all populations containing "TimedInput" in their name:
