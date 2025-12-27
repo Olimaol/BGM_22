@@ -724,8 +724,8 @@ if __name__ == "__main__":
             population_proportion=(35 + 23) / (70 + 75),
             # exclude all populations containing "TimedInput" in their name:
             excluded_populations_list=[
-                "TimedInput_cortex:caudate",
-                "TimedInput_cortex:putamen",
+                get_population("TimedInput_cortex:caudate"),
+                get_population("TimedInput_cortex:putamen"),
             ],
             # the dbs_depolarization parameter actually reduces the membrane potential
             # so its actually a hyperpolarization
