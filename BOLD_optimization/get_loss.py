@@ -243,23 +243,13 @@ def infer_max_sim_time_ms(
 
 
 def update_TimedInput(bgm_model: BGM):
-    inputs = bgm_model.model_creation_kwargs["input.rates"]
-    inputs = np.repeat(
-        inputs[:, np.newaxis],
-        repeats=bgm_model.params[f"str_d1:{bgm_model.name_appendix}.size"],
-        axis=1,
-    )
-    schedule = bgm_model.model_creation_kwargs["input.schedule"]
+    """Rewind the cortical TimedArray so the next simulation starts at its first block.
+
+    reset() restores rates, schedule and period to their construction values and
+    zeroes the internal timers.
+    """
     inp = get_population(f"TimedInput_cortex:{bgm_model.name_appendix}")
-    # set schedule and period in c by my own (prevent ANNarchy bug)
-    value = [float(schedule * i) for i in range(inputs.shape[0])]
-    val_int = np.rint(
-        np.atleast_1d(value) / bgm_model.model_creation_kwargs["timestep"]
-    ).astype(np.int64)
-    inp.cyInstance.set_schedule(val_int)
-    value = -1
-    period_steps = int(np.rint(value / bgm_model.model_creation_kwargs["timestep"]))
-    inp.cyInstance.set_period(period_steps)
+    inp.reset()
 
 
 class Spikes10s(CompNeuroExp):
@@ -642,15 +632,6 @@ def add_TimedInputs(model_creation_kwargs, params, loop_name):
         schedule=schedule,
         name=f"TimedInput_cortex:{loop_name}",
     )
-    # # set schedule and period in c by my own (prevent ANNarchy bug) TODO this only works after compile... so do the update!
-    # value = [float(schedule * i) for i in range(inputs.shape[0])]
-    # val_int = np.rint(
-    #     np.atleast_1d(value) / self.model_creation_kwargs["timestep"]
-    # ).astype(np.int64)
-    # inp.cyInstance.set_schedule(val_int)
-    # value = -1
-    # period_steps = int(np.rint(value / self.model_creation_kwargs["timestep"]))
-    # inp.cyInstance.set_period(period_steps)
     # create current projections
     for pop_name in [
         f"str_d1:{loop_name}",
