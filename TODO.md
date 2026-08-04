@@ -238,6 +238,17 @@ stall the fit. **Decide from the first mini-run**: log how many individuals per
 generation are gated (`bold_skipped` is in every loss file) and raise the threshold
 if the answer is "all of them, for many generations".
 
+**Extension (2026-08-04): the bands are condition-independent, and DBS is on
+during the probe.** `get_firing_rate_loss`'s `plausible_ranges` has no DBS switch,
+and `dbs_stimulator.on()` now precedes the rate probe, so an on-condition
+individual is judged against off-condition bands while STN and its targets are
+being driven harder. The risk of gating everything is strictly worse in the on
+condition than the 0.868 above suggests. The step 6 mini-runs therefore run with
+`--gate-threshold 1.0` and log the off and on rate losses side by side; calibrate
+the threshold — and decide whether the bands need an on-condition variant — from
+those numbers, not before. Inventing on-condition bands now would bake guessed
+values into an expensive fit.
+
 ### 11. `run_script_parallel` is no longer used by the optimization
 
 `deap_cma_opt.py` now runs its individuals itself. CompNeuroPy's version is
@@ -275,3 +286,61 @@ rejected when the same file is later named through a different path. This is why
 `build_input_caches.py` has to be run from `BOLD_optimization/`, like `get_loss.py`.
 Harmless once known; worth normalizing to a resolved absolute path if the caches are
 ever built from somewhere else.
+
+---
+
+## From the session on 2026-08-04 (making the DBS-on path real)
+
+The mechanism itself is documented in `DBS.md`; this section only records what we
+found and chose **not** to act on yet.
+
+### 14. Axon spikes bypass the synaptic delay line
+
+Because the DBS `pre_axon_spike` string differs from the synapse's `pre_spike`,
+ANNarchy takes a separate-loop transmission branch that reads `pop.axonal` at the
+current step, while regular spikes read `_delayed_spike[delay-1]`
+(`ANNarchy/generator/Projection/SingleThreadGenerator.py:983-1013`, whose own
+comment calls it "quite hacky").
+
+For `stn__snr` and `stn__gpe_*`, which carry multi-ms delays, the DBS-evoked
+volley therefore arrives earlier than a natural one from the same axon. Whether
+that matters at BOLD timescales is unknown — it is a millisecond-scale effect
+being read out through a 2.31 s TR — but it is a real deviation from the intended
+physiology and it is in ANNarchy, not in our configuration. Revisit only if the
+fitted `axon_spikes_per_pulse` turns out to carry a lot of the explanation.
+
+### 15. The hyperdirect cortical afferent to STN cannot be activated
+
+`afferents=True` is set, but `ann.projections(post=stn:putamen)` reaches the
+cortical drive through `TimedArray` → `CurrentInjection`. A `TimedArray` has no
+soma, no `dmp/dt`, and the rate-coded DBS rewriter raises on it, so it is excluded
+from the DBS footprint. In practice **afferent DBS in this model means
+`gpe_proto→stn` only.**
+
+Cortical fibre activation is one of the most-discussed DBS mechanisms, so its
+absence is a genuine limit on what the inference can conclude — a fitted
+"afferent" effect here is a pallidal one. Representing it would mean giving the
+cortical drive a spiking soma, which is a model change, not a bug fix.
+
+### 16. The DBS constants are unvalidated single-subject values
+
+`population_proportion = (35+23)/(70+75) = 0.4` (VTA, Berlin subject 1),
+125 Hz, and `snr__thal:putamen` as the single passing fibre (after Miocinovic et
+al. 2006) are hard-coded in `get_loss.py` and documented only inline. The pulse
+width is 100 µs against 60 µs in the data, raised because 60 µs is below dt.
+
+None of these is fitted, so each is an assumption the inference inherits.
+Sensitivity to at least `population_proportion` and `dbs_pulse_width_us` should be
+checked once a DBS-on fit exists — before any of it is written up.
+
+### 17. `dbs_depolarization` scales with `C` in Izhikevich-2007 models
+
+The term is appended to the right-hand side, so in models written as
+`C * dv/dt = ...` (the Izhikevich-2007 striatal ones) it is implicitly divided by
+`C`, while in the Izhikevich-2003 BG models `dv/dt = ...` it is not. The optimizer
+treats `dbs_depolarization` as one scalar in `[0, 10]` regardless.
+
+It does not bite today — every population in the DBS footprint is
+`Izhikevich2003NoisyBaseNonlin` — but it would the moment a striatal population
+entered the footprint, and it would do so silently. Worth a guard in
+`add_dbs_mechanisms` if that ever becomes possible.

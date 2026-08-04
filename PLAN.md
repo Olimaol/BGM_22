@@ -1,7 +1,8 @@
 # Plan: reviving BGM_v07 for the BOLD optimization
 
-Started 2026-08-03. Read alongside `CLAUDE.md` (orientation) and `TODO.md`
-(deferred findings).
+Started 2026-08-03. Read alongside `CLAUDE.md` (orientation), `TODO.md`
+(deferred findings) and `DBS.md` (what DBS changes in the model, and why the
+off and on conditions now compile the same network).
 
 ## Why this plan exists
 
@@ -61,6 +62,16 @@ connection to the putamen loop, so refitting its weights would assert a mechanis
 the model does not contain. This also gives a free control: caudate's on-vs-off
 BOLD change must then be explained entirely by its cortical drive.
 
+**DBS: retrofit the mechanisms before compile, in both conditions.** The DBS
+equations are added to the six putamen populations DBS can reach by swapping
+`neuron_type`/`synapse_type` on the already-built objects, not by
+`DBSstimulator(auto_implement=True)`, which clears and recreates the network and
+therefore cannot survive v07's `TimedArray`/`CurrentInjection` inputs. Off and on
+then differ only in parameter values — the claim the inference rests on. The
+price is that off-condition numerics changed: ANNarchy's RNG is one global
+stream, so two extra `Uniform` draws anywhere shift every population. Taken
+deliberately, before any real fit had been run. Full account in `DBS.md`.
+
 **Seeds: fixed at 42 during fitting** (common random numbers, so CMA-ES sees a
 deterministic objective), then the winning parameter vector re-run across ~10 seeds
 to report stability.
@@ -81,10 +92,16 @@ DBS-on fit, just to get the pipeline working. See `TODO.md` §2.
 3. ~~Rebuild `get_loss.py`: bug fixes + `--model-version`, smoke-tested on v08.~~ **done**
 4. ~~Build a short v07 cache and run the v07 path end-to-end.~~ **done**
 5. ~~Firing-rate gate, logging, checkpointing, failure policy; update `deap_cma_opt.py`.~~ **done**
-6. **Resolve the parameter bounds (`TODO.md` §1) before any real fit.** ← next
-7. Build the full DBS-off cache on a workstation; time one evaluation per machine.
-8. Five-generation mini-run with checkpointing. **This green is the milestone.**
-9. Launch the DBS-off fit, then DBS-on.
+6. **Make the DBS-on path work, and prove both conditions end-to-end.** ← next
+7. Resolve the parameter bounds (`TODO.md` §1) before any real fit — on the
+   post-step-6 numerics, since step 6 moves them.
+8. Workstation setup; build the full DBS-off **and** DBS-on caches; time one
+   evaluation per machine.
+9. Five-generation mini-run with checkpointing. **This green is the milestone.**
+10. Launch the DBS-off fit, then DBS-on.
+
+Step 6 came first because it changes every number the model produces, so any
+bounds measured before it would have to be redone.
 
 ## Where it stands
 
@@ -169,19 +186,54 @@ Step 5 is written and exercised on v08:
   layouts; the staged one carries the off-fit base parameters into both loops and
   then re-scales the putamen weights only. `deap_cma_opt.py --dbs on` searches
   exactly that: 10 (v07) putamen cluster scalings plus the 3 DBS parameters.
+  **Written, but never executed** — see step 6.
 
-Not yet done: the bounds (step 6), everything on the workstations (step 7 on).
+## Step 6: the DBS-on path was never real
+
+Started 2026-08-04. The staging above was written and the vector layouts defined,
+but no DBS-on evaluation had ever run: no DBS-on loss file, result, checkpoint,
+log or cache existed anywhere in the tree. `--dbs on` reached compilation on v08
+in Dec 2025 (`annarchy_folders/bgm_v08_on*`) and stopped there. Two defects were
+waiting:
+
+1. **v07 + `--dbs on` could not build the model at all.**
+   `DBSstimulator(auto_implement=True)` clears the network (`dbs.py:73`) and
+   recreates every projection through `_connector_methods_dict` (`dbs.py:8-21`),
+   which has no `"Specific"` key — and v07's `CurrentInjection` inputs keep
+   `connector_name = "Specific"`. `KeyError`. The rate-coded rewrite would also
+   have raised on the `TimedArray`s. v08 escaped only because its inputs are added
+   *after* the stimulator.
+2. **Even on v08, DBS was silently inert.** `on()` ran after `compile()`, so it
+   wrote to the C++ instance and not to `pop.init`; the first `reset()` in
+   `Spikes10s.run` and the bare `reset()` in `get_BOLD_full` then restored
+   `dbs_on = 0`. Nothing re-applied it. An on-evaluation would have run with DBS
+   off, not errored, and still written `"dbs": "on"` into the loss JSON.
+
+Both are fixed by the retrofit decision above plus calling `on()` **before**
+`compile()`, so the on-state is the compile-time state and every `reset()`
+restores it. `DBS.md` records the mechanism and the limitations found on the way
+(axon spikes bypass synaptic delays; the hyperdirect cortical afferent to STN
+cannot be activated at all; the DBS constants are unvalidated single-subject
+values).
 
 ## Immediate next actions
 
-1. Step 6 — the bounds. v07's are provisional: `[0, 0.01]` for the seven drive
+1. Step 6 — finish and verify. Baselines for the changed off-condition numerics,
+   a mechanism test asserting the off/on delta survives a reset, then off→on
+   mini-run pairs on v08 (minutes) and on v07 against a freshly built 5-TR
+   DBS-on cache. Mini-runs use `--gate-threshold 1.0`, because the rate bands
+   have no DBS switch and would otherwise skip BOLD on every individual.
+2. Step 7 — the bounds. v07's are provisional: `[0, 0.01]` for the seven drive
    weights with `p0 = 0.001`, the class default. The sweep above says the useful
    range is roughly `[5e-4, 2e-3]`, so the bound is ~5x above the useful top —
    far better conditioned than v08's `[0, 500]` but still guessed. Measure the
-   band-crossing per population and set tight bounds, for both versions.
-2. Step 7 — get the patched ANNarchy and the two repos onto hinton/waikiki
-   (`TODO.md` §6), then build the full DBS-off cache there. Budget from the
-   laptop: 24 min per loop for 5 TRs means ~25 h per loop serially at 310 TRs.
-   Generation is embarrassingly parallel over (pre, post) pairs, and `TODO.md` §3's
-   smaller layout should land at the same time.
-3. Step 8 — the five-generation mini-run.
+   band-crossing per population and set tight bounds, for both versions. Redo the
+   sweep first: step 6 moved the numbers.
+3. Step 8 — get the patched ANNarchy and the two repos onto hinton/waikiki
+   (`TODO.md` §6), then build the caches there. Budget from the laptop: 24 min per
+   loop for 5 TRs means ~25 h per loop serially at 310 TRs, so ~50 h and ~138 GiB
+   **per DBS condition** — and both conditions are needed, which step 9 used to
+   assume without ever saying. Generation is embarrassingly parallel over
+   (pre, post) pairs, and `TODO.md` §3's smaller layout should land at the same
+   time.
+4. Step 9 — the five-generation mini-run.

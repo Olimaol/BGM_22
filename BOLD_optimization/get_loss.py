@@ -11,7 +11,12 @@ from ANNarchy import (
 )
 from ANNarchy.extensions.bold import BoldMonitor
 from CompNeuroPy.full_models import BGM
-from CompNeuroPy import CompNeuroMonitors, CompNeuroExp, DBSstimulator
+from CompNeuroPy import (
+    CompNeuroMonitors,
+    CompNeuroExp,
+    DBSstimulator,
+    add_dbs_mechanisms,
+)
 import argparse
 import json
 import numpy as np
@@ -29,6 +34,29 @@ TR_S = 2.31
 
 ### The two BG loops simulated side by side, each driven by its own cortical mix
 LOOPS = ("caudate", "putamen")
+
+### The DBS footprint: the populations and projections DBS can actually reach, and
+### the only ones the DBS equation terms are added to. See DBS.md.
+###   stn        - the stimulated population
+###   snr, gpe_* - the postsynaptic targets of its efferents
+###   gpe_proto  - also its only spiking afferent
+###   thal       - the target of the snr__thal passing fibre
+### Everything else is left alone: the caudate loop is excluded from every DBS
+### effect by design, the striatal microcircuit is neither afferent nor efferent to
+### STN (so its terms would always be zero while costing two RNG draws per neuron
+### per step on the largest population), and the TimedArray/CurrentInjection input
+### machinery cannot carry them at all.
+DBS_POPULATION_NAMES = ("stn", "snr", "gpe_proto", "gpe_arky", "gpe_cp", "thal")
+DBS_PROJECTION_NAMES = (
+    "stn__snr",
+    "stn__gpe_proto",
+    "stn__gpe_arky",
+    "stn__gpe_cp",
+    "gpe_proto__stn",
+    "snr__thal",
+)
+### DBS is applied to the putamen loop only
+DBS_LOOP = "putamen"
 
 ### Model versions this script can drive.
 ### - v07 is the full model: the striatum comes from the Microcircuit class
@@ -472,6 +500,44 @@ def simulate_model(model_dict, model_version: str, duration_ms: float):
         for update_function in update_functions[:-1]:
             update_function(run_simulation=False)
         update_functions[-1](run_simulation=True)
+
+
+def assert_dbs_state(dbs_stimulator, dbs_condition: str, where: str):
+    """Check that the model is really in the DBS state the run claims.
+
+    The failure this guards against is silent: on() writes plain parameters, and a
+    reset() that restores pop.init would put them back to zero without raising.
+    The evaluation would then run without DBS and still record "dbs": "on" in the
+    loss file. Call this immediately before anything is simulated.
+    """
+    stim_pop = get_population(f"stn:{DBS_LOOP}")
+    expected_on = (
+        dbs_stimulator.dbs_on_array.flatten()
+        if dbs_condition == "on"
+        else np.zeros(stim_pop.size)
+    )
+    actual_on = np.asarray(stim_pop.dbs_on).flatten()
+    if not np.array_equal(actual_on, expected_on):
+        raise AssertionError(
+            f"{where}: dbs_on on stn:{DBS_LOOP} is not what DBS '{dbs_condition}' "
+            f"requires (sum {actual_on.sum()} vs expected {expected_on.sum()})"
+        )
+
+    expected_depol = dbs_stimulator.dbs_depolarization if dbs_condition == "on" else 0.0
+    if not np.isclose(stim_pop.dbs_depolarization, expected_depol):
+        raise AssertionError(
+            f"{where}: dbs_depolarization is {stim_pop.dbs_depolarization}, "
+            f"expected {expected_depol}"
+        )
+
+    ### the caudate loop is the free control: it must never carry a DBS effect
+    for pop_name in DBS_POPULATION_NAMES:
+        caudate_pop = get_population(f"{pop_name}:caudate")
+        if "dbs_on" in caudate_pop.attributes:
+            raise AssertionError(
+                f"{where}: {pop_name}:caudate carries DBS mechanisms, but the "
+                "caudate loop is supposed to be free of them"
+            )
 
 
 class Spikes10s(CompNeuroExp):
@@ -1026,50 +1092,14 @@ if __name__ == "__main__":
             do_compile=False,
         )
 
-    ### DBS SIMULATOR ###
-    # The last three parameters are the DBS ones. They used to be read at fixed
-    # indices 21-23, which only lined up with v08's 21 base parameters; v07 has 19.
-    if dbs_condition == "on":
-        # --compile only has to build the DBS mechanisms into the model, and it is
-        # called with a placeholder vector, so the strengths do not matter there.
-        dbs_depolarization, passing_fibres_strength, axon_spikes_per_pulse = (
-            dbs_params if dbs_params is not None else (0.0, 0.0, 0.0)
-        )
-        dbs_stimulator = DBSstimulator(
-            stimulated_population=get_population("stn:putamen"),
-            # VTA from berlin data subject 1:
-            population_proportion=(35 + 23) / (70 + 75),
-            # exclude all populations from caudate loop
-            excluded_populations_list=[
-                get_population(pop_name)
-                for pop_name in model_dict["caudate"].populations
-            ],
-            # the dbs_depolarization parameter actually reduces the membrane potential
-            # so its actually a hyperpolarization
-            dbs_depolarization=dbs_depolarization,  # [0,10] like weight/conductance in stn
-            orthodromic=True,
-            antidromic=True,
-            efferents=True,
-            afferents=True,
-            passing_fibres=True,
-            # snr__thal is actually gpi__thal, pasing fibre based on Miocinovic et al. 2006
-            passing_fibres_list=[get_projection("snr__thal:putamen")],
-            passing_fibres_strength=passing_fibres_strength,  # [0,1] scale between 0 and 1
-            dbs_pulse_frequency_Hz=125,  # from berlin data subject 1
-            # pulse width needs to be multiple of timestep (0.1 ms --> min 100 us)
-            # pulse width in berlin data is 60 us but we use 100 us here
-            dbs_pulse_width_us=100,
-            axon_spikes_per_pulse=axon_spikes_per_pulse,  # [0,1] max 1 spike per pulse(=timestep)
-            seed=paramsS["seed"],
-            auto_implement=True,
-        )
-        # because we use two cnp models we have to manually set created to true after DBS creation
-        for loop_name, bgm_model in model_dict.items():
-            bgm_model.created = True
-
-    ### ADD TIMED INPUTS TO BOTH LOOPS AFTER DBS ###
+    ### ADD TIMED INPUTS TO BOTH LOOPS ###
     # only v08 drives the model this way; v07 gets its inputs from the
-    # Microcircuit/CorticalInputs streams created during model creation
+    # Microcircuit/CorticalInputs streams created during model creation.
+    # This used to run *after* the DBS block, because DBSstimulator(auto_implement=True)
+    # cleared and recreated the network and could not reconstruct a TimedArray or a
+    # CurrentInjection. The DBS mechanisms are now retrofitted onto the existing
+    # objects instead, so the inputs can be built here where they belong, and every
+    # population exists before the DBS footprint is resolved.
     if model_version == "v08":
         for loop in LOOPS:
             add_TimedInputs(
@@ -1077,6 +1107,76 @@ if __name__ == "__main__":
                 params=model_dict[loop].params,
                 loop_name=loop,
             )
+
+    ### DBS MECHANISMS ###
+    # Added in BOTH conditions, so off and on compile the same network and differ
+    # only in parameter values. Two consequences worth knowing:
+    #  - DBSstimulator has to be constructed in the off condition too, because its
+    #    __init__ is what creates the `pulse` function and the dbs_pulse_* constants
+    #    that the rewritten equations reference.
+    #  - the off-condition numerics changed when this landed: ANNarchy's RNG is one
+    #    global stream, so the two extra Uniform draws shift every population,
+    #    including the caudate loop, which carries no DBS terms at all.
+    # See DBS.md.
+    dbs_population_list = [
+        get_population(f"{name}:{DBS_LOOP}") for name in DBS_POPULATION_NAMES
+    ]
+    dbs_projection_list = [
+        get_projection(f"{name}:{DBS_LOOP}") for name in DBS_PROJECTION_NAMES
+    ]
+    add_dbs_mechanisms(
+        populations=dbs_population_list, projections=dbs_projection_list
+    )
+
+    ### DBS SIMULATOR ###
+    # The last three parameters are the DBS ones. They used to be read at fixed
+    # indices 21-23, which only lined up with v08's 21 base parameters; v07 has 19.
+    # --compile is called with a placeholder vector and simulates nothing, so the
+    # strengths do not matter there.
+    dbs_depolarization, passing_fibres_strength, axon_spikes_per_pulse = (
+        dbs_params if dbs_params is not None else (0.0, 0.0, 0.0)
+    )
+    dbs_stimulator = DBSstimulator(
+        stimulated_population=get_population(f"stn:{DBS_LOOP}"),
+        # VTA from berlin data subject 1:
+        population_proportion=(35 + 23) / (70 + 75),
+        # everything outside the DBS footprint. This is load-bearing, not just
+        # documentation: the efferent and afferent branches of _set_orthodromic and
+        # _set_antidromic write axon_transmission and prob_axon_spike without a
+        # hasattr guard and skip only via this list, so without it the afferent pass
+        # would set axon_transmission on the CurrentInjection projections that carry
+        # the cortical drive into STN.
+        excluded_populations_list=[
+            pop for pop in populations() if pop not in dbs_population_list
+        ],
+        # the dbs_depolarization parameter actually reduces the membrane potential
+        # so its actually a hyperpolarization
+        dbs_depolarization=dbs_depolarization,  # [0,10] like weight/conductance in stn
+        orthodromic=True,
+        antidromic=True,
+        efferents=True,
+        afferents=True,
+        passing_fibres=True,
+        # snr__thal is actually gpi__thal, pasing fibre based on Miocinovic et al. 2006
+        passing_fibres_list=[get_projection(f"snr__thal:{DBS_LOOP}")],
+        passing_fibres_strength=passing_fibres_strength,  # [0,1] scale between 0 and 1
+        dbs_pulse_frequency_Hz=125,  # from berlin data subject 1
+        # pulse width needs to be multiple of timestep (0.1 ms --> min 100 us)
+        # pulse width in berlin data is 60 us but we use 100 us here
+        dbs_pulse_width_us=100,
+        axon_spikes_per_pulse=axon_spikes_per_pulse,  # [0,1] max 1 spike per pulse(=timestep)
+        seed=paramsS["seed"],
+        auto_implement=False,
+    )
+
+    ### ACTIVATE DBS ###
+    # Before compile() on purpose. Pre-compile, Population.__setattr__ writes to
+    # pop.init and Projection._set_flag writes to proj.init, so the on-state becomes
+    # the compile-time state and every reset() restores it. Called after compile it
+    # went to the C++ instance instead, and the first reset() in Spikes10s.run put
+    # dbs_on back to 0 - which is how DBS-on evaluations ran with DBS switched off.
+    if dbs_condition == "on":
+        dbs_stimulator.on()
 
     ### BOLD MONITORING ###
     # create BOLD monitors for the following regions:
@@ -1150,10 +1250,13 @@ if __name__ == "__main__":
             input_var = "I"
 
         # get populations from population names
-        populations = [get_population(name) for name in population_names]
+        # named bold_populations, not populations: a local assignment here would
+        # shadow ANNarchy's populations() for the whole function, including the
+        # DBS block above
+        bold_populations = [get_population(name) for name in population_names]
 
         bold_monitor_dict[bold_region] = BoldMonitor(
-            populations=populations,
+            populations=bold_populations,
             mapping={"I_CBF": input_var},
             normalize_input=2000,
             scale_factor=scale_factors,
@@ -1174,10 +1277,6 @@ if __name__ == "__main__":
     if args.compile:
         print("Compilation completed; skipping simulations (--compile).")
         sys.exit(0)
-
-    ### ACTIVATE DBS ###
-    if dbs_condition == "on":
-        dbs_stimulator.on()
 
     ### MONITORS ###
     ### create monitors to record the spikes from all populations
@@ -1205,6 +1304,7 @@ if __name__ == "__main__":
     ### SIMULATIONS ###
 
     ### SIMULATION FOR RATES: ###
+    assert_dbs_state(dbs_stimulator, dbs_condition, "before the firing-rate probe")
     firing_rate_dict = get_firing_rate_10s(param_list=param_list, experiment=experiment)
     # obtain loss based on firing rates, between 0 and 1
     firing_rate_loss = get_firing_rate_loss(firing_rate_dict, model_version)
@@ -1229,6 +1329,7 @@ if __name__ == "__main__":
         per_region_corr = {}
     else:
         ### SIMULATION FOR BOLD: ###
+        assert_dbs_state(dbs_stimulator, dbs_condition, "before the BOLD run")
         bold_data = get_BOLD_full(
             model_dict=model_dict,
             seed=paramsS["seed"],

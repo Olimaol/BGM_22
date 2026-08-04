@@ -5,8 +5,9 @@ simulated BOLD that is fitted to one subject's experimental BOLD under DBS on an
 off. The scientific goal is inference: fit DBS-off, refit DBS-on, and read off
 which parameters had to change — i.e. what DBS did inside the basal ganglia.
 
-Read `PLAN.md` for the current plan and where the work stands, and `TODO.md` for
-findings we deliberately postponed.
+Read `PLAN.md` for the current plan and where the work stands, `TODO.md` for
+findings we deliberately postponed, and `DBS.md` for exactly what differs between
+the DBS-off and DBS-on model.
 
 ## Three repos, one environment
 

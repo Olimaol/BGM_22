@@ -148,7 +148,7 @@ def load_best_off_fit(model_version: str, n_base: int):
             best_result = deap_cma_result
             best_name = name
     print(f"carrying over the base parameters of {best_name} (loss {best_loss:.4f})")
-    return [best_result[f"param{i}"] for i in range(n_base)]
+    return [best_result[f"param{i}"] for i in range(n_base)], best_name
 
 
 def search_space(model_version: str, dbs_condition: str):
@@ -184,9 +184,9 @@ def search_space(model_version: str, dbs_condition: str):
         base_p0 = np.array([0.001] * 7 + [0, 0] + [1] * n_clusters)
 
     if dbs_condition == "off":
-        return base_lower, base_upper, base_p0, None
+        return base_lower, base_upper, base_p0, None, None
 
-    fixed_base = load_best_off_fit(model_version, n_base)
+    fixed_base, off_fit_source = load_best_off_fit(model_version, n_base)
     # free: one scaling per weight cluster for putamen, then the 3 DBS parameters
     lower = np.array([0.0] * n_clusters + [0.0, 0.0, 0.0])
     upper = np.array(
@@ -195,10 +195,17 @@ def search_space(model_version: str, dbs_condition: str):
         # fractions: passing-fibre activation and spikes per pulse
         + [10.0, 1.0, 1.0]
     )
-    # start from the off-fit weights with DBS doing nothing, so generation 0
-    # reproduces the off fit apart from the stimulation itself
+    # Start from the off-fit weights with the three DBS parameters at zero, so
+    # generation 0 is the off fit's network with the stimulation switched off.
+    # It does NOT reproduce the off fit's output: the on condition also swaps the
+    # cortical drive for the DBS-on recording, and that alone moves every
+    # population in both loops. Measured on v08 at 5 TRs, DBS (0,0,0) vs the off
+    # run: str_d1 -28 Hz, snr +3 Hz, and the same shifts in caudate, which carries
+    # no DBS mechanisms at all. That drive change is the intended free control
+    # (see DBS.md), not an artefact - but p0 is a neutral starting point, not a
+    # reproduction of the off result.
     p0 = np.array(list(fixed_base[n_base - n_clusters :]) + [0.0, 0.0, 0.0])
-    return lower, upper, p0, fixed_base
+    return lower, upper, p0, fixed_base, off_fit_source
 
 
 def get_loss_args(
@@ -217,7 +224,9 @@ def get_loss_args(
         "--model-version",
         args.model_version,
         "--compile-appendix",
-        f"{args.model_version}_run_{args.optimization_run}_ind{index}",
+        # the DBS condition belongs in the name: an off and an on run with the same
+        # --optimization-run would otherwise share compile folders and loss files
+        f"{args.model_version}_{args.dbs}_run_{args.optimization_run}_ind{index}",
     ]
     if args.n_trs is not None:
         cmd += ["--n-trs", str(args.n_trs)]
@@ -309,7 +318,9 @@ if __name__ == "__main__":
 
     n_base = n_opt_params(args.model_version)
     n_clusters = len(proj_clusters(args.model_version))
-    lower, upper, p0, fixed_base = search_space(args.model_version, args.dbs)
+    lower, upper, p0, fixed_base, off_fit_source = search_space(
+        args.model_version, args.dbs
+    )
 
     max_evals = (
         args.max_evals if args.max_evals is not None else paramsS["deap_cma.run.max_evals"]
@@ -346,7 +357,8 @@ if __name__ == "__main__":
         ]
         loss_files = [
             DATA_DIR
-            / f"loss_{args.model_version}_run_{args.optimization_run}_ind{index}.json"
+            / f"loss_{args.model_version}_{args.dbs}_run_{args.optimization_run}"
+            f"_ind{index}.json"
             for index in range(len(population))
         ]
         log_paths = [
@@ -490,6 +502,18 @@ if __name__ == "__main__":
         deap_cma_result["best_fitness"] = state["best"]["loss"]
         for index, value in enumerate(state["best"]["params"]):
             deap_cma_result[f"param{index}"] = value
+
+    # An on-run searches only the putamen scalings and the 3 DBS parameters, so
+    # param0..paramN are half a vector on their own. Record the fixed base it was
+    # conditioned on and where that came from, otherwise the one artefact meant to
+    # answer "which parameters had to change" cannot be read without replaying
+    # load_best_off_fit's tie-break by hand.
+    deap_cma_result["dbs"] = args.dbs
+    deap_cma_result["model_version"] = args.model_version
+    deap_cma_result["fixed_base"] = (
+        list(fixed_base) if fixed_base is not None else None
+    )
+    deap_cma_result["fixed_base_source"] = off_fit_source
 
     save_variables(
         variable_list=[deap_cma_result],

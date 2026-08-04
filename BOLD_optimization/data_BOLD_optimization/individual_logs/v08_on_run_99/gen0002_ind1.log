@@ -1,0 +1,6 @@
+/home/oliver/miniforge3/envs/compneuro/lib/python3.11/site-packages/ANNarchy/generator/Compiler.py:213: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import parse_version
+ANNarchy 4.7 (4.7.3b) on linux (posix).
+cortical drive: 5 TRs -> simulating 11.6 s (ramp-up 2.31 s)
+firing-rate loss 0.8468 exceeds the gate 0.5000; skipping the BOLD run
+loss 1.8468 = firing_rate 0.8468 + bold 1.0000 (gated, not simulated)
