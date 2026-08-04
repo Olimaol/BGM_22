@@ -183,3 +183,95 @@ Not yet done:
 - The FC matrices in `sub-01_subdiv_results.h5` are **not** plain
   `corrcoef(time_series)` — they look regularized or partial. Worth confirming with
   whoever produced them if the FC is ever used as a fit target.
+
+---
+
+## From the session on 2026-08-04 (first execution of the v07 path, plan steps 4-5)
+
+### 9. The bounds question, now with v07 measured
+
+Resolves two caveats from §1 and adds numbers for v07. §1 stays open; this is the
+evidence to settle it with.
+
+**`sig0` is confirmed.** `DeapCma._prepare` scales the bounds to [0, 1] first and
+*then* sets `sigma = 0.25 if sig0 is None`, so the default really is 25% of the
+parameter range, as §1 assumed.
+
+**v07 is not saturated at its default.** With everything else held at base currents
+100 and cluster scalings 1, sweeping all seven drive weights together (5 TRs,
+DBS off, seed 42):
+
+| weight | caudate_dSPN | caudate_FS | thal:caudate | stn:caudate | rate loss |
+|--------|--------------|------------|--------------|-------------|-----------|
+| 0.0005 |  7.06 Hz     | 14.91 Hz   |  3.94 Hz     | 18.10 Hz    | —         |
+| 0.001  | 22.62        | 25.44      |  6.59        | 19.16       | 0.868     |
+| 0.002  | 69.88        | 51.44      | 14.54        | 21.75       | 0.837     |
+
+So the dSPN plausible band (20.45-53.69 Hz) is crossed between 0.001 and 0.002, and
+the response is steep rather than flat — the opposite of v08's behaviour in §1. This
+also confirms the optimized parameters really reach `mc.mean_weights_by_type` and
+`ci.mean_weights_by_type`.
+
+**Provisional bounds are now in `deap_cma_opt.search_space`:** `[0, 0.01]` for the
+seven v07 drive weights with `p0 = 0.001` (the class default, i.e. the model as its
+author configured it). That is ~5x above the useful top rather than v08's ~250,000x,
+but it is still a guess.
+
+**Caveats.** The sweep moved all seven weights together, so the striatal and the
+CorticalInputs weights are confounded; the rates it produces are the joint effect.
+`gpe_arky` (1.9-4.3 Hz against a 15-20 band), `gpe_cp` (10-15 against 75-85) and
+`snr` (132-139 against 21-93) are far outside their bands at every weight, which is
+what keeps the rate loss near 0.85 — those are driven by the base currents and the
+cluster scalings, not by this parameter. **Per-population bounds still have to be
+measured one parameter at a time.**
+
+### 10. The firing-rate gate threshold is not calibrated
+
+`parameters.py: firing_rate_gate = 0.5`, i.e. "roughly band-edge plausible or
+better", derived from the shape of the loss (≈0.02 when every population sits at its
+band centre, 0.5 at the edges) — not from observed v07 losses.
+
+The one real v07 evaluation so far scored **0.868**, well above the gate. If early
+CMA-ES generations all sit there, every individual is gated and the search sees only
+the rate term until the rates come good. That may be exactly the intent, or it may
+stall the fit. **Decide from the first mini-run**: log how many individuals per
+generation are gated (`bold_skipped` is in every loss file) and raise the threshold
+if the answer is "all of them, for many generations".
+
+### 11. `run_script_parallel` is no longer used by the optimization
+
+`deap_cma_opt.py` now runs its individuals itself. CompNeuroPy's version is
+unchanged and still has the behaviour that hid the December failure: any non-zero
+child exit sets an error flag, which terminates every sibling and calls a bare
+`exit(1)`. It also spawns `["python", script]`, i.e. whatever `python` resolves to
+rather than the running interpreter.
+
+Left alone deliberately — it is shared code with other users. Fix it there if anyone
+else hits the same wall.
+
+### 12. Cost of building the input caches, measured
+
+Laptop, 5 TRs (115,500 steps at dt = 0.1 ms), DBS off, current `float64`
+`(receivers, time)` layout:
+
+- **24.2 min for the caudate loop, 23.8 min for putamen**, 21 GB on disk for both.
+- Extrapolated to the full 310 TRs: **~25 h per loop, ~50 h per condition** serially.
+  Consistent with the ~70 h in §3, which was an estimate.
+
+The short cache lives in `mc_ci_cache_5tr/` (gitignored) and is only loadable at
+`--n-trs 5`, because `Microcircuit` and `CorticalInputs` require the stored `n_steps`
+to equal `int(t.duration/dt)` exactly.
+
+Note the constraint that only bites on short runs: the cache must also cover the
+**firing-rate probe**, which is a fixed 9900 ms. At full length the BOLD run dwarfs
+it; below 5 TRs the probe is the longer of the two and would run off the end of the
+cache. `build_input_caches.py` refuses that case up front.
+
+### 13. Cache state files store the cortical rate path as a bare string
+
+`Microcircuit` and `CorticalInputs` compare the saved `cortical_rate_path` verbatim
+against the one they are given, so a cache built from `../striatal_.../x.npz` is
+rejected when the same file is later named through a different path. This is why
+`build_input_caches.py` has to be run from `BOLD_optimization/`, like `get_loss.py`.
+Harmless once known; worth normalizing to a resolved absolute path if the caches are
+ever built from somewhere else.

@@ -80,18 +80,34 @@ BOLD monitors. Only the putamen loop is stimulated by DBS.
 ## Input caches (v07 only)
 
 `Microcircuit` and `CorticalInputs` write raw memmaps to
-`<storage_dir>/inputs/receiver_counts_<pre>_<post>.dat`, currently
-`mc_ci_cache/{mc,ci}_{caudate,putamen}_cache_{off,on}/`.
+`<storage_dir>/inputs/receiver_counts_<pre>_<post>.dat`, under
+`{mc,ci}_{caudate,putamen}_cache_{off,on}/`.
 
-**A cache is only loadable if its `n_steps` equals `int(t.duration/dt)` exactly.**
-The caches on disk hold 12,000 steps (1.2 s at dt=0.1) — enough for the old short
-tests, not for any real run. Cache size scales linearly with duration: 2.15 GiB for
-1.2 s means ~1.25 TiB per DBS condition at full length in the current
-`float64`/per-region layout. See `PLAN.md` for the agreed smaller layout.
+Build them with `build_input_caches.py`, which takes its settings from
+`get_loss.v07_model_creation_kwargs` so a cache always matches what an evaluation
+will demand:
+
+```bash
+python build_input_caches.py --dbs off --n-trs 5 --cache-dir <abs path>
+```
+
+**A cache is only loadable if its `n_steps` equals `int(t.duration/dt)` exactly**,
+so it is built for one `--n-trs` and usable only at that `--n-trs`. It must also
+cover the fixed 9900 ms firing-rate probe, which is the binding constraint below 5
+TRs; the script refuses that case up front.
+
+Two caches exist: `mc_ci_cache/` (12,000 steps, 1.2 s — the old short tests, too
+short for anything) and `mc_ci_cache_5tr/` (115,500 steps, 21 GB), which is what
+`--n-trs 5` smoke tests use. Cost on the laptop: **24 min per loop for 5 TRs**, so
+~25 h per loop at full length. Size at full length would be ~1.25 TiB per DBS
+condition in the current `float64`/per-region layout — see `PLAN.md` for the agreed
+smaller one.
 
 `storage_dir` is resolved **relative to the working directory you launch from**,
 which is why both `mc_ci_cache/` and `mc_caudate_off_cache/` exist with overlapping
-data. Pass absolute paths.
+data. Pass absolute paths — but note the cortical rate path inside the cache state
+is compared verbatim, so build and evaluate from `BOLD_optimization/` either way
+(`TODO.md` §13).
 
 ## Running things
 
@@ -104,16 +120,35 @@ python get_loss.py --compile --dbs off --model-version v08 --compile-appendix te
 # one evaluation; --n-trs shortens the run for smoke tests
 python get_loss.py --dbs off --model-version v08 --n-trs 20 <params>
 
+# a v07 evaluation against the short cache, with the gate disabled
+python get_loss.py --dbs off --model-version v07 --n-trs 5 \
+  --cache-dir <abs path>/mc_ci_cache_5tr --gate-threshold 1.0 <19 params>
+
 # the optimization
-python deap_cma_opt.py --dbs off --optimization-run 1
+python deap_cma_opt.py --dbs off --model-version v07 --optimization-run 1
+python deap_cma_opt.py --dbs off --model-version v07 --optimization-run 1 --resume
 ```
 
-Parameter count is 19 for v07 and 21 for v08 (see `n_opt_params`), optionally
-followed by 3 DBS parameters. `--dbs` is required on both scripts on purpose.
+Base parameter count is 19 for v07 and 21 for v08 (see `n_opt_params`). The full
+vector layouts are defined by `get_loss.split_param_list`: off takes the base
+vector (3 trailing DBS slots tolerated and ignored); on takes base + 3 DBS, or the
+staged base + one putamen weight scaling per cluster + 3 DBS. The DBS parameters
+are always the **last three** — they used to be read at fixed indices 21-23, which
+only lined up with v08. `--dbs` is required on all three scripts on purpose.
+
+A rate probe gates the BOLD run: above `firing_rate_gate` (0.5) BOLD is skipped and
+charged 1.0, since both loss terms are in [0, 1]. `--gate-threshold 1.0` disables it.
+The threshold is not yet calibrated (`TODO.md` §10).
 
 The loss file `data_BOLD_optimization/loss_<appendix>.json` records the loss
-components, per-region BOLD correlations, all firing rates and BOLD sample counts —
-not just the total.
+components, per-region BOLD correlations, all firing rates, BOLD sample counts, the
+parameter vector and whether the gate fired — not just the total.
+
+`deap_cma_opt.py` runs its own subprocesses rather than CompNeuroPy's
+`run_script_parallel`: one log per individual under
+`data_BOLD_optimization/individual_logs/<run tag>/`, exit codes kept, a dead
+individual penalised with loss 10.0 instead of killing the generation, an abort past
+half a generation, and a CMA-ES checkpoint per generation for `--resume`.
 
 ## Gotchas
 
@@ -130,8 +165,19 @@ not just the total.
   ANNarchy ignores it (it sets its own count, default 1) but **numpy's OpenBLAS does
   not**. `nproc` reports 4 there for this reason; the machines really have 40/48
   logical cores.
-- The striatal `exp_input_weight` bounds are orders of magnitude too wide
-  (see `TODO.md` §1) — do not start a real fit before resolving that.
+- **v07 simulates in `update_time` chunks**, because its inputs are handed to
+  ANNarchy one chunk at a time. Every simulated stretch — the ramp-up, the rest of
+  the run, the firing-rate probe — must be a whole number of chunks or
+  `simulate_model` raises. `update_time` is 110 ms because it divides the TR
+  (2310 ms, 21 chunks), the full run and the 9900 ms probe. The old 100 ms divided
+  none of them, which is why the ramp-up would have failed on the first call.
+- The cortical drive has one value per TR, coarser than `dt`. `Microcircuit` and
+  `CorticalInputs` repeat each value `TR/dt` times; a drive finer than `dt`, or one
+  whose spacing is not an integer multiple, is rejected.
+- The striatal `exp_input_weight` bounds are orders of magnitude too wide in **v08**
+  (see `TODO.md` §1) — do not start a real fit before resolving that. v07's drive
+  weight is better behaved but its bounds are still provisional (`TODO.md` §9).
+- Never make assumptions about ANNarchy, CompNeuroPy, and BGM_22 code purely from memory. Always verify your findings against the codebase.
 
 ## Workstations
 

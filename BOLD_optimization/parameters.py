@@ -8,12 +8,24 @@ parameters_test_microcircuit["t.duration"] = None  # whole data time
 parameters_test_microcircuit["t.rampup"] = 2310  # I match this to TR of BOLD
 # short run used only to score the firing rates; must be a multiple of
 # update_time because v07 hands its inputs to ANNarchy one chunk at a time
-parameters_test_microcircuit["t.firing_rate_sim"] = 10000
+parameters_test_microcircuit["t.firing_rate_sim"] = 9900
+# The rate probe gates the BOLD run: above this firing-rate loss the BOLD run is
+# skipped and charged 1.0. Both losses are in [0, 1]; the rate loss is
+# 1 - mean(logistic goodness) over 18 populations, which is ~0.02 when every
+# population sits at its band centre and 0.5 when every population sits exactly
+# on a band edge. 0.5 therefore means "roughly band-edge plausible or better".
+# NOT yet calibrated against real v07 rate losses -- see TODO.md.
+parameters_test_microcircuit["firing_rate_gate"] = 0.5
 
 ### v07 model (Microcircuit + CorticalInputs)
 parameters_test_microcircuit["mc.nx"] = 10
 parameters_test_microcircuit["mc.b"] = 10
-parameters_test_microcircuit["update_time"] = 100.0
+# v07 hands its cached inputs to ANNarchy one update_time chunk at a time, so
+# every simulated stretch has to be a whole number of chunks. The stretches are
+# the ramp-up (2310 ms = 1 TR), the rest of the run ((n_trs - 1) * 2310 ms) and
+# the firing-rate probe. 110 ms divides 2310 (21 chunks per TR) and 9900;
+# the previous 100 ms divided none of them.
+parameters_test_microcircuit["update_time"] = 110.0
 # where the precomputed input spike counts live; on the workstations point this
 # at /scratch/olmai/... , the caches are ~138 GiB per DBS condition
 parameters_test_microcircuit["mc_ci_cache_dir"] = "../mc_ci_cache"

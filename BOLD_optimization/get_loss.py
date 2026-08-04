@@ -242,10 +242,76 @@ def set_opt_params_v08(param_list, model_dict):
 
 
 def set_opt_params(param_list, model_dict, model_version: str):
-    """Dispatch to the parameter mapping of the requested model version."""
+    """Dispatch to the parameter mapping of the requested model version.
+
+    param_list holds the base parameters only; split_param_list separates those
+    from the DBS parameters and the optional putamen-only weight overrides.
+    """
     if model_version == "v07":
-        return set_opt_params_v07(param_list, model_dict)
-    return set_opt_params_v08(param_list, model_dict)
+        set_opt_params_v07(param_list, model_dict)
+    else:
+        set_opt_params_v08(param_list, model_dict)
+
+
+def apply_opt_params(
+    param_list, model_dict, model_version: str, putamen_cluster_scalings=None
+):
+    """Set the base parameters on both loops, then any putamen-only overrides."""
+    set_opt_params(param_list, model_dict, model_version)
+    if putamen_cluster_scalings is not None:
+        _set_cluster_weights(
+            putamen_cluster_scalings,
+            model_dict,
+            model_version,
+            offset=0,
+            loops=("putamen",),
+        )
+
+
+def split_param_list(param_list, model_version: str, dbs_condition: str):
+    """Split the command-line parameter vector into its three parts.
+
+    Returns (base_params, putamen_cluster_scalings, dbs_params). The layouts are
+
+        off : base                                    [+ 3 ignored DBS slots]
+        on  : base                                    + 3 DBS
+        on  : base + one scaling per weight cluster   + 3 DBS   (staged)
+
+    where base is 19 values for v07 and 21 for v08. The staged layout is the one
+    the inference calls for: caudate is excluded from every DBS effect and shares
+    no projection with putamen, so refitting its weights under DBS would assert a
+    mechanism the model does not contain. The base vector, carried over from the
+    DBS-off fit, therefore sets both loops and the extra block then re-scales the
+    putamen weights only. The layouts differ in length, so they cannot be
+    confused for one another.
+    """
+    n_base = n_opt_params(model_version)
+    n_clusters = len(proj_clusters(model_version))
+    n_given = len(param_list)
+
+    if dbs_condition == "off":
+        # the 3 DBS slots are accepted so one caller can pad every vector alike
+        if n_given not in (n_base, n_base + 3):
+            raise ValueError(
+                f"DBS off with model {model_version} takes {n_base} parameters "
+                f"(optionally followed by 3 ignored DBS slots), got {n_given}."
+            )
+        return list(param_list[:n_base]), None, None
+
+    if n_given == n_base + 3:
+        return list(param_list[:n_base]), None, list(param_list[-3:])
+    if n_given == n_base + n_clusters + 3:
+        return (
+            list(param_list[:n_base]),
+            list(param_list[n_base : n_base + n_clusters]),
+            list(param_list[-3:]),
+        )
+    raise ValueError(
+        f"DBS on with model {model_version} takes {n_base + 3} parameters "
+        f"(base + 3 DBS) or {n_base + n_clusters + 3} (base + {n_clusters} "
+        f"putamen weight scalings + 3 DBS), got {n_given}."
+    )
+
 
 def infer_max_sim_time_ms(
     dbs_condition: str,
@@ -314,6 +380,45 @@ def infer_max_sim_time_ms(
     return duration_ms, mixed_rates
 
 
+def v07_model_creation_kwargs(
+    loop: str,
+    dbs_condition: str,
+    duration_ms: float,
+    cache_dir: str | None = None,
+    build_caches: bool = False,
+):
+    """model_creation_kwargs for BGM_v07: the Microcircuit and CorticalInputs setup.
+
+    build_caches=True regenerates the precomputed spike counts instead of loading
+    them; that is what build_input_caches.py does. Every evaluation loads them,
+    so both paths have to agree on all of these values -- in particular the
+    caches are only accepted when their n_steps equals int(duration_ms / dt),
+    and the stored cortical_rate_path string must match exactly.
+    """
+    cache_dir = cache_dir if cache_dir is not None else paramsS["mc_ci_cache_dir"]
+    return {
+        "build_mc": build_caches,
+        "build_ci": build_caches,
+        "mc.name": loop,
+        "mc.nx": paramsS["mc.nx"],
+        "mc.b": paramsS["mc.b"],
+        "dbs": dbs_condition,
+        "timestep": paramsS["timestep"],
+        "t.duration": duration_ms,
+        "update_time": paramsS["update_time"],
+        "mc.storage_dir": f"{cache_dir}/mc_{loop}_cache_{dbs_condition}",
+        "mc.seed": paramsS["seed"],
+        "mc.fitted_params_path": paramsS["mc.fitted_params_path"],
+        "mc.cortical_rate_path": paramsS["mc.cortical_rate_path"][dbs_condition],
+        "ci.storage_dir": f"{cache_dir}/ci_{loop}_cache_{dbs_condition}",
+        "ci.seed": paramsS["seed"],
+        "ci.n_thal": paramsS["ci.n_thal"],
+        "ci.n_gpe_arky": paramsS["ci.n_gpe_arky"],
+        "ci.n_gpe_cp": paramsS["ci.n_gpe_cp"],
+        "ci.n_stn": paramsS["ci.n_stn"],
+    }
+
+
 def update_TimedInput(bgm_model: BGM):
     """Rewind the cortical TimedArray so the next simulation starts at its first block.
 
@@ -376,11 +481,13 @@ class Spikes10s(CompNeuroExp):
         model_dict: dict = None,
         seed: int = 42,
         model_version: str = "v08",
+        putamen_cluster_scalings=None,
     ):
         super().__init__(monitors)
         self.model_dict = model_dict
         self.seed = seed
         self.model_version = model_version
+        self.putamen_cluster_scalings = putamen_cluster_scalings
 
     def run(self, param_list: list):
         # at the begining always reset (also annarchy random!) and start monitors
@@ -391,7 +498,12 @@ class Spikes10s(CompNeuroExp):
         rewind_inputs(self.model_dict, self.model_version)
 
         # set optimized parameters
-        set_opt_params(param_list, self.model_dict, self.model_version)
+        apply_opt_params(
+            param_list,
+            self.model_dict,
+            self.model_version,
+            self.putamen_cluster_scalings,
+        )
 
         duration_ms = paramsS["t.firing_rate_sim"]
         simulate_model(self.model_dict, self.model_version, duration_ms)
@@ -438,7 +550,12 @@ def get_firing_rate_10s(param_list: list, experiment: Spikes10s):
 
 
 def get_BOLD_full(
-    model_dict, seed, bold_monitor_dict, param_list: list, model_version: str
+    model_dict,
+    seed,
+    bold_monitor_dict,
+    param_list: list,
+    model_version: str,
+    putamen_cluster_scalings=None,
 ):
     ### RESETS AND PREPARE ### TODO: how to reset BOLD monitor - skipped this just run scripts separately
     # reset ANNarchy and seed
@@ -449,7 +566,7 @@ def get_BOLD_full(
 
     ### OPTIMIZED PARAMETERS ###
     # set optimized parameters
-    set_opt_params(param_list, model_dict, model_version)
+    apply_opt_params(param_list, model_dict, model_version, putamen_cluster_scalings)
 
     ### RAMP UP ###
     # initial ramp up
@@ -764,8 +881,9 @@ if __name__ == "__main__":
     # python get_loss.py --compile --dbs on --compile-appendix test 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
     parser = argparse.ArgumentParser(
         description=(
-            "Run BOLD optimization with 21 optimization parameters supplied on the command line "
-            "(values mapped in order to set_opt_params)."
+            "Evaluate one parameter vector: simulate the firing rates, then (unless "
+            "gated) the BOLD, and write the loss and its components to a JSON file. "
+            "See split_param_list for the accepted vector layouts."
         )
     )
     parser.add_argument(
@@ -791,8 +909,9 @@ if __name__ == "__main__":
         nargs="*",
         type=float,
         help="Optimized parameter values, in the order expected by set_opt_params "
-        "for the chosen model version (19 for v07, 21 for v08), optionally "
-        "followed by the 3 DBS parameters.",
+        "for the chosen model version (19 for v07, 21 for v08). With --dbs on, "
+        "followed by the 3 DBS parameters, and optionally by one putamen-only "
+        "weight scaling per cluster in between -- see split_param_list.",
     )
     parser.add_argument(
         "--compile",
@@ -807,6 +926,21 @@ if __name__ == "__main__":
         "the full run uses all 310.",
     )
     parser.add_argument(
+        "--gate-threshold",
+        type=float,
+        default=paramsS["firing_rate_gate"],
+        help="Skip the expensive BOLD run when the firing-rate loss exceeds this "
+        "and charge the worst BOLD loss (1.0) instead. Both losses are in [0, 1], "
+        "so 1.0 disables the gate.",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        type=str,
+        default=None,
+        help="Where the v07 input caches live (see build_input_caches.py). "
+        "Defaults to mc_ci_cache_dir from parameters.py. Ignored for v08.",
+    )
+    parser.add_argument(
         "--compile-appendix",
         type=str,
         default="",
@@ -815,14 +949,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
     dbs_condition = args.dbs
     model_version = args.model_version
-    param_list = args.params
 
-    # print(f"DBS condition: {dbs_condition}")
-    # if param_list:
-    #     print(f"Parameter list: {param_list}")
-    # print(f"compile only: {args.compile}")
-    # if args.compile_appendix:
-    #     print(f"compile folder appendix: {args.compile_appendix}")
+    # --compile is run with a placeholder vector whose length nobody guarantees,
+    # and nothing is simulated, so only a real evaluation validates the layout.
+    if args.compile:
+        param_list, putamen_cluster_scalings, dbs_params = list(args.params), None, None
+    else:
+        param_list, putamen_cluster_scalings, dbs_params = split_param_list(
+            args.params, model_version, dbs_condition
+        )
 
     ### SETUP TIMESTEP + SEED ###
     if paramsS["seed"] == None:
@@ -861,31 +996,14 @@ if __name__ == "__main__":
         if model_version == "v07":
             ### v07 builds the striatum with Microcircuit and drives thal/gpe_arky/
             ### gpe_cp/stn with CorticalInputs, both streaming precomputed spike
-            ### counts from the caches under mc_ci_cache_dir.
-            cache_dir = paramsS["mc_ci_cache_dir"]
-            model_creation_kwargs_dict[loop] = {
-                "build_mc": False,  # True once, to build the caches
-                "build_ci": False,
-                "mc.name": loop,
-                "mc.nx": paramsS["mc.nx"],
-                "mc.b": paramsS["mc.b"],
-                "dbs": dbs_condition,
-                "timestep": paramsS["timestep"],
-                "t.duration": paramsS["t.duration"],
-                "update_time": paramsS["update_time"],
-                "mc.storage_dir": f"{cache_dir}/mc_{loop}_cache_{dbs_condition}",
-                "mc.seed": paramsS["seed"],
-                "mc.fitted_params_path": paramsS["mc.fitted_params_path"],
-                "mc.cortical_rate_path": paramsS["mc.cortical_rate_path"][
-                    dbs_condition
-                ],
-                "ci.storage_dir": f"{cache_dir}/ci_{loop}_cache_{dbs_condition}",
-                "ci.seed": paramsS["seed"],
-                "ci.n_thal": paramsS["ci.n_thal"],
-                "ci.n_gpe_arky": paramsS["ci.n_gpe_arky"],
-                "ci.n_gpe_cp": paramsS["ci.n_gpe_cp"],
-                "ci.n_stn": paramsS["ci.n_stn"],
-            }
+            ### counts from the caches under mc_ci_cache_dir (see
+            ### build_input_caches.py).
+            model_creation_kwargs_dict[loop] = v07_model_creation_kwargs(
+                loop=loop,
+                dbs_condition=dbs_condition,
+                duration_ms=paramsS["t.duration"],
+                cache_dir=args.cache_dir,
+            )
         else:
             ### v08 replaces the whole cortical drive with one TimedArray per loop
             # - "input.rates": array with (steps, post_size) shape containing the input rates for each time step
@@ -909,8 +1027,14 @@ if __name__ == "__main__":
         )
 
     ### DBS SIMULATOR ###
-    # parameters 21, 22, 23 are used for DBS if dbs_condition is "on"
+    # The last three parameters are the DBS ones. They used to be read at fixed
+    # indices 21-23, which only lined up with v08's 21 base parameters; v07 has 19.
     if dbs_condition == "on":
+        # --compile only has to build the DBS mechanisms into the model, and it is
+        # called with a placeholder vector, so the strengths do not matter there.
+        dbs_depolarization, passing_fibres_strength, axon_spikes_per_pulse = (
+            dbs_params if dbs_params is not None else (0.0, 0.0, 0.0)
+        )
         dbs_stimulator = DBSstimulator(
             stimulated_population=get_population("stn:putamen"),
             # VTA from berlin data subject 1:
@@ -922,7 +1046,7 @@ if __name__ == "__main__":
             ],
             # the dbs_depolarization parameter actually reduces the membrane potential
             # so its actually a hyperpolarization
-            dbs_depolarization=param_list[21],  # [0,10] like weight/conductance in stn
+            dbs_depolarization=dbs_depolarization,  # [0,10] like weight/conductance in stn
             orthodromic=True,
             antidromic=True,
             efferents=True,
@@ -930,14 +1054,12 @@ if __name__ == "__main__":
             passing_fibres=True,
             # snr__thal is actually gpi__thal, pasing fibre based on Miocinovic et al. 2006
             passing_fibres_list=[get_projection("snr__thal:putamen")],
-            passing_fibres_strength=param_list[22],  # [0,1] scale between 0 and 1
+            passing_fibres_strength=passing_fibres_strength,  # [0,1] scale between 0 and 1
             dbs_pulse_frequency_Hz=125,  # from berlin data subject 1
             # pulse width needs to be multiple of timestep (0.1 ms --> min 100 us)
             # pulse width in berlin data is 60 us but we use 100 us here
             dbs_pulse_width_us=100,
-            axon_spikes_per_pulse=param_list[
-                23
-            ],  # [0,1] max 1 spike per pulse(=timestep)
+            axon_spikes_per_pulse=axon_spikes_per_pulse,  # [0,1] max 1 spike per pulse(=timestep)
             seed=paramsS["seed"],
             auto_implement=True,
         )
@@ -1077,6 +1199,7 @@ if __name__ == "__main__":
         model_dict=model_dict,
         seed=paramsS["seed"],
         model_version=model_version,
+        putamen_cluster_scalings=putamen_cluster_scalings,
     )
 
     ### SIMULATIONS ###
@@ -1086,24 +1209,44 @@ if __name__ == "__main__":
     # obtain loss based on firing rates, between 0 and 1
     firing_rate_loss = get_firing_rate_loss(firing_rate_dict, model_version)
 
-    ### SIMULATION FOR BOLD: ###
-    bold_data = get_BOLD_full(
-        model_dict=model_dict,
-        seed=paramsS["seed"],
-        bold_monitor_dict=bold_monitor_dict,
-        param_list=param_list,
-        model_version=model_version,
-    )
-    # obtain loss based on BOLD correlation, between 0 and 1
-    bold_loss, per_region_corr = compute_bold_correlation_loss(
-        sim_bold=bold_data,
-        condition=dbs_condition,
-        tr_s=TR_S,
-        ramp_up_ms=paramsS["t.rampup"],
-        data_file=None,
-        region_map=None,
-        dt_ms=paramsS["timestep"],
-    )
+    ### FIRING-RATE GATE ###
+    # The rate probe costs seconds, the BOLD run costs half an hour. An individual
+    # whose populations are far outside their plausible bands cannot produce
+    # meaningful BOLD, so skip it and charge the worst possible BOLD loss, 1.0.
+    # Ordering stays consistent for CMA-ES, which is rank-based: an evaluated
+    # individual scores firing_rate_loss + bold_loss with bold_loss <= 1, so a
+    # gated one never displaces an evaluated one that had the same rate loss.
+    gate_threshold = args.gate_threshold
+    bold_skipped = firing_rate_loss > gate_threshold
+
+    if bold_skipped:
+        print(
+            f"firing-rate loss {firing_rate_loss:.4f} exceeds the gate "
+            f"{gate_threshold:.4f}; skipping the BOLD run"
+        )
+        bold_data = {}
+        bold_loss = 1.0
+        per_region_corr = {}
+    else:
+        ### SIMULATION FOR BOLD: ###
+        bold_data = get_BOLD_full(
+            model_dict=model_dict,
+            seed=paramsS["seed"],
+            bold_monitor_dict=bold_monitor_dict,
+            param_list=param_list,
+            model_version=model_version,
+            putamen_cluster_scalings=putamen_cluster_scalings,
+        )
+        # obtain loss based on BOLD correlation, between 0 and 1
+        bold_loss, per_region_corr = compute_bold_correlation_loss(
+            sim_bold=bold_data,
+            condition=dbs_condition,
+            tr_s=TR_S,
+            ramp_up_ms=paramsS["t.rampup"],
+            data_file=None,
+            region_map=None,
+            dt_ms=paramsS["timestep"],
+        )
 
     ### TOTAL LOSS ###
     total_loss = float(firing_rate_loss + bold_loss)
@@ -1117,13 +1260,23 @@ if __name__ == "__main__":
         "bold_correlations": {k: float(v) for k, v in per_region_corr.items()},
         "firing_rates_hz": {k: float(v) for k, v in firing_rate_dict.items()},
         "n_bold_samples": {k: int(np.asarray(v).size) for k, v in bold_data.items()},
+        "bold_skipped": bool(bold_skipped),
+        "gate_threshold": float(gate_threshold),
+        "params": [float(p) for p in param_list],
+        "putamen_cluster_scalings": (
+            None
+            if putamen_cluster_scalings is None
+            else [float(p) for p in putamen_cluster_scalings]
+        ),
+        "dbs_params": None if dbs_params is None else [float(p) for p in dbs_params],
         "dbs": dbs_condition,
         "model_version": model_version,
         "n_trs": len(mixed_rates["caudate"]["rate"]),
         "duration_ms": float(paramsS["t.duration"]),
     }
     print(
-        f"loss {total_loss:.4f} = firing_rate {firing_rate_loss:.4f} + bold {bold_loss:.4f}"
+        f"loss {total_loss:.4f} = firing_rate {firing_rate_loss:.4f} + bold "
+        f"{bold_loss:.4f}{' (gated, not simulated)' if bold_skipped else ''}"
     )
 
     loss_folder = Path(__file__).resolve().parent / paramsS["data_folder"]
