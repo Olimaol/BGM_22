@@ -22,8 +22,173 @@ import sys
 ### local
 from parameters import parameters_test_microcircuit as paramsS
 
+### Repetition time of the experimental BOLD data (s). The cortical drive is
+### sampled at this rate, one value per TR, and the simulated BOLD is recorded
+### on the same grid.
+TR_S = 2.31
 
-def set_opt_params(param_list, model_dict):
+### The two BG loops simulated side by side, each driven by its own cortical mix
+LOOPS = ("caudate", "putamen")
+
+### Model versions this script can drive.
+### - v07 is the full model: the striatum comes from the Microcircuit class
+###   (distance-dependent connectivity, correlated cortical input, missing-GABA
+###   compensation) and thal/gpe_arky/gpe_cp/stn get CorticalInputs. Its striatal
+###   populations are created by Microcircuit and keep names like "caudate_dSPN".
+### - v08 is the reduced model: plain BGM populations whose cortical drive is a
+###   single TimedArray scaled by exp_input_weight. Fast, no input caches, and
+###   useful as an end-to-end smoke test of this pipeline.
+MODEL_VERSIONS = ("v07", "v08")
+
+
+def striatal_pop_name(model_version: str, loop: str, compartment: str) -> str:
+    """Population name of a striatal compartment for the given model version.
+
+    compartment is one of "str_d1", "str_d2", "str_fsi".
+    """
+    if model_version == "v07":
+        mc_name = {"str_d1": "dSPN", "str_d2": "iSPN", "str_fsi": "FS"}[compartment]
+        return f"{loop}_{mc_name}"
+    return f"{compartment}:{loop}"
+
+
+def bg_pop_name(loop: str, compartment: str) -> str:
+    """Population name of a non-striatal BG compartment (same in both versions)."""
+    return f"{compartment}:{loop}"
+
+
+def population_name(model_version: str, loop: str, compartment: str) -> str:
+    """Population name of any compartment, dispatching on where it was created."""
+    if compartment in ("str_d1", "str_d2", "str_fsi"):
+        return striatal_pop_name(model_version, loop, compartment)
+    return bg_pop_name(loop, compartment)
+
+
+### Projection weight clusters. Instead of freeing every weight, the literature
+### values already in BGM.params are scaled by one factor per functional cluster,
+### which preserves their relative balance and keeps the search well conditioned.
+### v08 adds the intra-striatal projections; in v07 those live inside the
+### Microcircuit with weights sampled from the fitted connectivity, so they are
+### not model parameters here.
+PROJ_CLUSTERS_COMMON = {
+    "str_d1__bg": ["str_d1__snr", "str_d1__gpe_cp"],
+    "str_d2__bg": ["str_d2__gpe_proto", "str_d2__gpe_arky", "str_d2__gpe_cp"],
+    "stn__gpe": ["stn__gpe_proto", "stn__gpe_arky", "stn__gpe_cp"],
+    "stn__snr": ["stn__snr"],
+    "snr__thal": ["snr__thal"],
+    "thal__striatum": ["thal__str_d1", "thal__str_d2", "thal__str_fsi"],
+    "gpe_laterals": [
+        "gpe_proto__gpe_arky",
+        "gpe_proto__gpe_cp",
+        "gpe_arky__gpe_proto",
+        "gpe_arky__gpe_cp",
+        "gpe_cp__gpe_proto",
+        "gpe_cp__gpe_arky",
+    ],
+    "gpe_striatum": [
+        "gpe_proto__str_fsi",
+        "gpe_arky__str_d1",
+        "gpe_arky__str_d2",
+        "gpe_arky__str_fsi",
+        "gpe_cp__str_d1",
+        "gpe_cp__str_d2",
+        "gpe_cp__str_fsi",
+    ],
+    "gpe_proto__stn": ["gpe_proto__stn"],
+    "gpe_proto__snr": ["gpe_proto__snr"],
+}
+
+PROJ_CLUSTERS_V08_ONLY = {
+    "str_fsi__striatum": ["str_fsi__str_d1", "str_fsi__str_d2", "str_fsi__str_fsi"],
+    "str_laterals": [
+        "str_d1__str_d1",
+        "str_d1__str_d2",
+        "str_d2__str_d1",
+        "str_d2__str_d2",
+    ],
+}
+
+
+def proj_clusters(model_version: str) -> dict:
+    """Ordered weight clusters for a model version; index in this order = parameter order."""
+    if model_version == "v08":
+        return {**PROJ_CLUSTERS_COMMON, **PROJ_CLUSTERS_V08_ONLY}
+    return dict(PROJ_CLUSTERS_COMMON)
+
+
+def n_opt_params(model_version: str) -> int:
+    """Number of optimized parameters: 9 drive parameters + one per weight cluster."""
+    return 9 + len(proj_clusters(model_version))
+
+
+def _set_cluster_weights(param_list, model_dict, model_version, offset=9, loops=LOOPS):
+    """Scale the literature weights of every projection by its cluster's factor."""
+    clusters = proj_clusters(model_version)
+    scaling = {name: param_list[offset + i] for i, name in enumerate(clusters)}
+
+    for loop in loops:
+        bgm_model: BGM = model_dict[loop]
+        for cluster_name, proj_name_list in clusters.items():
+            for proj_name in proj_name_list:
+                weight_val_orig = bgm_model.params[f"{proj_name}:{loop}.weights"]
+                bgm_model.set_param(
+                    compartment=f"{proj_name}:{loop}",
+                    parameter_name="w",
+                    parameter_value=weight_val_orig * scaling[cluster_name],
+                )
+
+
+def set_opt_params_v07(param_list, model_dict):
+    """
+    Set the optimized parameters of the v07 model (19 parameters).
+
+    0-2  cortical input weights for dSPN, iSPN, FS (set on the Microcircuit)
+    3-6  cortical input weights for thal, gpe_arky, gpe_cp, stn (set on CorticalInputs)
+    7-8  baseline currents for snr and gpe_proto, which receive no cortical input
+    9+   one scaling factor per projection weight cluster
+    """
+    str_input_weights = {
+        "dSPN": param_list[0],
+        "iSPN": param_list[1],
+        "FS": param_list[2],
+    }
+    ci_input_weights = {
+        "thal": param_list[3],
+        "gpe_arky": param_list[4],
+        "gpe_cp": param_list[5],
+        "stn": param_list[6],
+    }
+    base_current_dict = {"snr": param_list[7], "gpe_proto": param_list[8]}
+
+    for loop in LOOPS:
+        bgm_model: BGM = model_dict[loop]
+
+        # striatal cortical drive lives in the Microcircuit; only the cortical
+        # keys are touched, the local (pre_type, post_type) entries hold the
+        # sampled intrinsic weights and must stay as they are
+        mc = bgm_model.mc
+        for post_type, weight in str_input_weights.items():
+            for cortical_region in mc.cortical_proportions_dict:
+                mc.mean_weights_by_type[(cortical_region, post_type)] = weight
+
+        # cortical drive of the remaining BG populations
+        ci = bgm_model.ci
+        for post_type, weight in ci_input_weights.items():
+            for cortical_region in ci.cortical_proportions_dict:
+                ci.mean_weights_by_type[(cortical_region, post_type)] = weight
+
+        # snr and gpe_proto have no cortical input, so their drive is a baseline current
+        for compartment_name, param_val in base_current_dict.items():
+            bgm_model.set_param(
+                compartment=f"{compartment_name}:{loop}",
+                parameter_name="base_mean",
+                parameter_value=param_val,
+            )
+
+    _set_cluster_weights(param_list, model_dict, "v07")
+
+
+def set_opt_params_v08(param_list, model_dict):
     """
     Function to set the optimized parameters of the model.
 
@@ -73,128 +238,25 @@ def set_opt_params(param_list, model_dict):
             )
 
     ### WEIGHT PARAMETERS ###
-    # projections are:
-    # str_d1__snr
-    # str_d1__gpe_cp
-    # str_d1__str_d1
-    # str_d1__str_d2
-    # str_d2__gpe_proto
-    # str_d2__gpe_arky
-    # str_d2__gpe_cp
-    # str_d2__str_d1
-    # str_d2__str_d2
-    # str_fsi__str_d1
-    # str_fsi__str_d2
-    # str_fsi__str_fsi
-    # stn__snr
-    # stn__gpe_proto
-    # stn__gpe_arky
-    # stn__gpe_cp
-    # gpe_proto__stn
-    # gpe_proto__snr
-    # gpe_proto__gpe_arky
-    # gpe_proto__gpe_cp
-    # gpe_proto__str_fsi
-    # gpe_arky__str_d1
-    # gpe_arky__str_d2
-    # gpe_arky__str_fsi
-    # gpe_arky__gpe_proto
-    # gpe_arky__gpe_cp
-    # gpe_cp__str_d1
-    # gpe_cp__str_d2
-    # gpe_cp__str_fsi
-    # gpe_cp__gpe_proto
-    # gpe_cp__gpe_arky
-    # snr__thal
-    # thal__str_d1
-    # thal__str_d2
-    # thal__str_fsi
+    _set_cluster_weights(param_list, model_dict, "v08")
 
-    # instad of setting all the weights indvidually, use the already defined weights of BGM and scale groups of them, we scale the origianl values by a factor between 0 and 5
-    proj_clusters = {
-        "str_d1__bg": ["str_d1__snr", "str_d1__gpe_cp"],
-        "str_d2__bg": ["str_d2__gpe_proto", "str_d2__gpe_arky", "str_d2__gpe_cp"],
-        "str_fsi__striatum": ["str_fsi__str_d1", "str_fsi__str_d2", "str_fsi__str_fsi"],
-        "str_laterals": [
-            "str_d1__str_d1",
-            "str_d1__str_d2",
-            "str_d2__str_d1",
-            "str_d2__str_d2",
-        ],
-        "stn__gpe": ["stn__gpe_proto", "stn__gpe_arky", "stn__gpe_cp"],
-        "stn__snr": ["stn__snr"],
-        "snr__thal": ["snr__thal"],
-        "thal__striatum": ["thal__str_d1", "thal__str_d2", "thal__str_fsi"],
-        "gpe_laterals": [
-            "gpe_proto__gpe_arky",
-            "gpe_proto__gpe_cp",
-            "gpe_arky__gpe_proto",
-            "gpe_arky__gpe_cp",
-            "gpe_cp__gpe_proto",
-            "gpe_cp__gpe_arky",
-        ],
-        "gpe_striatum": [
-            "gpe_proto__str_fsi",
-            "gpe_arky__str_d1",
-            "gpe_arky__str_d2",
-            "gpe_arky__str_fsi",
-            "gpe_cp__str_d1",
-            "gpe_cp__str_d2",
-            "gpe_cp__str_fsi",
-        ],
-        "gpe_proto__stn": ["gpe_proto__stn"],
-        "gpe_proto__snr": ["gpe_proto__snr"],
-    }
-    all_projections = [
-        proj_name for proj_list in proj_clusters.values() for proj_name in proj_list
-    ]
-    # create the reverse mapping for each projection to its cluster
-    proj_to_cluster = {
-        proj_name: cluster_name
-        for cluster_name, proj_list in proj_clusters.items()
-        for proj_name in proj_list
-    }
-    proj_cluster_scaling = {
-        "str_d1__bg": param_list[9],  # [0, 5]
-        "str_d2__bg": param_list[10],  # [0, 5]
-        "str_fsi__striatum": param_list[11],  # [0, 5]
-        "str_laterals": param_list[12],  # [0, 5]
-        "stn__gpe": param_list[13],  # [0, 5]
-        "stn__snr": param_list[14],  # [0, 5]
-        "snr__thal": param_list[15],  # [0, 5]
-        "thal__striatum": param_list[16],  # [0, 5]
-        "gpe_laterals": param_list[17],  # [0, 5]
-        "gpe_striatum": param_list[18],  # [0, 5]
-        "gpe_proto__stn": param_list[19],  # [0, 5]
-        "gpe_proto__snr": param_list[20],  # [0, 5]
-    }
 
-    # set the weights for both loops
-    for loop in ["caudate", "putamen"]:
-        bgm_model: BGM = model_dict[loop]
-        for proj_name in all_projections:
-            # get the scaling factor for the projection
-            cluster_name = proj_to_cluster[proj_name]
-            scaling_factor = proj_cluster_scaling[cluster_name]
-            # get the original value of the weight defined in BGM.params
-            weight_val_orig = bgm_model.params[f"{proj_name}:{loop}.weights"]
-            # set the weight value
-            bgm_model.set_param(
-                compartment=f"{proj_name}:{loop}",
-                parameter_name="w",
-                parameter_value=weight_val_orig * scaling_factor,
-            )
-
+def set_opt_params(param_list, model_dict, model_version: str):
+    """Dispatch to the parameter mapping of the requested model version."""
+    if model_version == "v07":
+        return set_opt_params_v07(param_list, model_dict)
+    return set_opt_params_v08(param_list, model_dict)
 
 def infer_max_sim_time_ms(
     dbs_condition: str,
     cortical_rate_path=paramsS["mc.cortical_rate_path"],
     dt_ms: float = 0.1,
+    n_trs: int | None = None,
 ):
     """Load MATLAB cortical firing rates for a DBS condition and infer max simulation time (ms).
 
-    The firing-rate arrays are sampled at the BOLD TR (2.31 s) without upsampling.
-    Duration rule: (len(rates) * 2.31 / 1000) / dt_ms.
+    The firing-rate arrays are sampled at the BOLD TR (2.31 s) without upsampling,
+    so one sample covers one TR and the total duration is len(rates) * TR.
 
     Returns
     -------
@@ -231,8 +293,18 @@ def infer_max_sim_time_ms(
         caudate_time = data.get("caudate_time")
         putamen_time = data.get("putamen_time")
 
-    # New duration rule using coarse TR samples (no upsampling)
-    duration_ms = (len(caudate_rate) * 2.31 * 1000.0) / dt_ms
+    # Optionally shorten the run (smoke tests); the experimental comparison
+    # trims to the shared length, so a shorter simulation stays aligned.
+    if n_trs is not None:
+        caudate_rate = caudate_rate[:n_trs]
+        putamen_rate = putamen_rate[:n_trs]
+        if caudate_time is not None:
+            caudate_time = caudate_time[:n_trs]
+        if putamen_time is not None:
+            putamen_time = putamen_time[:n_trs]
+
+    # One rate sample covers one TR, so the run lasts len(rates) * TR.
+    duration_ms = len(caudate_rate) * TR_S * 1000.0
 
     mixed_rates = {
         "caudate": {"time": caudate_time, "rate": caudate_rate},
@@ -252,16 +324,63 @@ def update_TimedInput(bgm_model: BGM):
     inp.reset()
 
 
+def rewind_inputs(model_dict, model_version: str):
+    """Rewind the cortical input streams so the next simulation starts at t=0.
+
+    v07 streams precomputed spike counts through Microcircuit/CorticalInputs
+    iterators, v08 replays a single TimedArray per loop.
+    """
+    for loop in LOOPS:
+        bgm_model: BGM = model_dict[loop]
+        if model_version == "v07":
+            bgm_model.mc.reset()
+            bgm_model.ci.reset()
+        else:
+            update_TimedInput(bgm_model)
+
+
+def simulate_model(model_dict, model_version: str, duration_ms: float):
+    """Simulate for duration_ms, refreshing the v07 input streams as needed.
+
+    v07 can only be simulated in steps of update_time, because the inputs are
+    handed to ANNarchy one chunk at a time. duration_ms must be a multiple of it.
+    """
+    if model_version != "v07":
+        simulate(duration_ms)
+        return
+
+    update_functions = []
+    for loop in LOOPS:
+        update_functions.append(model_dict[loop].mc.update)
+        update_functions.append(model_dict[loop].ci.update)
+
+    update_time = model_dict[LOOPS[0]].mc.update_time
+    n_updates = int(round(duration_ms / update_time))
+    if not np.isclose(n_updates * update_time, duration_ms):
+        raise ValueError(
+            f"v07 simulation time {duration_ms} ms is not a multiple of the input "
+            f"update_time {update_time} ms."
+        )
+
+    for _ in range(n_updates):
+        # refresh every input stream, then let the last call run the simulation
+        for update_function in update_functions[:-1]:
+            update_function(run_simulation=False)
+        update_functions[-1](run_simulation=True)
+
+
 class Spikes10s(CompNeuroExp):
     def __init__(
         self,
         monitors: CompNeuroMonitors = None,
         model_dict: dict = None,
         seed: int = 42,
+        model_version: str = "v08",
     ):
         super().__init__(monitors)
         self.model_dict = model_dict
         self.seed = seed
+        self.model_version = model_version
 
     def run(self, param_list: list):
         # at the begining always reset (also annarchy random!) and start monitors
@@ -269,17 +388,13 @@ class Spikes10s(CompNeuroExp):
         self.monitors.start()
         set_seed(self.seed)
 
-        # update the TimedInput to reset it
-        for loop in ["caudate", "putamen"]:
-            bgm_model: BGM = self.model_dict[loop]
-            update_TimedInput(bgm_model)
+        rewind_inputs(self.model_dict, self.model_version)
 
         # set optimized parameters
-        set_opt_params(param_list, self.model_dict)
+        set_opt_params(param_list, self.model_dict, self.model_version)
 
-        # calculate the update steps for 10 s
-        duration_ms = 10000
-        simulate(duration_ms)
+        duration_ms = paramsS["t.firing_rate_sim"]
+        simulate_model(self.model_dict, self.model_version, duration_ms)
 
         self.data["duration"] = duration_ms
 
@@ -303,10 +418,10 @@ def get_firing_rate_10s(param_list: list, experiment: Spikes10s):
         if not key.endswith(";spike"):
             continue
 
-        pop_name = key.split(";")[0]
+        recorded_pop = key.split(";")[0]
         n_neurons = len(spikes)
         if n_neurons == 0:
-            firing_rates[pop_name] = 0.0
+            firing_rates[recorded_pop] = 0.0
             continue
 
         # flatten all spike times from all neurons
@@ -317,37 +432,38 @@ def get_firing_rate_10s(param_list: list, experiment: Spikes10s):
             all_spike_times >= (1 - eval_proportion) * max_steps
         ]
         firing_rate_hz = len(eval_spike_times) / (n_neurons * eval_time_s)
-        firing_rates[pop_name] = firing_rate_hz
+        firing_rates[recorded_pop] = firing_rate_hz
 
     return firing_rates
 
 
-def get_BOLD_full(model_dict, seed, bold_monitor_dict, param_list: list):
+def get_BOLD_full(
+    model_dict, seed, bold_monitor_dict, param_list: list, model_version: str
+):
     ### RESETS AND PREPARE ### TODO: how to reset BOLD monitor - skipped this just run scripts separately
     # reset ANNarchy and seed
     reset()
     set_seed(seed)
 
-    # update the TimedInput to reset it
-    for loop in ["caudate", "putamen"]:
-        bgm_model: BGM = model_dict[loop]
-        update_TimedInput(bgm_model)
+    rewind_inputs(model_dict, model_version)
 
     ### OPTIMIZED PARAMETERS ###
     # set optimized parameters
-    set_opt_params(param_list, model_dict)
+    set_opt_params(param_list, model_dict, model_version)
 
     ### RAMP UP ###
     # initial ramp up
     ramp_up_duration_ms = paramsS["t.rampup"]
-    simulate(ramp_up_duration_ms)
+    simulate_model(model_dict, model_version, ramp_up_duration_ms)
 
     # start each bold monitor
     for bold_monitor in bold_monitor_dict.values():
         bold_monitor.start()
 
     ### REST OF SIMULATION ###
-    simulate(paramsS["t.duration"] - ramp_up_duration_ms)
+    simulate_model(
+        model_dict, model_version, paramsS["t.duration"] - ramp_up_duration_ms
+    )
 
     ### RESULTS ###
     # get the bold time signals of each bold monitor
@@ -407,20 +523,10 @@ def load_experimental_bold_timeseries(
     return bold_dict
 
 
-def downsample_bold_to_tr(
-    sim_signal: np.ndarray, dt_ms: float, tr_s: float
-) -> np.ndarray:
-    """Downsample a simulated BOLD trace (dt in ms) to the TR grid."""
-
-    step = int(np.rint((tr_s * 1000.0) / dt_ms))
-    step = max(step, 1)
-    return sim_signal[::step]
-
-
 def compute_bold_correlation_loss(
     sim_bold: dict[str, np.ndarray],
     condition: str = "on",
-    tr_s: float = 2.31,
+    tr_s: float = TR_S,
     ramp_up_ms: float = paramsS["t.rampup"],
     data_file: str | Path | None = None,
     region_map: dict[str, str] | None = None,
@@ -485,26 +591,18 @@ def compute_bold_correlation_loss(
         if exp_label not in exp_bold:
             continue
 
-        sim_series = np.asarray(sim_bold[sim_region])
+        # The BOLD monitors record on the TR grid, so no downsampling is needed.
+        sim_series = np.asarray(sim_bold[sim_region]).ravel()
         exp_series = np.asarray(exp_bold[exp_label])
 
-        sim_coarse = downsample_bold_to_tr(sim_series, dt_ms=dt_ms, tr_s=tr_s)
         exp_trimmed = exp_series[ramp_up_steps:] if ramp_up_steps > 0 else exp_series
 
-        if sim_region == "GPi":
-            print(
-                f"size of sim_series: {len(sim_series)}, size of exp_series: {len(exp_series)}"
-            )
-            print(
-                f"size of sim_coarse: {len(sim_coarse)}, size of exp_trimmed: {len(exp_trimmed)}"
-            )
-
-        n = min(len(sim_coarse), len(exp_trimmed))
+        n = min(len(sim_series), len(exp_trimmed))
         if n < 2:
             correlations[sim_region] = float("nan")
             continue
 
-        correlations[sim_region] = _safe_corr(sim_coarse[:n], exp_trimmed[:n])
+        correlations[sim_region] = _safe_corr(sim_series[:n], exp_trimmed[:n])
 
     valid_corrs = [c for c in correlations.values() if not np.isnan(c)]
     if not valid_corrs:
@@ -517,7 +615,9 @@ def compute_bold_correlation_loss(
     return loss, correlations
 
 
-def get_firing_rate_loss(firing_rate_dict: dict[str, float]) -> float:
+def get_firing_rate_loss(
+    firing_rate_dict: dict[str, float], model_version: str = "v08"
+) -> float:
     """
     Calculate a loss based on how far the firing rates are from plausible ranges.
     Goodness is smooth and bounded in [0, 1] using a logistic on relative deviation
@@ -547,15 +647,19 @@ def get_firing_rate_loss(firing_rate_dict: dict[str, float]) -> float:
         "snr": (21.0, 93.0),
         "thal": (15.0, 30.0),
     }
+    # resolve to the actual population names, which differ between model versions
+    # for the striatum (v07 gets those populations from the Microcircuit)
     loop_plausible_ranges = {}
-    for loop in ["caudate", "putamen"]:
-        for pop_name, bounds in plausible_ranges.items():
-            loop_plausible_ranges[f"{pop_name}:{loop}"] = bounds
+    for loop in LOOPS:
+        for compartment, bounds in plausible_ranges.items():
+            loop_plausible_ranges[
+                population_name(model_version, loop, compartment)
+            ] = bounds
 
     goodness_scores = []
     k_sharpness = 4.0  # larger = steeper penalty once outside the band
-    for pop_name, (lower, upper) in loop_plausible_ranges.items():
-        fr = firing_rate_dict[pop_name]  # crashes if pop_name not found
+    for pop_name_, (lower, upper) in loop_plausible_ranges.items():
+        fr = firing_rate_dict[pop_name_]  # crashes if pop_name_ not found
 
         center = 0.5 * (lower + upper)
         half_width = max(0.5 * (upper - lower), 1e-6)
@@ -667,20 +771,40 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dbs",
         type=str,
-        default=paramsS.get("dbs", "on"),
-        help="DBS condition string (e.g., 'on' or 'off').",
+        required=True,
+        choices=["on", "off"],
+        help="DBS condition. Required: silently defaulting here means a whole "
+        "optimization can run against the wrong condition.",
+    )
+    parser.add_argument(
+        "--model-version",
+        type=str,
+        default="v07",
+        choices=list(MODEL_VERSIONS),
+        help="Which BGM model to simulate. v07 is the full model with the "
+        "striatal microcircuit; v08 is the reduced model used as a fast "
+        "end-to-end test of this pipeline.",
     )
     parser.add_argument(
         "params",
         metavar="P",
         nargs="*",
         type=float,
-        help="21 parameter values in the exact order expected by set_opt_params.",
+        help="Optimized parameter values, in the order expected by set_opt_params "
+        "for the chosen model version (19 for v07, 21 for v08), optionally "
+        "followed by the 3 DBS parameters.",
     )
     parser.add_argument(
         "--compile",
         action="store_true",
         help="Compile the model and exit without running simulations.",
+    )
+    parser.add_argument(
+        "--n-trs",
+        type=int,
+        default=None,
+        help="Use only the first N TRs of the cortical drive. For smoke tests; "
+        "the full run uses all 310.",
     )
     parser.add_argument(
         "--compile-appendix",
@@ -690,6 +814,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     dbs_condition = args.dbs
+    model_version = args.model_version
     param_list = args.params
 
     # print(f"DBS condition: {dbs_condition}")
@@ -705,43 +830,77 @@ if __name__ == "__main__":
     else:
         setup(dt=paramsS["timestep"], seed=paramsS["seed"])
 
-    ### Obtain the maximum simulation time from the cortical rate files if needed
-    if "t.duration" not in paramsS or paramsS["t.duration"] is None:
-        paramsS["t.duration"], mixed_rates = infer_max_sim_time_ms(
-            dbs_condition=dbs_condition,
-            cortical_rate_path=paramsS["mc.cortical_rate_path"],
-            dt_ms=paramsS["timestep"],
-        )
-    else:
-        _, mixed_rates = infer_max_sim_time_ms(
-            dbs_condition=dbs_condition,
-            cortical_rate_path=paramsS["mc.cortical_rate_path"],
-            dt_ms=paramsS["timestep"],
-        )
+    ### Obtain the simulation time from the cortical rate files
+    inferred_duration_ms, mixed_rates = infer_max_sim_time_ms(
+        dbs_condition=dbs_condition,
+        cortical_rate_path=paramsS["mc.cortical_rate_path"],
+        dt_ms=paramsS["timestep"],
+        n_trs=args.n_trs,
+    )
+    # An explicit t.duration in parameters.py wins, unless --n-trs shortens the run
+    if paramsS.get("t.duration") is None or args.n_trs is not None:
+        paramsS["t.duration"] = inferred_duration_ms
+    print(
+        f"cortical drive: {len(mixed_rates['caudate']['rate'])} TRs -> "
+        f"simulating {paramsS['t.duration'] / 1000.0:.1f} s "
+        f"(ramp-up {paramsS['t.rampup'] / 1000.0:.2f} s)"
+    )
 
     ### CREATE THE TWO LOOP MODEL ###
     # loop for BG loops
     compilation_appendix = args.compile_appendix
     if compilation_appendix:
-        compile_folder = f"bgm_v08_{dbs_condition}_{compilation_appendix}"
+        compile_folder = f"bgm_{model_version}_{dbs_condition}_{compilation_appendix}"
     else:
-        compile_folder = f"bgm_v08_{dbs_condition}"
+        compile_folder = f"bgm_{model_version}_{dbs_condition}"
     model_dict = {}
-    for loop in ["caudate", "putamen"]:
-        ### Prepare the model_creation kwargs for the current dbs condition
-        # - "input.rates": array with (steps, post_size) shape containing the input rates for each time step
-        # - "input.schedule": a single scalar with the schedule time in ms for updating the input rates
-        # - "timestep": simulation timestep in ms
-        model_creation_kwargs = {
-            "input.rates": mixed_rates[loop]["rate"],
-            "input.schedule": 2.31 * 1000,
-            "timestep": paramsS["timestep"],
-        }
+    # keep the kwargs per loop: each loop is driven by its own cortical mix, and
+    # add_TimedInputs below needs the matching one
+    model_creation_kwargs_dict = {}
+    for loop in LOOPS:
+        if model_version == "v07":
+            ### v07 builds the striatum with Microcircuit and drives thal/gpe_arky/
+            ### gpe_cp/stn with CorticalInputs, both streaming precomputed spike
+            ### counts from the caches under mc_ci_cache_dir.
+            cache_dir = paramsS["mc_ci_cache_dir"]
+            model_creation_kwargs_dict[loop] = {
+                "build_mc": False,  # True once, to build the caches
+                "build_ci": False,
+                "mc.name": loop,
+                "mc.nx": paramsS["mc.nx"],
+                "mc.b": paramsS["mc.b"],
+                "dbs": dbs_condition,
+                "timestep": paramsS["timestep"],
+                "t.duration": paramsS["t.duration"],
+                "update_time": paramsS["update_time"],
+                "mc.storage_dir": f"{cache_dir}/mc_{loop}_cache_{dbs_condition}",
+                "mc.seed": paramsS["seed"],
+                "mc.fitted_params_path": paramsS["mc.fitted_params_path"],
+                "mc.cortical_rate_path": paramsS["mc.cortical_rate_path"][
+                    dbs_condition
+                ],
+                "ci.storage_dir": f"{cache_dir}/ci_{loop}_cache_{dbs_condition}",
+                "ci.seed": paramsS["seed"],
+                "ci.n_thal": paramsS["ci.n_thal"],
+                "ci.n_gpe_arky": paramsS["ci.n_gpe_arky"],
+                "ci.n_gpe_cp": paramsS["ci.n_gpe_cp"],
+                "ci.n_stn": paramsS["ci.n_stn"],
+            }
+        else:
+            ### v08 replaces the whole cortical drive with one TimedArray per loop
+            # - "input.rates": array with (steps, post_size) shape containing the input rates for each time step
+            # - "input.schedule": a single scalar with the schedule time in ms for updating the input rates
+            # - "timestep": simulation timestep in ms
+            model_creation_kwargs_dict[loop] = {
+                "input.rates": mixed_rates[loop]["rate"],
+                "input.schedule": TR_S * 1000.0,
+                "timestep": paramsS["timestep"],
+            }
 
         ### Create model for the current loop
         model_dict[loop] = BGM(
-            name="BGM_v08_p01",
-            model_creation_kwargs=model_creation_kwargs,
+            name=f"BGM_{model_version}_p01",
+            model_creation_kwargs=model_creation_kwargs_dict[loop],
             seed=paramsS["seed"],
             compile_folder_name=compile_folder,
             name_appendix=loop,
@@ -787,12 +946,15 @@ if __name__ == "__main__":
             bgm_model.created = True
 
     ### ADD TIMED INPUTS TO BOTH LOOPS AFTER DBS ###
-    for loop in ["caudate", "putamen"]:
-        add_TimedInputs(
-            model_creation_kwargs=model_creation_kwargs,
-            params=model_dict[loop].params,
-            loop_name=loop,
-        )
+    # only v08 drives the model this way; v07 gets its inputs from the
+    # Microcircuit/CorticalInputs streams created during model creation
+    if model_version == "v08":
+        for loop in LOOPS:
+            add_TimedInputs(
+                model_creation_kwargs=model_creation_kwargs_dict[loop],
+                params=model_dict[loop].params,
+                loop_name=loop,
+            )
 
     ### BOLD MONITORING ###
     # create BOLD monitors for the following regions:
@@ -804,33 +966,47 @@ if __name__ == "__main__":
     # Put : str_d1, str_d2, str_fsi [putamen loop]
     # MD : thal [caudate loop]
     # VAp : thal [putamen loop]
-    bold_region_dict: dict[str, list[str]] = {
-        "GPi": ["snr:caudate", "snr:putamen"],
+    # each entry maps an experimental ROI to the (compartment, loop) pairs pooled
+    # into it; the population names differ between model versions for the striatum
+    bold_region_compartments: dict[str, list[tuple[str, str]]] = {
+        "GPi": [("snr", "caudate"), ("snr", "putamen")],
         "GPe": [
-            "gpe_proto:caudate",
-            "gpe_arky:caudate",
-            "gpe_cp:caudate",
-            "gpe_proto:putamen",
-            "gpe_arky:putamen",
-            "gpe_cp:putamen",
+            ("gpe_proto", "caudate"),
+            ("gpe_arky", "caudate"),
+            ("gpe_cp", "caudate"),
+            ("gpe_proto", "putamen"),
+            ("gpe_arky", "putamen"),
+            ("gpe_cp", "putamen"),
         ],
-        "STN": ["stn:caudate", "stn:putamen"],
-        "Cau": ["str_d1:caudate", "str_d2:caudate", "str_fsi:caudate"],
-        "Put": ["str_d1:putamen", "str_d2:putamen", "str_fsi:putamen"],
-        "MD": ["thal:caudate"],
-        "VAp": ["thal:putamen"],
+        "STN": [("stn", "caudate"), ("stn", "putamen")],
+        "Cau": [
+            ("str_d1", "caudate"),
+            ("str_d2", "caudate"),
+            ("str_fsi", "caudate"),
+        ],
+        "Put": [
+            ("str_d1", "putamen"),
+            ("str_d2", "putamen"),
+            ("str_fsi", "putamen"),
+        ],
+        "MD": [("thal", "caudate")],
+        "VAp": [("thal", "putamen")],
+    }
+    bold_region_dict: dict[str, list[str]] = {
+        region: [population_name(model_version, loop, comp) for comp, loop in comps]
+        for region, comps in bold_region_compartments.items()
     }
     # calculate scaling factors for the different GPe populations
     gpe_proportions = {"gpe_proto": 0.5, "gpe_arky": 0.17, "gpe_cp": 0.10}
     gpe_scaling_factors = [
-        gpe_proportions[key.split(":")[0]] for key in bold_region_dict["GPe"]
+        gpe_proportions[comp] for comp, _ in bold_region_compartments["GPe"]
     ]
     gpe_scaling_factors = np.array(gpe_scaling_factors) / np.sum(gpe_scaling_factors)
     # scaling factors for striatum proportions (del Rey et al. 2022)
     # Cau and Put have the same proportions
     props_delRey = {"str_d1": 0.86 / 2, "str_d2": 0.86 / 2, "str_fsi": 0.026}
     str_scaling_factors = [
-        props_delRey[key.split(":")[0]] for key in bold_region_dict["Cau"]
+        props_delRey[comp] for comp, _ in bold_region_compartments["Cau"]
     ]
     str_scaling_factors = np.array(str_scaling_factors) / np.sum(str_scaling_factors)
 
@@ -852,7 +1028,7 @@ if __name__ == "__main__":
             input_var = "I"
 
         # get populations from population names
-        populations = [get_population(pop_name) for pop_name in population_names]
+        populations = [get_population(name) for name in population_names]
 
         bold_monitor_dict[bold_region] = BoldMonitor(
             populations=populations,
@@ -865,6 +1041,13 @@ if __name__ == "__main__":
     ### COMPILE ###
     ### Compile model (i.e. both loops in a single model) afterwards we are ready to simulate
     model_dict["caudate"].compile()
+
+    ### BOLD SAMPLING RATE ###
+    # Record BOLD on the TR grid of the experimental data instead of every dt.
+    # At dt = 0.1 ms a full run would otherwise store 7.16 million samples per
+    # region, several GB per process, of which only every 23100th is ever used.
+    for bold_monitor in bold_monitor_dict.values():
+        bold_monitor._monitor.period = TR_S * 1000.0
 
     if args.compile:
         print("Compilation completed; skipping simulations (--compile).")
@@ -880,9 +1063,9 @@ if __name__ == "__main__":
     pops_to_monitor = []
     for loop in ["caudate", "putamen"]:
         bgm_model: BGM = model_dict[loop]
-        for pop_name in bgm_model.populations:
-            if not pop_name.startswith("TimedInput"):
-                pops_to_monitor.append(pop_name)
+        for name in bgm_model.populations:
+            if not name.startswith("TimedInput"):
+                pops_to_monitor.append(name)
     # create the monitor dictionary with variables to record
     monitor_dictionary = {pop_name: ["spike"] for pop_name in pops_to_monitor}
     monitors = CompNeuroMonitors(monitor_dictionary)
@@ -890,7 +1073,10 @@ if __name__ == "__main__":
     ### EXPERIMENT ###
     ### Define a CompNeuroPy experiment to run the model 10 s and obtain the spike recordings
     experiment = Spikes10s(
-        monitors=monitors, model_dict=model_dict, seed=paramsS["seed"]
+        monitors=monitors,
+        model_dict=model_dict,
+        seed=paramsS["seed"],
+        model_version=model_version,
     )
 
     ### SIMULATIONS ###
@@ -898,7 +1084,7 @@ if __name__ == "__main__":
     ### SIMULATION FOR RATES: ###
     firing_rate_dict = get_firing_rate_10s(param_list=param_list, experiment=experiment)
     # obtain loss based on firing rates, between 0 and 1
-    firing_rate_loss = get_firing_rate_loss(firing_rate_dict)
+    firing_rate_loss = get_firing_rate_loss(firing_rate_dict, model_version)
 
     ### SIMULATION FOR BOLD: ###
     bold_data = get_BOLD_full(
@@ -906,12 +1092,13 @@ if __name__ == "__main__":
         seed=paramsS["seed"],
         bold_monitor_dict=bold_monitor_dict,
         param_list=param_list,
+        model_version=model_version,
     )
     # obtain loss based on BOLD correlation, between 0 and 1
     bold_loss, per_region_corr = compute_bold_correlation_loss(
         sim_bold=bold_data,
         condition=dbs_condition,
-        tr_s=2.31,
+        tr_s=TR_S,
         ramp_up_ms=paramsS["t.rampup"],
         data_file=None,
         region_map=None,
@@ -920,9 +1107,24 @@ if __name__ == "__main__":
 
     ### TOTAL LOSS ###
     total_loss = float(firing_rate_loss + bold_loss)
+    # Record the components too: a bare total cannot tell a good BOLD fit with
+    # implausible rates from the reverse, and the diagnosis matters more than the
+    # number when a multi-day run produces something unexpected.
     loss_payload = {
         "total_loss": total_loss,
+        "firing_rate_loss": float(firing_rate_loss),
+        "bold_loss": float(bold_loss),
+        "bold_correlations": {k: float(v) for k, v in per_region_corr.items()},
+        "firing_rates_hz": {k: float(v) for k, v in firing_rate_dict.items()},
+        "n_bold_samples": {k: int(np.asarray(v).size) for k, v in bold_data.items()},
+        "dbs": dbs_condition,
+        "model_version": model_version,
+        "n_trs": len(mixed_rates["caudate"]["rate"]),
+        "duration_ms": float(paramsS["t.duration"]),
     }
+    print(
+        f"loss {total_loss:.4f} = firing_rate {firing_rate_loss:.4f} + bold {bold_loss:.4f}"
+    )
 
     loss_folder = Path(__file__).resolve().parent / paramsS["data_folder"]
     loss_folder.mkdir(parents=True, exist_ok=True)

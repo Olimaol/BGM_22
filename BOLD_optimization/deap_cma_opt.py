@@ -11,8 +11,10 @@ parser = argparse.ArgumentParser(description="Run DEAP CMA-ES optimization for B
 parser.add_argument(
     "--dbs",
     type=str,
-    default=paramsS.get("dbs", "on"),
-    help="DBS condition string passed to get_loss.py (e.g., 'on' or 'off').",
+    required=True,
+    choices=["on", "off"],
+    help="DBS condition passed to get_loss.py. Required: silently defaulting "
+    "here means a whole optimization can run against the wrong condition.",
 )
 parser.add_argument(
     "--optimization-run",
@@ -140,7 +142,9 @@ deap_cma = DeapCma(
     max_evals=paramsS["deap_cma.run.max_evals"],
     p0=p0,
     hard_bounds=True,
-    plot_file=paramsS["data_folder"] + "/deap_cma_plot.png",
+    plot_file=(
+        f"{paramsS['data_folder']}/deap_cma_plot_{dbs_condition}_run_{optimization_run}.png"
+    ),
     cma_params_dict={
         "lambda_": paramsS["deap_cma.lambda"]
     },  # TODO set this depending on how many parallel jobs we can run
