@@ -92,8 +92,25 @@ Steps 1-3 are done and verified. Measured on the laptop, v07 went from **41.87 t
 ~3.25 s per simulated second** — a full 716 s evaluation from ~500 min to **~39 min**,
 against a C++ floor of ~21 min. v08 reproduces its pre-refactor loss exactly.
 
-Commits: `ANNarchy_compneuro` `2a11e858` (fast buffer + backported `update()`
-semantics) and `f215694e` (rounding fix); CompNeuroPy `c0ad10f`; BGM_22 `9716591`.
+Commits, by plan step:
+
+| step | repo | commit |
+|------|------|--------|
+| 1 patch ANNarchy | `ANNarchy_compneuro` | `2a11e858` fast buffer + backported `update()` semantics |
+| 1 patch ANNarchy | `ANNarchy_compneuro` | `f215694e` round instead of truncate when converting schedule/period |
+| 2 drop workarounds | CompNeuroPy | `c0ad10f` (also carries the coarser-cortical-drive change) |
+| 2 drop workarounds | BGM_22 | `9716591` |
+| 3 rebuild `get_loss.py` | BGM_22 | `3b65e8f` bug fixes + `--model-version` |
+| — documentation | BGM_22 | `2db3872` `CLAUDE.md`, `PLAN.md`, `TODO.md` |
+
+Unrelated January work committed at the same time: BGM_22 `a0cd700`
+(`test_microcircuit.py`) and CompNeuroPy `5fcc6b9` (`spike_input_cortex.py` demo),
+both produced for the SPP-2041 meeting.
+
+BGM_22 and CompNeuroPy are pushed and in sync with `origin/olimaol_develop`.
+**`ANNarchy_compneuro` is local only** and must stay that way: its `origin` is
+`github.com/ANNarchy/ANNarchy`, the upstream project rather than a fork, so the
+patch needs another route to the workstations (see `TODO.md` §6).
 
 **The v07 code path has never been executed** — `Microcircuit` refuses a cache whose
 `n_steps` differs from `int(t.duration/dt)`, and the caches on disk hold 12,000 steps
