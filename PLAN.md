@@ -148,7 +148,9 @@ Unrelated January work committed at the same time: BGM_22 `a0cd700`
 (`test_microcircuit.py`) and CompNeuroPy `5fcc6b9` (`spike_input_cortex.py` demo),
 both produced for the SPP-2041 meeting.
 
-BGM_22 and CompNeuroPy are pushed and in sync with `origin/olimaol_develop`.
+BGM_22 and CompNeuroPy are committed but **the 2026-08-04 commits have not been
+pushed** — push them before step 7, since that is how the code reaches the
+workstations.
 **`ANNarchy_compneuro` is local only** and must stay that way: its `origin` is
 `github.com/ANNarchy/ANNarchy`, the upstream project rather than a fork, so the
 patch needs another route to the workstations (see `TODO.md` §6).
