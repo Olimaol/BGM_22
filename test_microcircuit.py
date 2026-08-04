@@ -13,9 +13,9 @@ if __name__ == "__main__":
     mc = Microcircuit(
         name=NAME,
         dbs_condition=DBS_CONDITION,
-        build_connectivity=False,
-        build_missing_gaba_input=False,
-        build_cortical_input=False,
+        build_connectivity=True,
+        build_missing_gaba_input=True,
+        build_cortical_input=True,
         dt=TIMESTEP,
         T=TMAX,
         update_time=100.0,
