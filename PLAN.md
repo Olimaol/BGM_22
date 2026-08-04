@@ -92,9 +92,9 @@ DBS-on fit, just to get the pipeline working. See `TODO.md` §2.
 3. ~~Rebuild `get_loss.py`: bug fixes + `--model-version`, smoke-tested on v08.~~ **done**
 4. ~~Build a short v07 cache and run the v07 path end-to-end.~~ **done**
 5. ~~Firing-rate gate, logging, checkpointing, failure policy; update `deap_cma_opt.py`.~~ **done**
-6. **Make the DBS-on path work, and prove both conditions end-to-end.** ← next
-7. Resolve the parameter bounds (`TODO.md` §1) before any real fit — on the
-   post-step-6 numerics, since step 6 moves them.
+6. ~~Make the DBS-on path work, and prove both conditions end-to-end.~~ **done**
+7. **Resolve the parameter bounds (`TODO.md` §1) before any real fit** — on the
+   post-step-6 numerics, since step 6 moved them. ← next
 8. Workstation setup; build the full DBS-off **and** DBS-on caches; time one
    evaluation per machine.
 9. Five-generation mini-run with checkpointing. **This green is the milestone.**
@@ -216,24 +216,67 @@ restores it. `DBS.md` records the mechanism and the limitations found on the way
 cannot be activated at all; the DBS constants are unvalidated single-subject
 values).
 
+### What step 6 produced
+
+**The off-condition regression is small.** v07, 5 TRs, DBS off, the same vector as
+the reference run:
+
+| | before | after |
+|---|---|---|
+| total | 1.5430 | **1.5442** |
+| firing rate | 0.8678 | 0.8705 |
+| BOLD | 0.6752 | 0.6737 |
+
+The RNG stream did move, as predicted, but by little: v07's DBS footprint excludes
+the 1000-neuron microcircuit, which is what dominates RNG consumption.
+
+**The DBS effect is real and confined to putamen.** v07 at 5 TRs, off vs on
+(`dbs_depolarization` 3.0, `passing_fibres_strength` 0.5,
+`axon_spikes_per_pulse` 0.5), Hz:
+
+| population | off | on | Δ | | caudate twin | Δ |
+|---|---|---|---|---|---|---|
+| snr:putamen | 139.11 | 112.63 | **−26.48** | | snr:caudate | +0.71 |
+| gpe_proto:putamen | 111.90 | 88.97 | **−22.93** | | gpe_proto:caudate | +0.79 |
+| stn:putamen | 18.53 | 10.69 | **−7.84** | | stn:caudate | −0.79 |
+| thal:putamen | 4.56 | 3.12 | −1.44 | | thal:caudate | −1.18 |
+
+The sub-1 Hz caudate changes are the cortical drive differing by condition, not a
+DBS leak. On v08, where the two on-runs can be compared on the *same* drive with
+only the DBS parameters differing, every caudate population is identical to 2 dp
+while nine putamen populations move — so the free control holds exactly.
+
+**The whole fitting loop runs in both conditions**, on both model versions:
+a `--dbs off` mini-run, then a `--dbs on` mini-run seeding from its pickle
+through `load_best_off_fit`, then `--resume`. v07 on carried over
+`deap_cma_result_v07_off_run_98` and searched 13 free parameters against a
+19-slot fixed base; v08 on searched 15 against 21. `test_dbs_on.py` covers the
+mechanism, the negative validation case, and the free control; all 24 checks pass.
+
+**The rate gate would have gated everything.** v07 off scored 0.8705 and on
+0.8742, both far above the 0.5 gate, so all four mini-runs ran with
+`--gate-threshold 1.0`. `TODO.md` §10 has the numbers.
+
+**A laptop limit, not a code one:** `--lambda 4` on v07 lost two of four
+`cc1plus` processes to the OOM killer during the per-individual compile; 16 GB is
+not enough for four v07 compiles at once. `--lambda 2` was fine. Noted in
+`TODO.md` §6 as a thing to measure before choosing lambda on the workstations —
+it is a different limit from the December failure, which was OOM during
+*simulation*.
+
 ## Immediate next actions
 
-1. Step 6 — finish and verify. Baselines for the changed off-condition numerics,
-   a mechanism test asserting the off/on delta survives a reset, then off→on
-   mini-run pairs on v08 (minutes) and on v07 against a freshly built 5-TR
-   DBS-on cache. Mini-runs use `--gate-threshold 1.0`, because the rate bands
-   have no DBS switch and would otherwise skip BOLD on every individual.
-2. Step 7 — the bounds. v07's are provisional: `[0, 0.01]` for the seven drive
+1. Step 7 — the bounds. v07's are provisional: `[0, 0.01]` for the seven drive
    weights with `p0 = 0.001`, the class default. The sweep above says the useful
    range is roughly `[5e-4, 2e-3]`, so the bound is ~5x above the useful top —
    far better conditioned than v08's `[0, 500]` but still guessed. Measure the
    band-crossing per population and set tight bounds, for both versions. Redo the
    sweep first: step 6 moved the numbers.
-3. Step 8 — get the patched ANNarchy and the two repos onto hinton/waikiki
+2. Step 8 — get the patched ANNarchy and the two repos onto hinton/waikiki
    (`TODO.md` §6), then build the caches there. Budget from the laptop: 24 min per
    loop for 5 TRs means ~25 h per loop serially at 310 TRs, so ~50 h and ~138 GiB
    **per DBS condition** — and both conditions are needed, which step 9 used to
    assume without ever saying. Generation is embarrassingly parallel over
    (pre, post) pairs, and `TODO.md` §3's smaller layout should land at the same
    time.
-4. Step 9 — the five-generation mini-run.
+3. Step 9 — the five-generation mini-run.

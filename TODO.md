@@ -137,6 +137,15 @@ used.
   run one generation each way on hinton and compare wall time.
 - Measure the real per-evaluation time on both machines; all current budgets come
   from laptop timings.
+- **lambda may be bound by compilation, not simulation.** On the laptop (16 GB)
+  a v07 mini-run at `--lambda 4` had two of its four `cc1plus` processes killed
+  by the OOM killer during the per-individual compile; `--lambda 2` was fine.
+  This is a different limit from the December failure, which was OOM during
+  *simulation* with 24 processes. Measure the peak RSS of one v07 `g++` before
+  choosing lambda on hinton (125 GB) and waikiki (251 GB) — and note the
+  per-individual compile folders mean lambda compilations run at once. If it
+  binds, compile once with `--compile` and pass `--skip-compile` to the run, or
+  stagger the compile phase.
 
 ### 7. Where the rebuild stands (state at the end of the session)
 
@@ -243,11 +252,18 @@ during the probe.** `get_firing_rate_loss`'s `plausible_ranges` has no DBS switc
 and `dbs_stimulator.on()` now precedes the rate probe, so an on-condition
 individual is judged against off-condition bands while STN and its targets are
 being driven harder. The risk of gating everything is strictly worse in the on
-condition than the 0.868 above suggests. The step 6 mini-runs therefore run with
-`--gate-threshold 1.0` and log the off and on rate losses side by side; calibrate
-the threshold — and decide whether the bands need an on-condition variant — from
-those numbers, not before. Inventing on-condition bands now would bake guessed
-values into an expensive fit.
+condition than the 0.868 above suggests. The step 6 mini-runs therefore ran with
+`--gate-threshold 1.0` and logged the off and on rate losses side by side.
+
+**Measured (2026-08-04), v07 at 5 TRs, the default parameter vector:** off
+**0.8705**, on **0.8742**. So the on condition is barely worse, but *both* are far
+above the 0.5 gate — at the default vector every individual would be gated in
+either condition, and the search would see only the rate term. The gate is
+therefore untenable as configured, and the question is not on-vs-off but whether
+0.5 is reachable at all once the bounds (§1, §9) let the rate term come good.
+Decide together with the bounds, from a real mini-run at fitted parameters rather
+than at the defaults. Inventing on-condition bands now would bake guessed values
+into an expensive fit.
 
 ### 11. `run_script_parallel` is no longer used by the optimization
 
