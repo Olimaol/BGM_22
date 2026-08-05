@@ -382,3 +382,38 @@ commit (`73481ab`, 15:14), so the numbers were already wrong when it claimed
 "everything cited here was checked against the code". They have been recomputed
 against the current 2100-line file. Re-verify them, or replace them with function
 names, whenever `dbs.py` changes.
+
+## From the session on 2026-08-05 (documenting the model creation)
+
+### 19. `parameters.py` labels the *planned* cache size as the current one
+
+The `mc_ci_cache_dir` comment says "the caches are ~138 GiB per DBS condition".
+That number is §3's estimate for the **layout we have not built yet** — `uint16`
+instead of `float64`, cortical regions pre-summed per postsynaptic type. The
+caches that exist today are ~11x larger. Anyone provisioning `/scratch` from that
+comment will under-allocate by an order of magnitude.
+
+Derivation, cross-checked against the cache that exists. The streams total
+**24 084 receiver rows** across both loops in the current layout — caudate 11 342
+(2942 compensation + 6000 cortical-striatal + 2400 `CorticalInputs`), putamen
+12 742 (2942 + 7000 + 2800) — each row `n_steps` values:
+
+| layout | rows | `n_steps` | per DBS condition |
+|--------|--------|--------|--------|
+| current, `--n-trs 5` | 24 084 | 115 500 | 22.28 GB derived / **22.28 GB measured** |
+| current, 310 TRs | 24 084 | 7 161 000 | 1 380 GB = **1.26 TiB** |
+| planned (`uint16`, pre-summed), 310 TRs | 8 684 | 7 161 000 | 124 GB = 116 GiB |
+
+The derived and measured 5-TR figures agree to four digits, so the extrapolation
+is sound, and the planned-layout row confirms that §3's ~138 GiB is the right
+order for what it describes. `CLAUDE.md` and `PLAN.md` already carry the correct
+current figure (~1.25 TiB); `parameters.py` is the only outlier.
+
+**What to do.** Either qualify the comment ("~1.26 TiB today, ~120 GiB after the
+layout change of TODO §3") or leave it until §3 actually lands and the number
+becomes true. Not corrected here, because changing it in isolation invites the
+opposite confusion.
+
+**Caveat.** The planned-layout row assumes pre-summing collapses all cortical
+regions to one stream per postsynaptic type and nothing else changes. It has not
+been built, so treat it as arithmetic, not measurement.

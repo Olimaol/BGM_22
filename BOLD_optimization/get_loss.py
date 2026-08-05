@@ -8,6 +8,7 @@ from ANNarchy import (
     populations,
     TimedArray,
     CurrentInjection,
+    report,
 )
 from ANNarchy.extensions.bold import BoldMonitor
 from CompNeuroPy.full_models import BGM
@@ -1012,13 +1013,25 @@ if __name__ == "__main__":
         default="",
         help="Optional suffix for the ANNarchy compile folder (e.g., run tag).",
     )
+    parser.add_argument(
+        "--report",
+        type=str,
+        default=None,
+        help="Write an ANNarchy report of the compiled network to this path and "
+        "exit. The filename must end in .md or .tex. Documents what this script "
+        "actually builds -- populations, projections, neuron and synapse models "
+        "including the DBS retrofit -- rather than what the source suggests. "
+        "Implies --compile.",
+    )
     args = parser.parse_args()
     dbs_condition = args.dbs
     model_version = args.model_version
 
     # --compile is run with a placeholder vector whose length nobody guarantees,
     # and nothing is simulated, so only a real evaluation validates the layout.
-    if args.compile:
+    # --report simulates nothing either, and is meant to be callable without a
+    # parameter vector at all.
+    if args.compile or args.report:
         param_list, putamen_cluster_scalings, dbs_params = list(args.params), None, None
     else:
         param_list, putamen_cluster_scalings, dbs_params = split_param_list(
@@ -1266,6 +1279,15 @@ if __name__ == "__main__":
     ### COMPILE ###
     ### Compile model (i.e. both loops in a single model) afterwards we are ready to simulate
     model_dict["caudate"].compile()
+
+    ### NETWORK REPORT ###
+    # After compile, so the report describes the network ANNarchy really built,
+    # including the equations add_dbs_mechanisms rewrote. Before the BoldMonitor
+    # period is changed below, so the monitors appear as they were declared.
+    if args.report:
+        report(filename=args.report)
+        print(f"Wrote network report to {args.report}; skipping simulations.")
+        sys.exit(0)
 
     ### BOLD SAMPLING RATE ###
     # Record BOLD on the TR grid of the experimental data instead of every dt.

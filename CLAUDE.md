@@ -7,7 +7,9 @@ which parameters had to change — i.e. what DBS did inside the basal ganglia.
 
 Read `PLAN.md` for the current plan and where the work stands, `TODO.md` for
 findings we deliberately postponed, and `DBS.md` for exactly what differs between
-the DBS-off and DBS-on model.
+the DBS-off and DBS-on model. `model_v07.md` walks through how the real model is
+built, step by step from `setup()` to `compile()`; `model_v08.md` does the same
+for the reduced model, as a delta against it.
 
 ## Three repos, one environment
 
