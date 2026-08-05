@@ -192,6 +192,8 @@ Not yet done:
 - The FC matrices in `sub-01_subdiv_results.h5` are **not** plain
   `corrcoef(time_series)` — they look regularized or partial. Worth confirming with
   whoever produced them if the FC is ever used as a fit target.
+- The user doesn't want dbs to appear in `model_creation_kwargs["dbs"]`, passed to `Microcircuit(dbs_condition=...)` and `CorticalInputs(dbs_condition=...)`. The model creation, i.e. creating the BGM model, should be independent of DBS. DBS is added after model creation. Currently, the dbs information during the model creation only selects the cortical firing-rate files. SO better give directly the locations of the files.
+- rename dbs_depolarization, it actually hyperpolarizes the neurons, currently it's just a wrong naming
 
 ---
 
