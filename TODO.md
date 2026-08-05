@@ -362,3 +362,23 @@ It does not bite today — every population in the DBS footprint is
 `Izhikevich2003NoisyBaseNonlin` — but it would the moment a striatal population
 entered the footprint, and it would do so silently. Worth a guard in
 `add_dbs_mechanisms` if that ever becomes possible.
+
+## From the session on 2026-08-05 (DBS.md corrections)
+
+### 18. DBS.md's line references drift silently
+
+Two claims in `DBS.md` were wrong and were corrected on 2026-08-05: `c`/`d` were
+described as existing for the DBS axon reset (they are the ordinary Izhikevich
+reset parameters, used by every regular spike), and `post.dbs_on` was described
+as confining an axon volley to the VTA (it is 1 on every non-excluded population,
+so it only bites on projections into the stimulated population and into excluded
+ones — efferents and passing fibres carry the volley outside the VTA, which is
+the orthodromic effect).
+
+While fixing them, **every one of the 15 `dbs.py:NNN` references in `DBS.md` was
+stale** — some by −345 lines, some by +155, so `dbs.py` had been reordered as well
+as grown. The document was committed (`a8e0222`, 15:42) *after* the last `dbs.py`
+commit (`73481ab`, 15:14), so the numbers were already wrong when it claimed
+"everything cited here was checked against the code". They have been recomputed
+against the current 2100-line file. Re-verify them, or replace them with function
+names, whenever `dbs.py` changes.

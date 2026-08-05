@@ -9,7 +9,7 @@ refer to `CompNeuroPy/src/CompNeuroPy/dbs.py` unless stated otherwise.
 
 ## Where DBS lives
 
-The entire mechanism is `CompNeuroPy/src/CompNeuroPy/dbs.py` (1849 lines),
+The entire mechanism is `CompNeuroPy/src/CompNeuroPy/dbs.py` (2100 lines),
 exported from `CompNeuroPy/__init__.py`. There are **no DBS neuron models,
 synapse models, populations or projections anywhere** — `neuron_models/` and
 `synapse_models/` contain no occurrence of `dbs`, `axon` or `antidromic`.
@@ -42,7 +42,7 @@ at run time. `on()` calls `_set_dbs_on`, `_set_depolarization`, `_set_axon_spike
 There are two ways to accomplish stage A:
 
 - `DBSstimulator(auto_implement=True)` — clears the whole network
-  (`dbs.py:73` `cnp_clear`) and recreates every population and projection from
+  (`dbs.py:589` `cnp_clear`) and recreates every population and projection from
   introspected `__init__` kwargs. **This project does not use it**, because
   recreation rebuilds every population as a plain `ann.Population` and every
   projection through `_connector_methods_dict` (`dbs.py:8-21`), which has no
@@ -59,7 +59,7 @@ There are two ways to accomplish stage A:
 
 ## Exactly what is added to a spiking neuron model
 
-`add_DBS_to_spiking_neuron_model` (`dbs.py:474-550`).
+`add_DBS_to_spiking_neuron_model` (`dbs.py:129-205`).
 
 Five new parameters:
 
@@ -105,13 +105,17 @@ u += ite(unif_var_dbs2 < antidromic_prob, dbs_on*antidromic*d, 0)
 ```
 
 i.e. a full Izhikevich spike reset (`v → c`, `u += d`) applied *without* the
-neuron having crossed threshold and *without* entering refractoriness. This is
-why the neuron model needs a `d` parameter at all.
+neuron having crossed threshold and *without* entering refractoriness. `c` and
+`d` are not DBS additions — they are the ordinary Izhikevich reset parameters
+every one of these neuron models already has for its regular spikes (`reset="v =
+c; u = u + d"`, e.g. `neuron_models/final_models/izhikevich_2007_like_nm.py:253-256`;
+`d` may be 0 in a given parameter set, but the mechanism is always there). What
+DBS adds is the same reset fired by a pulse instead of by threshold crossing.
 
-`add_term_to_eq_line` (`dbs.py:552-578`) inserts before any `:` flag, so
+`add_term_to_eq_line` (`dbs.py:40-63`) inserts before any `:` flag, so
 `: init=...` and `: population` survive.
 
-Rate-coded models get a parallel treatment (`dbs.py:620-683`): `axon_rate_amp`
+Rate-coded models get a parallel treatment (`dbs.py:206-269`): `axon_rate_amp`
 instead of `prob_axon_spike`, a new `axon_rate = axon_rate_amp*dbs_on` variable,
 and the same term on `dmp/dt` against −1 instead of −90. **It raises
 `ValueError("No line with dmp/dt found…")` on any rate model without `mp`** —
@@ -120,7 +124,7 @@ two reasons the input machinery must be kept out of the DBS footprint.
 
 ## Exactly what is added to a synapse model
 
-Spiking (`dbs.py:763-809`):
+Spiking (`dbs.py:293-339`):
 
 ```
 p_axon_spike_trans = 0 : projection
@@ -128,20 +132,36 @@ unif_var_dbs = Uniform(0., 1.)
 pre_axon_spike = g_target += ite(unif_var_dbs<p_axon_spike_trans, w*post.dbs_on, 0)
 ```
 
-Three gates stack on an axon-spike-driven transmission: the per-synapse Bernoulli
-`p_axon_spike_trans`, the normal weight `w`, and **`post.dbs_on`** — the
-*postsynaptic* neuron's flag, so an afferent volley only reaches the neurons
-inside the VTA.
+Three gates stack on an axon-spike-driven transmission: `p_axon_spike_trans`
+(declared `: projection`, drawn against a per-synapse uniform), the normal weight
+`w`, and **`post.dbs_on`** — the *postsynaptic* neuron's flag.
 
-Rate-coded (`dbs.py:811-858`): `pre.r` is replaced by `pre_rate` everywhere and
+**`post.dbs_on` does not keep the volley inside the VTA.** `_set_dbs_on` gives
+`dbs_on = 1` to every non-excluded population and hands the partial `dbs_on_array`
+only to the stimulated population (see the `on()` section below), so the factor
+bites in exactly two places:
+
+- projections whose post *is* the stimulated population — the **afferents**, and
+  any recurrent projection. There an incoming volley reaches only the stimulated
+  neurons whose `dbs_on` is 1, i.e. those inside the VTA.
+- projections into an **excluded** population, where `dbs_on = 0` blocks it.
+
+On the **efferents** of the stimulated region and on the **passing fibres**, post
+is an ordinary downstream population with `dbs_on = 1`, so the factor is a no-op:
+the volley leaves the stimulated region and drives those targets. That is the
+whole point of the orthodromic effect — DBS is felt well outside the VTA.
+
+Rate-coded (`dbs.py:340-387`): `pre.r` is replaced by `pre_rate` everywhere and
 
 ```
 pre_rate = pre.r + p_axon_spike_trans*pre.axon_rate*post.dbs_on
 ```
 
+with the same `post.dbs_on` factor and therefore the same reach.
+
 ## The pulse train
 
-`_set_constants` (`dbs.py:1196-1213`), called from `DBSstimulator.__init__`:
+`_set_constants` (`dbs.py:1353-1371`), called from `DBSstimulator.__init__`:
 
 ```python
 ann.Constant("dbs_pulse_frequency_Hz", dbs_pulse_frequency_Hz)
@@ -161,28 +181,28 @@ and compilation fails. `DBSstimulator` is no longer an on-only object.
 
 `axon_spikes_per_pulse` is converted to a per-timestep probability by
 `np.clip(axon_spikes_per_pulse * 1000 * dt / dbs_pulse_width_us, 0, 1)`
-(`dbs.py:1217-1232`). With this project's numbers that is the identity, so
+(`dbs.py:1372-1388`). With this project's numbers that is the identity, so
 `axon_spikes_per_pulse` *is* the per-pulse spike probability.
 
 ## What `on()` writes, and where
 
-`_set_dbs_on` (`dbs.py:1755-1799`) — runs first:
+`_set_dbs_on` (`dbs.py:2006-2050`) — runs first:
 - excluded populations → `dbs_on = 0`
 - stimulated population → the 0/1 `dbs_on_array`
 - every other population → `dbs_on = 1`
 
-The array (`_create_dbs_on_array`, `dbs.py:1156-1196`) has
+The array (`_create_dbs_on_array`, `dbs.py:1311-1352`) has
 `rng.choice([ceil, floor])` of `proportion * N` ones, shuffled with
 `np.random.default_rng(seed)`. **It is not `round(proportion*N)`** — assert
 against `dbs_stimulator.dbs_on_array`, not against a recomputed count.
 
-`_set_depolarization` (`dbs.py:1234-1259`) — `dbs_depolarization` on the
+`_set_depolarization` (`dbs.py:1389-1415`) — `dbs_depolarization` on the
 stimulated population only, 0 everywhere else. The somatic effect is STN-only.
 
-`_set_axon_spikes` (`dbs.py:1261-1388`) — first `_deactivate_axon_DBS()` zeroes
+`_set_axon_spikes` (`dbs.py:1416-1544`) — first `_deactivate_axon_DBS()` zeroes
 everything, then:
 
-*Orthodromic* (`dbs.py:1430-1532`):
+*Orthodromic* (`dbs.py:1585-1688`):
 - `efferents` → for each `ann.projections(pre=stim_pop)`: `axon_transmission = 1`,
   `p_axon_spike_trans = 1`, and `proj.pre.prob_axon_spike = prob`
 - `afferents` → for each `ann.projections(post=stim_pop)`: the same, but
@@ -191,7 +211,7 @@ everything, then:
 - `passing_fibres` → per projection in `passing_fibres_list`:
   `p_axon_spike_trans = passing_fibres_strength[i]`
 
-*Antidromic* (`dbs.py:1534-1659`):
+*Antidromic* (`dbs.py:1689-1816`):
 - `efferents` → `stim_pop.antidromic = 1`, `antidromic_prob = 1`
 - `afferents` → each presynaptic population: `antidromic = 1`,
   `antidromic_prob = np.mean(stim_pop.dbs_on)`, i.e. the VTA coverage fraction
@@ -200,8 +220,8 @@ everything, then:
 
 ### `excluded_populations_list` is load-bearing
 
-Most setters guard with `hasattr` (`_set_dbs_on:1787-1792`,
-`_set_depolarization:1250-1255`, `_deactivate_axon_DBS:1394-1428`), so a
+Most setters guard with `hasattr` (`_set_dbs_on:2038-2044`,
+`_set_depolarization:1404-1410`, `_deactivate_axon_DBS:1545-1584`), so a
 population without the mechanisms is inert there. But the **efferent and afferent
 branches of `_set_orthodromic` and `_set_antidromic` are unguarded** — they set
 `proj.axon_transmission`, `proj.p_axon_spike_trans`, `proj.pre.prob_axon_spike`
