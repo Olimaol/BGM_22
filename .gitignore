@@ -22,7 +22,7 @@ experimental_data/berlin_data/*
 *cache*/
 # ignore the data generated in striatal_microcircuit_requirements
 striatal_microcircuit_requirements/connectivity_parameters/connectivity_fit_data
-striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data# optimization run artefacts: checkpoints, result pickles and per-individual logs
+striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data
 */data_BOLD_optimization/checkpoints/
 */data_BOLD_optimization/deap_cma_result/
 */data_BOLD_optimization/individual_logs/
