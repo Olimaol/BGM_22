@@ -178,6 +178,36 @@ half a generation, and a CMA-ES checkpoint per generation for `--resume`.
 - The striatal `exp_input_weight` bounds are orders of magnitude too wide in **v08**
   (see `TODO.md` §1) — do not start a real fit before resolving that. v07's drive
   weight is better behaved but its bounds are still provisional (`TODO.md` §9).
+- **A parameter set after `compile()` does not survive `reset()`.**
+  `Population.__setattr__` writes to `pop.init` while the population is
+  uninitialized and to the C++ instance afterwards, and `Population.reset()` is
+  `self.set(self.init)`. So anything assigned post-compile silently reverts at the
+  next reset — and CompNeuroPy's `CompNeuroExp.reset()` defaults to
+  `parameters=True`. This is exactly how DBS-on evaluations ran with DBS switched
+  off, without an error and with a plausible loss file. Set such state **before**
+  compile, or re-apply it after every reset site.
+- **Assigning an attribute a Population or Projection does not have is not an
+  error.** `__setattr__` falls through to `object.__setattr__`, so a wrong or
+  missing parameter name quietly becomes a plain Python attribute and the intended
+  effect is dropped. Nothing warns. Any code that walks a list of objects setting
+  parameters should check `name in pop.attributes` first and raise otherwise.
+- **ANNarchy's RNG is not per population.** Random variables in equations draw
+  from one global `std::vector<std::mt19937> rng` — `rng[0]` for global variables,
+  `rng[thread_id]` under OpenMP. Adding or removing a random variable *anywhere*
+  shifts the numbers every other population receives, including populations in the
+  other, unconnected BG loop. The "capture a baseline and prove it bit-identical"
+  convention below cannot be satisfied locally for such a change; expect the whole
+  model to move and record the delta instead.
+- **Two unrelated things in this project are called `dbs`.**
+  `model_creation_kwargs["dbs"]` only selects the cortical firing-rate file and the
+  cache directory — it changes no equation, weight or connectivity. The actual
+  stimulation is `DBSstimulator` plus the equation terms added by
+  `add_dbs_mechanisms`. `DBS.md` has the full account. Do **not** reach for
+  `DBSstimulator(auto_implement=True)` even though it is what the CompNeuroPy
+  example uses: it clears and recreates the entire network, which cannot
+  reconstruct `TimedArray`/`CurrentInjection` (v07 dies with a `KeyError` on
+  `connector_name == "Specific"`) and invalidates every Python pointer into the
+  model.
 - Never make assumptions about ANNarchy, CompNeuroPy, and BGM_22 code purely from memory. Always verify your findings against the codebase.
 
 ## Workstations
