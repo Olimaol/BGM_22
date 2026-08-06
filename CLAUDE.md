@@ -81,14 +81,20 @@ BOLD monitors. Only the putamen loop is stimulated by DBS.
   laptop, an **interactive** MathWorks sign-in — `start_matlab()` hangs unattended
   (`TODO.md` §21). The folder is **git-ignored**, so back it up before rerunning:
   `create_data_raw_folder` deletes it after a `y/n` prompt.
-- **The cortical proportions live in exactly one place**,
+- Cortical proportions: `experimental_data/cortical_proportions/README.md` — how the
+  per-region caudate/putamen input mixes were derived, which numbers are measured
+  and which are our assumptions, and what is weakest (putamen PMv, range
+  0.10–0.24). The anchor is macaque tracer counts (Borra et al. 2021, 2022);
+  human tractography cannot answer this.
+- **The proportions live in exactly one place**,
   `BOLD_optimization/parameters.py: cortical_proportions_dict`. They split each
   striatal neuron's cortical afferents per region *and* weight the
   `caudate_rate`/`putamen_rate` mix above, so a second copy could silently
   disagree; `Microcircuit`/`CorticalInputs` have no defaults and validate what they
   are given. Changing them means regenerating the rate `.npz` — the file records
-  the weights it was built with and `get_loss` raises on a mismatch. Only v08 is
-  driven by the mixed series; v07 uses the per-region ones.
+  the weights it was built with and `get_loss` raises on a mismatch — and
+  rebuilding every v07 cache. Only v08 is driven by the mixed series; v07 uses the
+  per-region ones.
 - Striatal firing rates: `experimental_data/activity_striatum/README.md` — where the
   dSPN/iSPN rates and the `get_firing_rate_loss` bands come from, which assumption
   they rest on, and what was rejected. The values are the **medication-off** state of

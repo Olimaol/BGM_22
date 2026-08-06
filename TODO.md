@@ -584,11 +584,21 @@ deconvolved cortical series are only moderately correlated (off-diagonal r: min
 0.16 for dlPFC-M1, median 0.46, max 0.90 for PMd-PMv), so the regions are
 genuinely distinguishable. But the *mixed* drive barely moves:
 `corr(old mix, new mix)` = **0.995** for the caudate and **0.982** for the
-putamen, with the standard deviation changing by 1-5% and the mean not at all. So
-for v08, which sees nothing but the mixed series, the correction is close to a
-no-op. It bites in v07, where the proportions also set the per-region stream
-sizes: caudate PMv 700 -> 280 afferents, putamen PMv 350 -> 1260, putamen dlPFC
-350 -> 700, caudate dlPFC 3150 -> 3850 (per SPN, out of 7000).
+putamen (this was measured on the off condition before the change; the on
+condition later came out at 0.996 / 0.991). The mean cannot move — every column
+sums to 1 and every series has mean 5 Hz. So for v08, which sees nothing but the
+mixed series, the correction is close to a no-op *in timing*.
+
+Amplitude is the exception, and the figure quoted here originally ("1-5%") was
+measured on the off condition only. Across both: the standard deviation moves
++1.0% / +4.6% (off caudate / putamen) and +10.7% / **-11.7%** (on). The
+on-condition putamen drive is now ~12% less modulated than before — absorbable by
+the fitted input weight, but asymmetric between the two DBS conditions the
+inference compares, which is worth remembering.
+
+The change bites hardest in v07, where the proportions also set the per-region
+stream sizes: caudate PMv 700 -> 280 afferents, putamen PMv 350 -> 1260, putamen
+dlPFC 350 -> 700, caudate dlPFC 3150 -> 3850 (per SPN, out of 7000).
 
 One consequence cuts against us and should be stated: the corrected proportions
 make the two loops *more* alike, `corr(caudate mix, putamen mix)` rising from
