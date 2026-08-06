@@ -462,3 +462,141 @@ Sensitivity bound: 8–12 Hz. Any further change invalidates the v07 caches exac
 as the SPN rates did — still free while none exist.
 
 
+
+## From the session on 2026-08-06 (cortical proportions)
+
+### 21. The cortical proportions have no source, and PMv is wrong by ~3.5x
+
+`model_v07.md` §7.5 lists the per-region cortical proportions without a citation,
+because there is none. They are hand-set round numbers, duplicated verbatim in
+three places that have to agree:
+
+- `CompNeuroPy/.../striatal_microcircuit/microcircuit.py:150`
+- `CompNeuroPy/.../striatal_microcircuit/cortical_inputs.py:260`
+- `striatal_microcircuit_requirements/cortical_firing_rates/cortical_drive_by_bold.py:27`
+  (`MIXING_FACTORS`)
+
+They do two different jobs. In the microcircuit and `CorticalInputs` they set
+`N_eff = round(p * N_cortical_inputs)`, i.e. how many of a receiver's 7000 (SPN)
+or 2800 (FS) cortical afferents come from each region, and a region with `p <= 0`
+is skipped entirely. In `cortical_drive_by_bold.py` they are the weights of the
+linear mix that produces the stored `caudate_rate` / `putamen_rate` series. That
+third use is the reason this cannot be changed casually: the committed
+`firing_rates_matlab_condition-{on,off}.npz` was generated with the current
+weights — verified, `corr(stored caudate_rate, old mix) = 1.0000` — and
+regenerating it needs MATLAB (`matlabengine`). Editing the constant without
+regenerating leaves code and data silently disagreeing.
+
+**What the quantity should be.** For loop L and cortical ROI r, the fraction of
+corticostriatal afferents onto a striatal neuron in L that originate in r,
+renormalised over just the seven ROIs the Berlin data provides. Everything else
+that projects to the striatum — cingulate, insula, temporal, posterior parietal,
+orbital and ventrolateral prefrontal — has no ROI here and is renormalised away.
+In the macaque tracer data those excluded sources are 30-60% of all corticostriatal
+cells, so the renormalisation is not a rounding detail; the seven ROIs stand in
+for the whole cortex.
+
+**Primary evidence — quantitative macaque retrograde tracing.** These are the only
+sources that report corticostriatal input as a percentage of labelled cells rather
+than as a topography.
+
+Borra et al. 2022, *J Neurosci* 42:7060 (doi:10.1523/JNEUROSCI.0071-22.2022),
+Table 2, % of ipsilateral labelled cells by region group:
+
+| injection | rostral cing. | prefrontal | motor | parietal | insula | temporal | caudal cing. |
+|---|---|---|---|---|---|---|---|
+| caudate, lateral head | 21.5 | 37.8 | 8.4 | 6.1 | 4.8 | 13.5 | 7.0 |
+| caudate, medial head | 30.6 | 48.5 | 4.1 | 0.1 | 2.3 | 9.4 | 4.4 |
+| caudate, body | 7.0 | 4.8 | 74.1 | 11.5 | 0 | 0 | 2.6 |
+| putamen, rostral | 23.0 | 17.5 | 37.8 | 8.1 | 7.0 | 4.3 | 2.3 |
+| putamen, dorsal motor | 15.3 | 0.7 | 61.9 | 16.6 | 1.4 | 0 | 4.1 |
+| putamen, middle motor | 8.3 | 1.0 | 64.5 | 21.6 | 2.0 | 0.8 | 1.8 |
+| putamen, middle motor | 9.4 | 0 | 72.1 | 15.1 | 0.5 | 0.1 | 2.8 |
+| putamen, midventral motor | 2.6 | 0.5 | 75.5 | 18.6 | 1.2 | 0.8 | 0.8 |
+
+Borra et al. 2021, *J Neurosci* 41:1455-1469 (doi:10.1523/JNEUROSCI.1475-20.2020),
+Table 3, splitting that "motor" column per area for the motor putamen (F1 = M1,
+F2 = PMd, F3 = SMA, F4/F5 = PMv, F6 = preSMA, F7 = pre-PMd):
+
+| case | 24c/d | F6 | F7 | F3 | F2 | front. operc. | F5 | F4 | F1 |
+|---|---|---|---|---|---|---|---|---|---|
+| 75 dorsal | 14.4 | 0.8 | 0.3 | 12.7 | 7.1 | 2.2 | 2.5 | 2.0 | 34.1 |
+| 71r middle | 14.4 | 0.8 | 0.5 | 13.2 | 6.5 | 2.4 | 7.9 | 3.3 | 26.9 |
+| 71l midventral | 2.5 | 0.1 | — | 6.9 | 0.7 | 7.6 | 33.4 | 8.2 | 18.6 |
+| 61 | 12.3 | 3.7 | 1.2 | 10.6 | 9.3 | 16.5 | 10.0 | 3.0 | 2.7 |
+
+Supporting topography, used to split the bins the tables leave grouped: Takada et
+al. 1998 *Exp Brain Res* 120:114 (M1 lateral putamen, SMA medial putamen, PMd/PMv
+dorsomedial); Inase et al. 1999 *Brain Res* 833:191 (preSMA to rostral caudate and
+the cell bridges, segregated rostral to the SMA zone); Calzavara et al. 2007
+*Eur J Neurosci* 26:2005 (areas 9 and 46 to caudate head, caudal 46 extending into
+rostral putamen; PMdr to dorsal and lateral caudate); Flaherty & Graybiel 1995
+*J Neurophysiol* 74:2638 (M1's striatal projection magnification ~2x that of each
+individual S1 subarea, so summed S1 lands well below M1).
+
+**Secondary — human.** Human tractography is nearly all qualitative (Leh et al.
+2007, Lehericy et al. 2004, Draganski et al. 2008 report topography, not
+fractions). The one human source with per-pathway percentages is the connectomic
+analysis of Cacciola et al. 2017, *Front Neuroanat* 11:85
+(doi:10.3389/fnana.2017.00085, n = 15, CSD tractography), in the coarse Desikan-Killiany
+parcellation, which cannot separate M1/PMd/PMv (all "precentral") or
+SMA/preSMA/dlPFC (all "superior frontal"). Two ratios survive that coarseness and
+both say the macaque numbers need a nudge: caudate rostral-middle-frontal 25.8%
+against precentral 3.7% (more prefrontal in the human caudate than in the
+macaque), and putamen postcentral 4.6% against precentral 9.0% (more S1). This
+matches the reported expansion of prefrontal corticostriatal projections in humans
+(Neggers et al. 2015 *J Neurophysiol* 113:2164-2172; Balsters et al. 2020 *eLife*
+9:e53680).
+
+**Recommended replacement**, macaque tracer percentages as the anchor, nudged
+toward the human ratios above. Caudate weighted 0.75 head / 0.25 body, putamen
+0.7 motor / 0.3 rostral:
+
+| region | caudate (now -> rec.) | putamen (now -> rec.) |
+|---|---|---|
+| dlPFC | 0.45 -> **0.55** | 0.05 -> **0.10** |
+| preSMA | 0.25 -> **0.15** | 0.10 -> **0.05** |
+| PMd | 0.15 -> **0.18** | 0.15 -> **0.11** |
+| PMv | 0.10 -> **0.04** | 0.05 -> **0.18** |
+| SMA | 0.04 -> **0.06** | 0.25 -> **0.15** |
+| M1 | 0.01 -> **0.02** | 0.30 -> **0.28** |
+| S1 | 0.00 -> **0.00** | 0.10 -> **0.13** |
+
+Both columns still sum to 1, which matters: the seven rate series are each
+normalised to mean 5.0 Hz, so any mix that sums to 1 leaves the mean drive
+unchanged and only the variance and timing move. Caudate S1 stays at exactly 0 —
+S1 to caudate is absent in the tracer data, and 0 also keeps that stream from
+being built at all, so the caudate keeps one stream fewer than the putamen.
+
+**The one entry to argue about is putamen PMv, 0.05 -> 0.18.** It rests on F4+F5
+being a major putaminal input, which is true but strongly zone-dependent: F5 is
+2.5% and 7.9% of labelled cells in the two arm/hand motor cases and 33.4% in the
+midventral orofacial case. A whole-putamen ROI contains that ventral sector, which
+is why the average is high, but the value is sensitive to how the sectors are
+weighted. Range 0.10-0.24. Every other entry is stable to within about 0.03.
+
+**Measured sensitivity — this may not be worth spending MATLAB on.** The seven
+deconvolved cortical series are only moderately correlated (off-diagonal r: min
+0.16 for dlPFC-M1, median 0.46, max 0.90 for PMd-PMv), so the regions are
+genuinely distinguishable. But the *mixed* drive barely moves:
+`corr(old mix, new mix)` = **0.995** for the caudate and **0.982** for the
+putamen, with the standard deviation changing by 1-5% and the mean not at all. So
+for v08, which sees nothing but the mixed series, the correction is close to a
+no-op. It bites in v07, where the proportions also set the per-region stream
+sizes: caudate PMv 700 -> 280 afferents, putamen PMv 350 -> 1260, putamen dlPFC
+350 -> 700, caudate dlPFC 3150 -> 3850 (per SPN, out of 7000).
+
+One consequence cuts against us and should be stated: the corrected proportions
+make the two loops *more* alike, `corr(caudate mix, putamen mix)` rising from
+**0.798** to **0.843**. The proportions are the only physical difference between
+the loops (`model_v07.md` §7.5), so this shrinks the contrast the inference
+depends on. It is the
+honest number, not a reason to keep the old one, but it means the loop separation
+is doing less work than the current table implies.
+
+**Not applied.** Changing it means editing all three sites *and* regenerating both
+`firing_rates_matlab_condition-{on,off}.npz` under MATLAB, and it invalidates
+every v07 input cache (none exist right now, so that part is free — same window
+that made the striatal-rate change in §20 cheap). Given the 0.98-0.995 correlation
+above, the defensible order is: do it when MATLAB is next in hand, before the
+caches are built, not as a standalone errand.
