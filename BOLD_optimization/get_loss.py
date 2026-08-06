@@ -431,6 +431,7 @@ def v07_model_creation_kwargs(
         "mc.name": loop,
         "mc.nx": paramsS["mc.nx"],
         "mc.b": paramsS["mc.b"],
+        "mc.firing_rate_dict": paramsS["mc.firing_rate_dict"],
         "dbs": dbs_condition,
         "timestep": paramsS["timestep"],
         "t.duration": duration_ms,
@@ -817,12 +818,16 @@ def get_firing_rate_loss(
     float
         The calculated loss value.
     """
-    # D1 and D2 extracted from: (Liang et al., 2008) using with levodopa treatment, see experimental_data/activity_striatum/extract_from_liang_etal_2008.py
+    # str_d1/str_d2: mean +- 1 SD of the parkinsonian Off state (levodopa withdrawn)
+    # in (Liang et al., 2008), Table 1. The centres are exactly the rates the
+    # missing-GABA caches are drawn at (parameters.py, "mc.firing_rate_dict"), so
+    # change the two together. Derivation and caveats:
+    # ../experimental_data/activity_striatum/README.md
     # FS: 10 Hz based on: (Yamada et al., 2016; Marche und Apicella, 2021; Adler et al., 2013; Hernandez et al., 2013; He et al., 2024)
     # stn and snr (gpi): from [Li et al., 2015]
     plausible_ranges = {
-        "str_d1": (20.45, 53.69),
-        "str_d2": (12.99, 45.15),
+        "str_d1": (12.67, 37.33),
+        "str_d2": (21.22, 44.78),
         "str_fsi": (5.0, 15.0),
         "gpe_proto": (75.0, 85.0),
         "gpe_arky": (15.0, 20.0),

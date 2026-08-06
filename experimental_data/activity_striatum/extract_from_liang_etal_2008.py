@@ -1,6 +1,14 @@
 """
-data extracted from paper https://doi.org/10.1523/JNEUROSCI.1176-08.2008
-extraction here: https://docs.google.com/spreadsheets/d/1FYXBhNQJZx-MvGt7IpQZi1EVFxsDKHEMx73uF5hI4pE/edit?usp=sharing
+!!! THE MODEL DOES NOT USE THE OUTPUT OF THIS SCRIPT. !!!
+
+The microcircuit uses dSPN 25.0 Hz / iSPN 33.0 Hz, read straight off Table 1 of the
+paper for the parkinsonian Off state. This script is the mixture deconvolution that
+was considered and rejected; it is kept because it is the evidence for that
+decision and it supplies the sensitivity bound on dSPN (22.37 vs 25.0 Hz).
+See ./README.md for why.
+
+data extracted from paper https://doi.org/10.1523/JNEUROSCI.1176-08.2008 (local: ./7537.full.pdf)
+extraction here: https://docs.google.com/spreadsheets/d/1FYXBhNQJZx-MvGt7IpQZi1EVFxsDKHEMx73uF5hI4pE/edit?usp=sharing (local: ./Liang_etal_2008_extraction - MSN.csv)
 
 Compute estimated means and standard deviations for true D1 and D2 groups
 from summary statistics of putative D1 / putative D2 groups using the
@@ -192,5 +200,36 @@ print(f"{'D2':<7s} {'on':>6s}  {mu_on_D2:10.2f} {sigma_on_D2:10.2f}")
 print("\nIntermediate values:")
 print(f"delta_inc (assumed equal for D1 and D2_inc) = {delta_inc:.3f}")
 print(f"mu_on_D2_inc (D2 that increased) = {mu_on_D2_inc:.3f}")
+
+# ---------------------------------------------------------------------------
+# The four candidate value sets, side by side
+# ---------------------------------------------------------------------------
+# "putative" takes the paper's response groups at face value: increasers are dSPN,
+# decreasers are iSPN. "deconvolved" is everything computed above, which additionally
+# assumes a 50/50 D1:D2 split and re-assigns 20 of the 88 increasers to D2.
+#
+# Both rest on the same unavoidable assumption -- that the direction of the levodopa
+# response identifies the receptor class -- which the paper itself flags as an
+# inference, not a measurement (p. 7542). The deconvolution only adds assumptions
+# on top of it; it does not remove that one.
+#
+# Note the OFF column: iSPN is identical in both, because mu_off_D2 = mu_off_P2 is
+# an *assumption* of the deconvolution rather than a result of it. The entire OFF
+# effect is the 25.0 -> 22.37 shift on dSPN.
+print("\n" + "=" * 60)
+print("Candidate value sets (Hz). The model uses the OFF / putative column.")
+print("=" * 60)
+print("{:<12s} {:>14s} {:>14s}".format("", "putative", "deconvolved"))
+print("-" * 60)
+print(f"{'dSPN off':<12s} {mu_off_P1:>14.2f} {mu_off_D1:>14.2f}   <- model: 25.0")
+print(f"{'iSPN off':<12s} {mu_off_P2:>14.2f} {mu_off_D2:>14.2f}   <- model: 33.0")
+print(f"{'dSPN on':<12s} {mu_on_P1:>14.2f} {mu_on_D1:>14.2f}")
+print(f"{'iSPN on':<12s} {mu_on_P2:>14.2f} {mu_on_D2:>14.2f}")
+print("-" * 60)
+print(
+    "The model's 25.0 / 33.0 are Table 1 of the paper (n = 140, all units incl. the\n"
+    "~3% unchanged), which is the same quantity as the 'putative' column here; the\n"
+    "small differences are rounding and those few extra units."
+)
 
 # End of script

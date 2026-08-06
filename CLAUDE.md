@@ -78,6 +78,10 @@ BOLD monitors. Only the putamen loop is stimulated by DBS.
   — cortical BOLD deconvolved with an SPM HRF into firing rates, one value per TR,
   plus `caudate_rate`/`putamen_rate` mixed by anatomical proportion. Requires MATLAB
   (`matlabengine`) to regenerate.
+- Striatal firing rates: `experimental_data/activity_striatum/README.md` — where the
+  dSPN/iSPN rates and the `get_firing_rate_loss` bands come from, which assumption
+  they rest on, and what was rejected. The values are the **medication-off** state of
+  Liang et al. 2008; changing them invalidates every v07 input cache.
 - Full run length: 310 TRs x 2.31 s = **716,100 ms**.
 
 ## Input caches (v07 only)
@@ -97,17 +101,22 @@ python build_input_caches.py --dbs off --n-trs 5 --cache-dir <abs path>
 **A cache is only loadable if its `n_steps` equals `int(t.duration/dt)` exactly**,
 so it is built for one `--n-trs` and usable only at that `--n-trs`. It must also
 cover the fixed 9900 ms firing-rate probe, which is the binding constraint below 5
-TRs; the script refuses that case up front.
+TRs; the script refuses that case up front. A cache also has to match the
+`firing_rate_dict` and `correlation_dict` it was drawn at, and one written before
+those were recorded is refused outright.
 
-Two caches exist: `mc_ci_cache/` (12,000 steps, 1.2 s — the old short tests, too
-short for anything) and `mc_ci_cache_5tr/` (115,500 steps, 21 GB), which is what
-`--n-trs 5` smoke tests use. Cost on the laptop: **24 min per loop for 5 TRs**, so
-~25 h per loop at full length. Size at full length would be ~1.25 TiB per DBS
-condition in the current `float64`/per-region layout — see `PLAN.md` for the agreed
-smaller one.
+**No cache currently exists.** `mc_ci_cache/`, `mc_ci_cache_5tr/` and
+`mc_caudate_off_cache/` were deleted on 2026-08-06 when the striatal rates moved to
+the medication-off values, which invalidated the missing-GABA streams in all of
+them. `mc_ci_cache_dir` in `parameters.py` still points at the now-absent
+`../mc_ci_cache`, so a v07 run without `--cache-dir` fails immediately rather than
+loading something stale. Rebuilding for `--n-trs 5` costs **24 min per loop per DBS
+condition** (~1.6 h for all four) and ~42 GB; at full length it is ~25 h per loop
+and ~1.25 TiB per DBS condition in the current `float64`/per-region layout — see
+`PLAN.md` for the agreed smaller one.
 
 `storage_dir` is resolved **relative to the working directory you launch from**,
-which is why both `mc_ci_cache/` and `mc_caudate_off_cache/` exist with overlapping
+which is how `mc_ci_cache/` and `mc_caudate_off_cache/` came to hold overlapping
 data. Pass absolute paths — but note the cortical rate path inside the cache state
 is compared verbatim, so build and evaluate from `BOLD_optimization/` either way
 (`TODO.md` §13).

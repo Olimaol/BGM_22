@@ -26,6 +26,17 @@ parameters_test_microcircuit["mc.b"] = 10
 # the firing-rate probe. 110 ms divides 2310 (21 chunks per TR) and 9900;
 # the previous 100 ms divided none of them.
 parameters_test_microcircuit["update_time"] = 110.0
+# Rates assumed for the striatal neurons that surround the simulated lattice but
+# are not themselves simulated; the missing-GABA spike counts are drawn at these,
+# so they are baked into the input caches. dSPN/iSPN are the parkinsonian Off
+# state (levodopa withdrawn) of Liang et al. 2008 -- see
+# ../experimental_data/activity_striatum/README.md for the derivation, and keep
+# these in sync with the plausible bands in get_loss.get_firing_rate_loss.
+parameters_test_microcircuit["mc.firing_rate_dict"] = {
+    "FS": 10.0,
+    "dSPN": 25.0,
+    "iSPN": 33.0,
+}
 # where the precomputed input spike counts live; on the workstations point this
 # at /scratch/olmai/... , the caches are ~138 GiB per DBS condition
 parameters_test_microcircuit["mc_ci_cache_dir"] = "../mc_ci_cache"

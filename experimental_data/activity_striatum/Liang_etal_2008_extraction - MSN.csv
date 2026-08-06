@@ -1,0 +1,37 @@
+n,region,dosis,state,mean,sem,std,weighted mean,weighted var,weighted diff
+73,putamen,high,off,"29,9","1,7","9,295751718","2182,7","6221,592","211,2286209"
+67,caudate,high,off,"25,7","1,4","7,097323439","1721,9","3324,552","340,8280659"
+73,putamen,high,on,33,2,"11,48912529",2409,9504,"223,2964334"
+67,caudate,high,on,"32,9","2,1","12,04528954","2204,3","9575,874","113,9886578"
+23,putamen,low,off,"22,8","2,8","13,36981675","524,4","3932,544","670,421275"
+25,caudate,low,off,"17,4","2,7","11,26259295",435,"3044,304","913,4192167"
+23,putamen,low,on,"25,7","3,3","16,72940525","591,1","6157,206","708,7234625"
+25,caudate,low,on,"28,1","3,7","19,61349026","702,5","9232,536","305,489603"
+,,,,,,,,,
+,,,,,,,,,
+combined over dosis:,,,,,,,,,
+N,region,state,combined mean,combined std,,,,,
+96,putamen,off,"28,2","10,8",,,,,
+92,caudate,off,"23,4","9,2",,,,,
+96,putamen,on,"31,3","13,2",,,,,
+92,caudate,on,"31,6","14,5",,,,,
+,,,,,,,,,
+,,,,,,,,,
+"grouped by response (putative D1 increase, putative D2 decrease), all for high dosis:",,,,,,,,,
+,response,group,state,mean,sem,std,weighted mean,weighted var,weighted diff
+50,uni,putative D1,off,"21,1","1,6","11,3137085",1055,6272,722
+20,uni,putative D2,off,"33,6","2,6","11,62755348",672,"2568,8","0,06805555556"
+50,uni,putative D1,on,"33,3",2,"14,14213562",1665,9800,"1987,364669"
+20,uni,putative D2,on,"22,6","2,2","9,838699101",452,"1839,2","46,00555556"
+38,bi,putative D1,off,"29,9",2,"12,32882801","1136,2",5624,950
+28,bi,putative D2,off,"33,5","2,4","12,69960629",938,"4354,56","0,04861111111"
+38,bi,putative D1,on,"47,9","2,4","14,79459361","1820,2","8098,56","2614,953512"
+28,bi,putative D2,on,20,2,"10,58300524",560,3024,"32,86111111"
+,,,,,,,,,
+,,,,,,,,,
+combined over response:,,,,,,,,,
+N,group,state,combined mean,combined std,,,,,
+88,putative D1,off,"24,9","12,5",,,,,
+48,putative D2,off,"33,5","12,1",,,,,
+88,putative D1,on,"39,6","16,1",,,,,
+48,putative D2,on,"21,1","10,3",,,,,

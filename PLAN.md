@@ -145,7 +145,9 @@ proves it reaches both `mc` and `ci`:
 | 0.002  | 69.88        | 51.44      | 14.54        | 21.75       |
 
 Unlike v08, v07's drive parameter is **not** saturated at its default: the plausible
-dSPN band (20.45-53.69 Hz) is crossed between 0.001 and 0.002. See `TODO.md` §9.
+dSPN band was crossed between 0.001 and 0.002. See `TODO.md` §9 — the band has since
+moved to the medication-off values (12.67-37.33 Hz), which shifts the useful weight
+range down without changing the conclusion.
 
 Commits, by plan step:
 

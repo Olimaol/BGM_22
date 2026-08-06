@@ -92,13 +92,13 @@ postsynaptic type, so it is exactly lossless today.
 
 `Microcircuit._simulate_distance_dependent_spike_counts` generates the missing
 local GABA input assuming the surrounding striatal neurons fire at
-`{"FS": 10.0, "dSPN": 37.07, "iSPN": 29.07}` Hz. Those are baked into the cache.
+`{"FS": 10.0, "dSPN": 25.0, "iSPN": 33.0}` Hz. Those are baked into the cache.
 
 `get_firing_rate_loss` scores the simulated rates against bands centred on exactly
-those values (20.45-53.69 and 12.99-45.15), so the design is coherent at the band
+those values (12.67-37.33 and 21.22-44.78), so the design is coherent at the band
 centre. But the loss is a smooth logistic, so a fit sitting near a band edge would
-have neurons firing at e.g. 50 Hz while being inhibited by a surround the cache
-assumes fires at 37 Hz.
+have neurons firing at e.g. 37 Hz while being inhibited by a surround the cache
+assumes fires at 25 Hz.
 
 **Decided:** fit first, then compare the fitted rates against the assumption and
 report the mismatch. Only if they drift to an edge, consider iterating to a fixed
@@ -222,6 +222,17 @@ So the dSPN plausible band (20.45-53.69 Hz) is crossed between 0.001 and 0.002, 
 the response is steep rather than flat — the opposite of v08's behaviour in §1. This
 also confirms the optimized parameters really reach `mc.mean_weights_by_type` and
 `ci.mean_weights_by_type`.
+
+> **Superseded on 2026-08-06, in part.** The measured rates in the table stand, but
+> the bands they were read against do not: the striatal targets moved to the
+> medication-off values (dSPN band now 12.67-37.33, iSPN 21.22-44.78) — see
+> `experimental_data/activity_striatum/README.md`. Under the new dSPN band, 22.62 Hz
+> at weight 0.001 sits comfortably inside rather than near the lower edge, and 69.88
+> at 0.002 is well outside rather than just outside. The useful weight range
+> therefore shifts *down*, which if anything better centres the provisional
+> `[0, 0.01]` bounds with `p0 = 0.001`. **The rate-loss column (0.868, 0.837) was
+> computed against the old bands and is stale** — it would have to be re-measured,
+> and doing so needs a rebuilt cache.
 
 **Provisional bounds are now in `deap_cma_opt.search_space`:** `[0, 0.01]` for the
 seven v07 drive weights with `p0 = 0.001` (the class default, i.e. the model as its
@@ -413,6 +424,31 @@ current figure (~1.25 TiB); `parameters.py` is the only outlier.
 layout change of TODO §3") or leave it until §3 actually lands and the number
 becomes true. Not corrected here, because changing it in isolation invites the
 opposite confusion.
+
+## From the session on 2026-08-06 (striatal firing rates)
+
+### 20. The FS rate is not on a stated dopamine condition
+
+`firing_rate_dict["FS"] = 10.0` Hz cites Yamada et al. 2016, Marche & Apicella
+2021, Adler et al. 2013, Hernandez et al. 2013 and He et al. 2024. **Nothing in
+this repository records whether those recordings are from dopamine-depleted
+animals.** The dSPN and iSPN rates were just put on an explicit condition — the
+parkinsonian Off state of Liang et al. 2008, see
+`experimental_data/activity_striatum/README.md` — and FS is now the only striatal
+rate that is not.
+
+This matters because dopamine depletion is generally reported to change striatal
+FSI activity, and because the rate is what the missing-GABA cache draws the
+surrogate FS spike trains at. It is also the pre-synaptic rate for `FS->dSPN`,
+`FS->iSPN` and `FS->FS`, i.e. all the feedforward inhibition the lattice receives
+from outside itself.
+
+Secondary: the `str_fsi` band `(5, 15)` in `get_firing_rate_loss` is hand-set, not
+derived from any reported SD, unlike `str_d1` and `str_d2`.
+
+**What to do.** Check each of the five sources for species and dopamine state, then
+either confirm 10 Hz for the Off condition or replace it. Changing it invalidates
+the v07 caches exactly as the SPN rates did.
 
 **Caveat.** The planned-layout row assumes pre-summing collapses all cortical
 regions to one stream per postsynaptic type and nothing else changes. It has not

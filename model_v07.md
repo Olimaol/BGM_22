@@ -682,13 +682,19 @@ as `mean_weights_by_type[(pre, post)]`. That scalar is what the streamed spike
 counts get multiplied by at simulation time — the compensation stream carries
 counts, not currents.
 
-Defaults driving this: `firing_rate_dict = {FS: 10.0, dSPN: 37.07, iSPN: 29.07}`
-Hz (dSPN/iSPN from Liang et al. 2008, FS from the FS literature) and
+The rates driving this come from `parameters.py: mc.firing_rate_dict`, threaded
+through `v07_model_creation_kwargs` so evaluation and cache building cannot
+disagree: `{FS: 10.0, dSPN: 25.0, iSPN: 33.0}` Hz. dSPN/iSPN are the parkinsonian
+**medication-off** state of Liang et al. 2008; FS is from a separate literature on
+an unstated dopamine condition (`TODO.md` §20). The derivation, the assumption it
+rests on and the alternatives rejected are in
+`experimental_data/activity_striatum/README.md`. Alongside them,
 `correlation_dict = {FS: 0.06, dSPN: 0.004, iSPN: 0.004}` (Adler et al. 2013).
 
-Cached in `inputs/missing_input_state.pkl`. On load, the pair-key set, `dt` and
-**`n_steps` exactly** must match, every `.dat` must exist, and the RNG state is
-restored.
+Cached in `inputs/missing_input_state.pkl`. On load, the pair-key set, `dt`,
+**`n_steps` exactly**, `firing_rate_dict` and `correlation_dict` must match, every
+`.dat` must exist, and the RNG state is restored. A state file written before the
+last two were recorded is refused rather than trusted.
 
 ### 7.4 Cortical input — built once, cached
 
