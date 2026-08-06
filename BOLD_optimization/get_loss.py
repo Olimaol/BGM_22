@@ -1239,11 +1239,21 @@ if __name__ == "__main__":
     gpe_scaling_factors = np.array(gpe_scaling_factors) / np.sum(gpe_scaling_factors)
     # scaling factors for striatum proportions (del Rey et al. 2022)
     # Cau and Put have the same proportions
-    props_delRey = {"str_d1": 0.86 / 2, "str_d2": 0.86 / 2, "str_fsi": 0.026}
-    str_scaling_factors = [
-        props_delRey[comp] for comp, _ in bold_region_compartments["Cau"]
-    ]
-    str_scaling_factors = np.array(str_scaling_factors) / np.sum(str_scaling_factors)
+    # v08 only: its three striatal populations all have 100 neurons, so they have
+    # to be weighted explicitly. In v07 the Microcircuit already sizes dSPN/iSPN/FS
+    # by these very proportions, and BoldMonitor's default is to weight by
+    # population size, so passing them again would only restate that default (up to
+    # the integer rounding of the cell counts). Leave it to the default there.
+    if model_version == "v08":
+        props_delRey = {"str_d1": 0.86 / 2, "str_d2": 0.86 / 2, "str_fsi": 0.026}
+        str_scaling_factors = [
+            props_delRey[comp] for comp, _ in bold_region_compartments["Cau"]
+        ]
+        str_scaling_factors = (
+            np.array(str_scaling_factors) / np.sum(str_scaling_factors)
+        ).tolist()
+    else:
+        str_scaling_factors = None
 
     # create the BoldMonitor objects
     bold_monitor_dict: dict[str, BoldMonitor] = {}
@@ -1251,7 +1261,7 @@ if __name__ == "__main__":
         if bold_region == "GPe":
             scale_factors = gpe_scaling_factors.tolist()
         elif bold_region in ["Cau", "Put"]:
-            scale_factors = str_scaling_factors.tolist()
+            scale_factors = str_scaling_factors
         else:
             scale_factors = None
 

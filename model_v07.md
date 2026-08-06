@@ -182,14 +182,45 @@ populations with `mapping={"I_CBF": input_var}` and `normalize_input=2000`:
 | GPi | `snr` × both loops | — |
 | GPe | `gpe_proto`, `gpe_arky`, `gpe_cp` × both loops | 0.5 / 0.17 / 0.10, normalized |
 | STN | `stn` × both loops | — |
-| Cau | `caudate_dSPN`, `caudate_iSPN`, `caudate_FS` | del Rey proportions, normalized |
+| Cau | `caudate_dSPN`, `caudate_iSPN`, `caudate_FS` | — (v08 only, see below) |
 | Put | `putamen_dSPN`, `putamen_iSPN`, `putamen_FS` | same |
 | MD | `thal:caudate` | — |
 | VAp | `thal:putamen` | — |
 
+A `—` means no `scale_factor` is passed, so `BoldMonitor` falls back to weighting
+each population by its share of the pooled neuron count
+(`BoldMonitor.py:113-122`).
+
+**No striatal scale factors in v07.** `Microcircuit` already sizes dSPN/iSPN/FS by
+the del Rey et al. (2022) proportions (`microcircuit.py:180`), so the size-
+proportional default *is* the del Rey weighting and passing it explicitly would
+only restate it. The explicit `props_delRey` factors are therefore applied in v08
+only, where all three striatal populations have 100 neurons and the default would
+weight them equally. The two are not bit-identical: the default uses the integer
+cell counts after `int()` truncation and the remainder fix-up
+(`microcircuit.py:237-242`), which at `nx = b = 10` gives 486 / 485 / 29 →
+0.486 / 0.485 / 0.029 against the exact 0.485327 / 0.485327 / 0.029345.
+
+**The GPe factors have no recorded source.** They appear only in
+`get_loss.py:1235` and `test_microcircuit_bgm.py:472`, both introduced whole in
+commit `76d3867`, uncited; they sum to 0.77, not 1, which would fit fractions of
+all GPe cells with the rest belonging to types the model does not have. These do
+change the pooling, since `gpe_proto/arky/cp` are all 100 neurons. The source
+still has to be found.
+
 **The input variable differs by population family.** BGM populations expose the
 total current as `I`; the Humphries striatal populations expose it as `I_v`. Cau
 and Put therefore map `I_CBF` to `I_v`, everything else to `I`.
+
+**`I_base` is deliberately outside `I`.** The BGM populations add
+`I_base = base_mean + offset_base` on the `dv/dt` line, not inside `I`, so the
+BOLD monitor never sees it. That is the intended split: `I_base` belongs to the
+neuron model *without* synaptic input, and the monitor should only see what the
+synaptic input contributes. It does mean the fitted baseline currents of `snr` and
+`gpe_proto` — the only two populations whose entire drive is `base_mean`, since
+they receive no cortical input — reach the BOLD signal only through their effect
+on the network. The DBS somatic term sits on the same line and is likewise unseen
+(`DBS.md`).
 
 ### 3.7 `compile()`
 

@@ -34,6 +34,12 @@ populations, the same 28 core projections with the same weights and delays, the
 same `parameters.csv` rows outside the striatal block, the same DBS retrofit, the
 same seven BOLD monitors, the same single compile for both loops.
 
+One detail of the BOLD monitors is v08-only: Cau and Put are pooled with explicit
+`props_delRey` scale factors here, because v08's three striatal populations all
+have 100 neurons and `BoldMonitor`'s size-proportional default would weight them
+equally. v07 passes none and lets the default reproduce the proportions its
+microcircuit was built with — `model_v07.md` §3.6.
+
 ---
 
 ## 2. Creation sequence
