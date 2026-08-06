@@ -75,9 +75,11 @@ The complete table, since it fixes the entire intrinsic striatal connectivity:
 | FS → FS | 0.15242 | 189.16 |
 
 **There is no `dSPN → FS` or `iSPN → FS` entry, so SPNs never project onto FS
-neurons.** The pair set of this file is also what defines the local projection
-list, the weight matrices and the compensation streams — the number seven
-propagates everywhere.
+neurons.** The pair set of this file is the only place the local connection types
+are declared: the local projection list, the weight matrices and the compensation
+streams are all built by iterating these keys, and the cache refuses to load if
+the key set changed. No count is hardcoded — add a row and everything downstream
+follows.
 
 ### The cortical rate file
 
