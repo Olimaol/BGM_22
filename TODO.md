@@ -600,3 +600,48 @@ every v07 input cache (none exist right now, so that part is free — same windo
 that made the striatal-rate change in §20 cheap). Given the 0.98-0.995 correlation
 above, the defensible order is: do it when MATLAB is next in hand, before the
 caches are built, not as a standalone errand.
+
+### 22. The spike-count generator runs at `concentration = 1.0`, and nothing checks the result
+
+`ReceiverSimulator.generate_p_matrix` draws each receiver's per-bin spike
+probability from `Beta(p·c, (1−p)·c)`, where `c` is the `concentration` argument
+of `spike_input_cortex.simulate_receiver_counts_*`. **No caller ever passes it**,
+so `c = 1.0` everywhere; in both call sites an explicit `concentration=1000.0`
+sits commented out one line below the call:
+
+- `CompNeuroPy/.../striatal_microcircuit/microcircuit.py:1303` (cortical)
+- `CompNeuroPy/.../striatal_microcircuit/microcircuit.py:1670` (missing GABA)
+
+`CorticalInputs` never had the line at all.
+
+At `c = 1` the Beta variance is `p(1−p)/2`, so with `p ≈ 5·10⁻⁴` the per-receiver
+probability has a standard deviation ~30x its own mean. The mean count is
+preserved exactly — which is why nothing downstream has ever complained — but the
+distribution around it is not the intended near-Binomial. Measured (see
+`model_v07.md` §7.4 for both tables), on a cortical stream of `N_eff = 3150`
+sources at 5 Hz, `dt = 0.1 ms`, expected 1.575 counts per bin:
+
+| | mean | SD | max | bins exactly 0 | Fano | realized corr (target 0.014) |
+|---|---|---|---|---|---|---|
+| `c = 1.0` | 1.540 | 48.65 | 3131 | 99.6 % | 1537 | 0.0002 |
+| `c = 1000.0` | 1.574 | 2.55 | 42 | 49.1 % | 4.2 | 0.0083 |
+
+Two things follow. **The drive is delivered as rare, enormous conductance
+jumps** — bins in which all 3150 presynaptic neurons fire within one 0.1 ms step
+are routine — rather than as a dense input stream. And **the shared fractions are
+largely destroyed**: the 0.014 of Kincaid et al. arrives as 0.0002, and on a
+missing-GABA stream a target of 0.5 arrives as 0.15. The §7.3 machinery that
+computes `E_shared(d)` by double integration is doing careful work that the
+final draw then discards.
+
+Which value is right is genuinely open — `c = 1000` is a guess that happens to
+look sane, not a calibration, and even there the Fano factor is 4.2 rather than
+~1. The honest fix is to state a target input statistic first (Fano factor and
+pairwise count correlation of the real presynaptic pools), then choose `c` to
+meet it, then check the striatal rates still land in their bands. Until then this
+is an unvalidated free parameter sitting under every input the model receives.
+
+**Cost of changing it:** it invalidates every v07 input cache, exactly as the
+striatal rates in §20 did. None exist right now, so the change is free today and
+expensive after the caches are built. If it is going to be looked at, it should be
+looked at before the rebuild, together with §3 and §21.
