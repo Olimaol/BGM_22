@@ -854,42 +854,56 @@ N_eff = round(cortical_proportions_dict[region] · N_cortical_inputs_dict[receiv
 
 with `N_cortical_inputs_dict = {FS: 2800, dSPN: 7000, iSPN: 7000}`. The
 proportions sum to 1, so the per-region counts sum back to the total — a caudate
-dSPN's 7000 cortical afferents are split 3150 dlPFC, 1750 preSMA, 1050 PMd, 700
-PMv, 280 SMA, 70 M1, 0 S1. A region with `N_eff = 0` is skipped and gets no
+dSPN's 7000 cortical afferents are split 3850 dlPFC, 1260 PMd, 1050 preSMA, 420
+SMA, 280 PMv, 140 M1, 0 S1. A region with `N_eff = 0` is skipped and gets no
 stream, which is the only reason the two loops differ in stream count.
 
 **Step 3: the draw**, for **dSPN and iSPN only**, one stream per region per
 receiver type, through §7.4 with `shared_input = shared_fraction = 0.014`
 (Kincaid et al. 1998) and `rho = 0.0`. Concretely for dlPFC → caudate dSPN:
-`N_eff = 3150` sources at a mean 5 Hz give `p = 5·10⁻⁴` and 1.575 expected counts
+`N_eff = 3850` sources at a mean 5 Hz give `p = 5·10⁻⁴` and 1.925 expected counts
 per 0.1 ms bin per receiver — see §7.4 for what the realised distribution around
 that mean actually looks like.
 
-The cortical proportions are hard-coded per region and are **the only physical
-difference between the two loops**:
+The cortical proportions are **the only physical difference between the two
+loops**:
 
 | region | caudate | putamen |
 |---|---|---|
-| dlPFC | 0.45 | 0.05 |
-| preSMA | 0.25 | 0.10 |
-| PMd | 0.15 | 0.15 |
-| PMv | 0.10 | 0.05 |
-| SMA | 0.04 | 0.25 |
-| M1 | 0.01 | 0.30 |
-| S1 | 0.00 | 0.10 |
+| dlPFC | 0.55 | 0.10 |
+| preSMA | 0.15 | 0.05 |
+| PMd | 0.18 | 0.11 |
+| PMv | 0.04 | 0.18 |
+| SMA | 0.06 | 0.15 |
+| M1 | 0.02 | 0.28 |
+| S1 | 0.00 | 0.13 |
 
 S1 contributes nothing to the caudate, so the caudate loop has one cortical
 stream fewer per receiver type than the putamen loop.
 
-**These values are not cited to anything.** They are hand-set round numbers,
-duplicated verbatim in three places that must agree —
-`microcircuit.py:150`, `cortical_inputs.py:260`, and
-`cortical_firing_rates/cortical_drive_by_bold.py:27` (`MIXING_FACTORS`, which
-builds the stored `caudate_rate`/`putamen_rate` series). They encode the right
-qualitative topography — caudate associative, putamen sensorimotor — but the
-quantitative split disagrees with the tracer literature on several entries, most
-sharply for PMv. `TODO.md` §21 has the literature review, a recommended
-replacement table, and the measured sensitivity of the drive to the choice.
+**They are defined in exactly one place**, `BOLD_optimization/parameters.py`
+under `cortical_proportions_dict`, and reach the model as
+`mc.cortical_proportions_dict` in the creation kwargs (§3.3), which
+`model_creation_functions.py` hands to both `Microcircuit` and `CorticalInputs`.
+Neither class has a default any more — both call
+`spike_input_cortex.validate_cortical_proportions()`, which raises if the mapping
+is missing, negative, or does not sum to 1. The reason for the strictness is that
+the *same* numbers weight the mix producing `caudate_rate`/`putamen_rate` inside
+the cortical rate `.npz` (`cortical_drive_by_bold.py`, which imports them from
+`parameters.py` too), so a second copy could silently disagree with the file the
+model is driven by. **Changing them means regenerating that `.npz`** —
+`cortical_drive_by_bold_run.py`, which needs MATLAB and records the proportions
+in `__data_raw_meta__`.
+
+The values come from quantitative macaque retrograde tracing — Borra et al. 2022
+for the caudate/putamen region groups, Borra et al. 2021 for the per-area split
+of the motor putamen — nudged toward the two ratios that survive the coarse
+parcellation of the one human study reporting per-pathway percentages (Cacciola
+et al. 2017). `TODO.md` §21 has the derivation, the alternatives considered, and
+the sensitivity measurements; the short version is that the mixed drive is nearly
+invariant to the choice (`corr` 0.98–0.995 against the previous hand-set numbers)
+while the per-region stream sizes are not, and that putamen PMv is the one entry
+worth arguing about (plausible range 0.10–0.24).
 
 **FS cortical input is not drawn — it is derived**
 (`Microcircuit._derive_fs_cortical_inputs()`). The FS streams never go through
