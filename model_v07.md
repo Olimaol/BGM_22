@@ -464,6 +464,22 @@ offset from `Normal(0, base_noise)`; otherwise it is held. At
 `gpe_proto` receive no cortical drive at all, so their excitation *is* their
 baseline current, fitted as parameters 7 and 8 (§11).
 
+**`lambda` and `exp_input_weight` are declared but unused.** The constructor
+always writes both into the parameter block — `lambda` holds the `exp_input`
+argument, `exp_input_weight` is hard-coded to 1.0 — but the line that consumes
+them,
+
+```
+exp_input  = Exponential(lambda) * exp_input_weight * g_cor
+dg_ampa/dt = -g_ampa/tau_ampa + exp_input / dt
+```
+
+is only emitted when `exp_input > 0.0`. With `exp_input = 0.0` for every v07
+population (§5) that line is absent, which is why neither parameter appears in
+the equations above; they sit in the compiled model as inert constants. It's used
+for cortical input in **v08** (see `model_v08.md` §4). v07 delivers cortical input
+through `CurrentInjection`s instead.
+
 ### 6.2 `Izhikevich2007Humphries2009SPND1` / `SPND2` — dSPN and iSPN
 
 Both instantiated by `Microcircuit.create_populations_annarchy()` with
