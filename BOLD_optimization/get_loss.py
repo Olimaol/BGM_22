@@ -823,12 +823,17 @@ def get_firing_rate_loss(
     # missing-GABA caches are drawn at (parameters.py, "mc.firing_rate_dict"), so
     # change the two together. Derivation and caveats:
     # ../experimental_data/activity_striatum/README.md
-    # FS: 10 Hz based on: (Yamada et al., 2016; Marche und Apicella, 2021; Adler et al., 2013; Hernandez et al., 2013; He et al., 2024)
+    # str_fsi: no parkinsonian-primate FSI recording exists, so 10 Hz is the
+    # normal-primate level (Marche & Apicella, 2021; Yamada et al., 2016; Adler
+    # et al., 2013; n-weighted 10.6 Hz) times a chronic dopamine-depletion factor
+    # of 1.0 (Mallet et al., 2006; Hernandez et al., 2013; He et al., 2024). The
+    # band is mean +- 1 SD like the SPN ones, with the relative spread taken from
+    # the only source that reports an SD: 8.5/12.6 = 0.675, so 10.0 +- 6.75.
     # stn and snr (gpi): from [Li et al., 2015]
     plausible_ranges = {
         "str_d1": (12.67, 37.33),
         "str_d2": (21.22, 44.78),
-        "str_fsi": (5.0, 15.0),
+        "str_fsi": (3.25, 16.75),
         "gpe_proto": (75.0, 85.0),
         "gpe_arky": (15.0, 20.0),
         "gpe_cp": (75.0, 85.0),

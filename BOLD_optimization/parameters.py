@@ -29,9 +29,11 @@ parameters_test_microcircuit["update_time"] = 110.0
 # Rates assumed for the striatal neurons that surround the simulated lattice but
 # are not themselves simulated; the missing-GABA spike counts are drawn at these,
 # so they are baked into the input caches. dSPN/iSPN are the parkinsonian Off
-# state (levodopa withdrawn) of Liang et al. 2008 -- see
-# ../experimental_data/activity_striatum/README.md for the derivation, and keep
-# these in sync with the plausible bands in get_loss.get_firing_rate_loss.
+# state (levodopa withdrawn) of Liang et al. 2008; FS is the normal-primate level
+# times a chronic dopamine-depletion factor of 1.0, since no parkinsonian-primate
+# FSI recording exists -- see ../experimental_data/activity_striatum/README.md for
+# both derivations, and keep these in sync with the plausible bands in
+# get_loss.get_firing_rate_loss.
 parameters_test_microcircuit["mc.firing_rate_dict"] = {
     "FS": 10.0,
     "dSPN": 25.0,

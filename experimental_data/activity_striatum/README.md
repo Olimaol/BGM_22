@@ -1,4 +1,4 @@
-# Striatal firing rates: where dSPN 25 Hz and iSPN 33 Hz come from
+# Striatal firing rates: where dSPN 25 Hz, iSPN 33 Hz and FS 10 Hz come from
 
 The model needs a resting firing rate for each striatal cell type. Two places
 consume it, and they have to agree:
@@ -15,14 +15,14 @@ and mirrored as the `Microcircuit` default:
 |---|---|---|---|
 | dSPN | **25.0 Hz** | (12.67, 37.33) | Liang et al. 2008, Table 1 |
 | iSPN | **33.0 Hz** | (21.22, 44.78) | Liang et al. 2008, Table 1 |
-| FS | 10.0 Hz | (5, 15) | Yamada 2016; Marche & Apicella 2021; Adler 2013; Hernandez 2013; He 2024 |
+| FS | **10.0 Hz** | (3.25, 16.75) | normal-primate level (Marche & Apicella 2021; Yamada 2016; Adler 2013) × a chronic dopamine-depletion factor of 1.0 (Mallet 2006; Hernandez 2013; He 2024) — see [The FS rate](#the-fs-rate) |
 
 Files here: `Liang_etal_2008_extraction - MSN.csv` is the spreadsheet transcription
 of the paper's tables ([online copy](https://docs.google.com/spreadsheets/d/1FYXBhNQJZx-MvGt7IpQZi1EVFxsDKHEMx73uF5hI4pE/edit?usp=sharing)),
 and `extract_from_liang_etal_2008.py` is a deconvolution that we
 **do not use** — see [What we rejected](#what-we-rejected). The paper itself is not
-in the repository; get it from the DOI below. Publisher PDFs in this directory are
-gitignored.
+in the repository; get it from the DOI below. The five FS sources are here as
+publisher PDFs, which are gitignored — cite them, do not expect them in a clone.
 
 ---
 
@@ -199,15 +199,135 @@ costs nothing for our purpose: the Off state is the same physiological condition
 in both — parkinsonian baseline with maintenance levodopa withdrawn — and the
 paper reports the dose sets showed "similar distributions of changes".
 
-### The FS rate
+---
+
+## The FS rate
 
 10 Hz does not come from Liang at all; that study excluded interneurons by design
-("Units that could be classified as interneurons […] were not selected"). It comes
-from a separate literature (Yamada 2016; Marche & Apicella 2021; Adler 2013;
-Hernandez 2013; He 2024), and **this repository does not record whether those
-recordings are from dopamine-depleted animals**. So unlike the SPN rates, FS is
-not on a stated dopamine condition. The `(5, 15)` band is hand-set, not derived
-from any reported SD. Logged in `TODO.md`.
+("Units that could be classified as interneurons […] were not selected"). **No
+recording of parkinsonian primate striatal FSIs exists in this literature.** So FS
+has a different logical structure from the two SPN rates, and the difference
+matters when reading the number:
+
+- dSPN/iSPN are *measured* in chronically parkinsonian, unmedicated monkeys.
+- FS is a **normal-primate level times a dopamine-depletion correction imported
+  from rodents**. Two separate inferential steps, neither of them Liang's.
+
+### The level: three normal-primate datasets
+
+| source | animals, region | n (FSI) | rest-like rate | where the number is |
+|---|---|---|---|---|
+| Marche & Apicella 2021 | 2 normal *M. mulatta*, mostly putamen | 73 | **12.6 ± 8.5 Hz (SD)**, 0.5 s pre-cue baseline | printed in the text, §3.2 |
+| Yamada et al. 2016 | 6 normal monkeys, Cd + Put | 42 | **≈8.7 Hz** ITI (≈10.8 Hz in-trial) | Fig. 5D only, **digitized here** |
+| Adler et al. 2013 | 2 normal *M. fascicularis*, anterior striatum | 36 | no value reported; the log scatter spans ~4–20 Hz, centre ~8–10 Hz | Fig. 1D only |
+
+n-weighted, taking Adler at 9 Hz:
+
+```
+(73*12.6 + 42*8.7 + 36*9.0) / 151 = 10.6 Hz     (pooled SEM ~0.7)
+```
+
+Dropping Adler, which contributes no published number, gives 11.2 Hz.
+
+**We keep 10.0 Hz.** It is inside one pooled SEM of 10.6, and well inside the
+honest uncertainty (see the sensitivity bound below), so moving it would be
+precision the sources do not support. 10.5 Hz would be the value if you wanted the
+constant to *be* the pooled estimate rather than merely agree with it; that is a
+one-line change in the three places listed under
+[Changing these values](#changing-these-values), and it is free only while no v07
+cache exists.
+
+### The dopamine condition: no chronic change
+
+Three independent rodent studies say dopamine depletion does not move the FSI
+*baseline* rate. The reorganisation is in connectivity, not in rate.
+
+- **Mallet et al. 2006** (J Neurosci 26:3875, 6-OHDA rat, anesthetized, FSIs
+  identified by Neurobiotin + immunohistochemistry) — abstract, verbatim: *"In the
+  dopamine-depleted striatum, because the intrinsic activity of these interneurons
+  was not altered, their feedforward inhibition worsened the striatal imbalance."*
+- **Hernandez et al. 2013** (rat, intrastriatal 6-OHDA in dorsolateral striatum,
+  awake behaving, 149 control / 137 depleted FSIs, both hemispheres of the same
+  animals): pre-task baselines superimpose (~13 Hz in acquisition, ~18 Hz in late
+  overtraining, control vs depleted). Only the *in-task* rates rise and the
+  task-bracketing pattern is destroyed. **The same dataset shows MSN baselines
+  elevated** (p < 0.0001, reversed by L-DOPA) while FSI baselines are not — a
+  within-study dissociation, and the strongest single piece of support here.
+- **He et al. 2024** (mouse, MFB 6-OHDA, awake head-fixed, putative PV-INs): a
+  large drop in weeks 2–3 (≈22 → ≈5 Hz, p < 0.01 / 0.05) that is **transient** —
+  by >3 weeks ≈21 vs ≈16 Hz, not significant, which the authors report as
+  consistent with Chen 2018 and Yu 2022.
+
+Liang's monkeys were MPTP-lesioned **more than a year** earlier and our subject has
+chronic PD, so the relevant regime is He's ">3 weeks", where the factor is 1.0.
+
+```
+10.6 Hz (normal primate)  x  1.0 (chronic depletion)  =  10.6 Hz
+```
+
+**Sensitivity bound:** if He's >3 week trend (x0.76) is a real effect rather than an
+underpowered null, the floor is ~8 Hz. Treat **8–12 Hz** as the range. 10.0 sits in
+the middle of it.
+
+### The band
+
+Same construction as the SPN bands — mean ± 1 SD *across neurons* — so the same
+caveat applies verbatim: it is a plausibility window, not a confidence interval on
+the population mean. Marche & Apicella is the only one of the three that reports an
+SD, so the relative spread comes from there and is applied to the value we use:
+
+```
+CV = 8.5 / 12.6 = 0.675  ->  SD = 0.675 * 10.0 = 6.75  ->  (3.25, 16.75)
+```
+
+This is looser than the `(5, 15)` it replaces, which was hand-set and not derived
+from any reported SD. The widening is not a relaxation we chose; it is what the one
+published SD says. If the FS rate ever needs to be pinned harder, tighten it
+deliberately and say so here.
+
+### Caveats
+
+1. **The dopamine condition is imported, not measured.** Everything above rests on
+   rodent depletion generalising to primate. There is no parkinsonian-primate FSI
+   recording to check it against.
+2. **Internal consistency is not proven.** Chronic denervation lifts primate MSNs
+   from ~1 Hz to 25–33 Hz (a 20-fold change), and we are asserting FS is unmoved in
+   the same striatum. Hernandez shows exactly that dissociation — but in rat, where
+   the MSN elevation is nowhere near 20-fold.
+3. **Primate "FSI" is a waveform class, not a cell type.** Adler says so outright:
+   TH-expressing and calretinin interneurons can also be fast-spiking, and
+   calretinin cells are *particularly numerous in the primate striatum*. The model's
+   `FS` population is PV+ specifically.
+4. **He's null is underpowered.** 35 sham / 51 6-OHDA units split across three time
+   windows is ~10–17 per cell per window. Mallet and Hernandez carry the no-change
+   claim; He mainly establishes that the early drop recovers.
+5. **No caudate/putamen split exists for FS** (Marche ≈ putamen, Yamada pools,
+   Adler anterior striatum). Same situation as the SPNs, so one value for both
+   loops stays consistent.
+6. **These are not resting state.** They are ITI / pre-cue windows in trained,
+   food-restricted, task-engaged animals. Yamada mitigates it: FSN rate did not
+   differ between ITI and trial in two of three experiments, nor in the combined
+   data.
+
+### What would need supplemental material or source data
+
+None of these change the recommendation — they affect the third significant figure
+of a number whose honest uncertainty is ±2 Hz — but they are the reason the level
+is quoted as ~10.6 and not to two decimals.
+
+- **Yamada Fig. 5.** ITI values exist only in the figure, and the legend never says
+  whether the error bars are SD or SEM (the text uses "mean ± S.E." elsewhere).
+  Three outlier neurons in Exp. 3 (~43 Hz, n = 3) pull the combined ITI mean from
+  5.95 to 8.7; without per-cell data there is no principled way to decide whether to
+  keep them. Needs source data or the authors.
+- **Adler Fig. 1D.** The paper reports no numeric FSI rate anywhere. The ~9 Hz used
+  above is read off a log scatter. Needs source data — or drop Adler from the
+  pooling, which moves 10.6 → 11.2.
+- **He Fig. 4E.** Per-window means ± SEM and per-window n are not tabulated; the
+  supplement is figures S1–S5 with no source-data table. Needed to know how
+  underpowered the >3 week null actually is.
+- **Marche & Apicella 2017**, the earlier paper from the same lab, would add a
+  fourth primate sample at no cost. Not in this directory.
 
 ---
 
@@ -242,8 +362,8 @@ Keep three places in sync:
   building cannot disagree
 - `CompNeuroPy/src/CompNeuroPy/striatal_microcircuit/microcircuit.py` — the class
   default, for any other caller
-- `BOLD_optimization/get_loss.py` — `get_firing_rate_loss`, whose `str_d1` and
-  `str_d2` bands are centred on these values
+- `BOLD_optimization/get_loss.py` — `get_firing_rate_loss`, whose `str_d1`,
+  `str_d2` and `str_fsi` bands are centred on these values
 
 `TODO.md` §4 tracks the self-consistency question this raises: the surround is
 *assumed* to fire at 25/33 Hz while the simulated neurons are free to land

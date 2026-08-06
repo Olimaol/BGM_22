@@ -425,31 +425,39 @@ layout change of TODO §3") or leave it until §3 actually lands and the number
 becomes true. Not corrected here, because changing it in isolation invites the
 opposite confusion.
 
-## From the session on 2026-08-06 (striatal firing rates)
-
-### 20. The FS rate is not on a stated dopamine condition
-
-`firing_rate_dict["FS"] = 10.0` Hz cites Yamada et al. 2016, Marche & Apicella
-2021, Adler et al. 2013, Hernandez et al. 2013 and He et al. 2024. **Nothing in
-this repository records whether those recordings are from dopamine-depleted
-animals.** The dSPN and iSPN rates were just put on an explicit condition — the
-parkinsonian Off state of Liang et al. 2008, see
-`experimental_data/activity_striatum/README.md` — and FS is now the only striatal
-rate that is not.
-
-This matters because dopamine depletion is generally reported to change striatal
-FSI activity, and because the rate is what the missing-GABA cache draws the
-surrogate FS spike trains at. It is also the pre-synaptic rate for `FS->dSPN`,
-`FS->iSPN` and `FS->FS`, i.e. all the feedforward inhibition the lattice receives
-from outside itself.
-
-Secondary: the `str_fsi` band `(5, 15)` in `get_firing_rate_loss` is hand-set, not
-derived from any reported SD, unlike `str_d1` and `str_d2`.
-
-**What to do.** Check each of the five sources for species and dopamine state, then
-either confirm 10 Hz for the Off condition or replace it. Changing it invalidates
-the v07 caches exactly as the SPN rates did.
-
 **Caveat.** The planned-layout row assumes pre-summing collapses all cortical
 regions to one stream per postsynaptic type and nothing else changes. It has not
 been built, so treat it as arithmetic, not measurement.
+
+## From the session on 2026-08-06 (striatal firing rates)
+
+### 20. The FS rate is not on a stated dopamine condition — RESOLVED 2026-08-06
+
+All five sources were read. **10.0 Hz is confirmed for the unmedicated
+parkinsonian condition** and the derivation is written up in
+`experimental_data/activity_striatum/README.md` §"The FS rate". In short:
+
+- The three primate sources (Marche & Apicella 2021, Yamada 2016, Adler 2013) are
+  all **normal** animals; n-weighted over 151 FSIs they give 10.6 Hz (SEM ~0.7).
+- The two rodent sources are the dopamine-condition correction, and — together
+  with Mallet et al. 2006, which was *not* in the folder and which both He and
+  Yamada cite as the reference for FSI changes in parkinsonism — they agree the
+  FSI **baseline** rate is unaltered by chronic depletion. He's large drop is
+  transient (weeks 2–3, gone by >3 weeks). Factor 1.0.
+- The `str_fsi` band was `(5, 15)`, hand-set. It is now `(3.25, 16.75)` —
+  mean ± 1 SD like the SPN bands, with the relative spread from the only source
+  that reports an SD (Marche, CV 0.675).
+
+**What is left, and it is not small.** The dopamine condition is *imported from
+rodents*, not measured in primates: no parkinsonian-primate striatal FSI recording
+exists. So FS is structurally weaker than the SPN rates, which are measured in
+chronically parkinsonian monkeys. The specific worry is consistency — chronic
+denervation lifts primate MSNs ~20-fold (Liang) and we assert FS is unmoved in the
+same striatum. Hernandez shows exactly that dissociation within one dataset, but in
+rat, where the MSN elevation is far smaller. If the striatal rates ever become a
+suspect in a bad fit, this is a place to look, alongside §4.
+
+Sensitivity bound: 8–12 Hz. Changing the value invalidates the v07 caches exactly
+as the SPN rates did — free right now, since none exist.
+
+
