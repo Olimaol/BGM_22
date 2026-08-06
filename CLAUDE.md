@@ -76,8 +76,19 @@ BOLD monitors. Only the putamen loop is stimulated by DBS.
 - Cortical drive:
   `striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data/firing_rates_matlab_condition-{on,off}.npz`
   — cortical BOLD deconvolved with an SPM HRF into firing rates, one value per TR,
-  plus `caudate_rate`/`putamen_rate` mixed by anatomical proportion. Requires MATLAB
-  (`matlabengine`) to regenerate.
+  plus `caudate_rate`/`putamen_rate` mixed by anatomical proportion. Regenerate with
+  `cortical_drive_by_bold_run.py`, which needs MATLAB (`matlabengine`) and, on the
+  laptop, an **interactive** MathWorks sign-in — `start_matlab()` hangs unattended
+  (`TODO.md` §21). The folder is **git-ignored**, so back it up before rerunning:
+  `create_data_raw_folder` deletes it after a `y/n` prompt.
+- **The cortical proportions live in exactly one place**,
+  `BOLD_optimization/parameters.py: cortical_proportions_dict`. They split each
+  striatal neuron's cortical afferents per region *and* weight the
+  `caudate_rate`/`putamen_rate` mix above, so a second copy could silently
+  disagree; `Microcircuit`/`CorticalInputs` have no defaults and validate what they
+  are given. Changing them means regenerating the rate `.npz` — the file records
+  the weights it was built with and `get_loss` raises on a mismatch. Only v08 is
+  driven by the mixed series; v07 uses the per-region ones.
 - Striatal firing rates: `experimental_data/activity_striatum/README.md` — where the
   dSPN/iSPN rates and the `get_firing_rate_loss` bands come from, which assumption
   they rest on, and what was rejected. The values are the **medication-off** state of

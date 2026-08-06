@@ -388,6 +388,32 @@ def infer_max_sim_time_ms(
         caudate_time = data.get("caudate_time")
         putamen_time = data.get("putamen_time")
 
+        # caudate_rate/putamen_rate are the seven per-region series mixed by the
+        # cortical proportions. Only v08 is driven by them, but nothing else
+        # would notice if the file were mixed with proportions other than the
+        # ones parameters.py now hands the striatal streams, so check here.
+        stored_proportions = data.get("cortical_proportions_json")
+
+    if stored_proportions is None:
+        print(
+            f"WARNING: '{rate_file}' predates the recording of the mixing weights, so "
+            "its caudate_rate/putamen_rate cannot be checked against "
+            "parameters.py['cortical_proportions_dict']. If the proportions have "
+            "changed since it was written, the v08 drive is stale -- regenerate with "
+            "cortical_drive_by_bold_run.py. v07 is unaffected: it is driven by the "
+            "per-region series, which the proportions do not touch."
+        )
+    else:
+        stored = json.loads(str(stored_proportions))
+        expected = paramsS["cortical_proportions_dict"]
+        if stored != expected:
+            raise ValueError(
+                f"'{rate_file}' was mixed with cortical proportions {stored}, but "
+                f"parameters.py now specifies {expected}. The v08 drive and the v07 "
+                "striatal input streams would be built from different anatomies. "
+                "Regenerate the rate file with cortical_drive_by_bold_run.py."
+            )
+
     # Optionally shorten the run (smoke tests); the experimental comparison
     # trims to the shared length, so a shorter simulation stays aligned.
     if n_trs is not None:
@@ -432,6 +458,9 @@ def v07_model_creation_kwargs(
         "mc.nx": paramsS["mc.nx"],
         "mc.b": paramsS["mc.b"],
         "mc.firing_rate_dict": paramsS["mc.firing_rate_dict"],
+        # shared by the Microcircuit and the CorticalInputs, and by the script
+        # that mixed caudate_rate/putamen_rate into the cortical rate file
+        "mc.cortical_proportions_dict": paramsS["cortical_proportions_dict"][loop],
         "dbs": dbs_condition,
         "timestep": paramsS["timestep"],
         "t.duration": duration_ms,

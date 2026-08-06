@@ -11,7 +11,9 @@ import numpy as np
 import scipy.stats as stats
 from scipy.fft import fft, ifft
 import matlab.engine
+import json
 import os
+import sys
 
 CORTICAL_LABELS = (
     "M1",
@@ -23,27 +25,29 @@ CORTICAL_LABELS = (
     "dlPFC",
 )
 
-# Mixing coefficients to build composite corticostriatal drives
-MIXING_FACTORS = {
-    "caudate": {
-        "dlPFC": 0.45,
-        "preSMA": 0.25,
-        "PMd": 0.15,
-        "PMv": 0.10,
-        "SMA": 0.04,
-        "M1": 0.01,
-        "S1": 0.00,
-    },
-    "putamen": {
-        "dlPFC": 0.05,
-        "preSMA": 0.10,
-        "PMd": 0.15,
-        "PMv": 0.05,
-        "SMA": 0.25,
-        "M1": 0.30,
-        "S1": 0.10,
-    },
-}
+# Mixing coefficients to build composite corticostriatal drives. These are the
+# same per-region cortical proportions the Microcircuit and the CorticalInputs
+# turn into afferent counts, so they are read from the one place that holds them
+# rather than copied here -- a copy that drifted would leave the caudate_rate /
+# putamen_rate series in the output .npz mixed differently from the striatal
+# input streams, with nothing to catch it.
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[2] / "BOLD_optimization")
+)
+from parameters import parameters_test_microcircuit as _paramsS
+
+MIXING_FACTORS = _paramsS["cortical_proportions_dict"]
+
+for _target, _weights in MIXING_FACTORS.items():
+    if set(_weights) != set(CORTICAL_LABELS):
+        raise ValueError(
+            f"cortical proportions for '{_target}' cover {sorted(_weights)}, but this "
+            f"script reads {sorted(CORTICAL_LABELS)} from the BOLD file."
+        )
+    if not np.isclose(sum(_weights.values()), 1.0, rtol=0.0, atol=1e-9):
+        raise ValueError(
+            f"cortical proportions for '{_target}' sum to {sum(_weights.values())}, not 1."
+        )
 
 
 def spm_hrf(tr, oversampling=1):
@@ -410,6 +414,12 @@ if __name__ == "__main__":
         scipy_payload[f"{target}_time"] = data["time"]
         scipy_payload[f"{target}_rate"] = data["rate"]
 
+    # record the weights the mixed series were built with, so a consumer can tell
+    # whether this file still matches the proportions the model is built from
+    scipy_payload["cortical_proportions_json"] = json.dumps(
+        MIXING_FACTORS, sort_keys=True
+    )
+
     np.savez_compressed(
         results_dir / f"firing_rates_scipy_condition-{condition}.npz", **scipy_payload
     )
@@ -458,6 +468,10 @@ if __name__ == "__main__":
     for target, data in mixed_rate_results_matlab.items():
         matlab_payload[f"{target}_time"] = data["time"]
         matlab_payload[f"{target}_rate"] = data["rate"]
+
+    matlab_payload["cortical_proportions_json"] = json.dumps(
+        MIXING_FACTORS, sort_keys=True
+    )
 
     np.savez_compressed(
         results_dir / f"firing_rates_matlab_condition-{condition}.npz",

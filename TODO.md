@@ -465,27 +465,31 @@ as the SPN rates did — still free while none exist.
 
 ## From the session on 2026-08-06 (cortical proportions)
 
-### 21. The cortical proportions have no source, and PMv is wrong by ~3.5x
+### 21. The cortical proportions had no source, and PMv was wrong by ~3.5x — APPLIED 2026-08-06
 
-`model_v07.md` §7.5 lists the per-region cortical proportions without a citation,
-because there is none. They are hand-set round numbers, duplicated verbatim in
-three places that have to agree:
+The per-region cortical proportions were hand-set round numbers with no citation,
+duplicated verbatim in three places that had to agree: `microcircuit.py`,
+`cortical_inputs.py` and `cortical_drive_by_bold.py` (`MIXING_FACTORS`). They now
+live once, in `BOLD_optimization/parameters.py` under
+`cortical_proportions_dict`, and all three read them from there. Both CompNeuroPy
+classes lost their defaults and call
+`spike_input_cortex.validate_cortical_proportions()`, which raises on a missing
+mapping, a negative share, or a sum other than 1.
 
-- `CompNeuroPy/.../striatal_microcircuit/microcircuit.py:150`
-- `CompNeuroPy/.../striatal_microcircuit/cortical_inputs.py:260`
-- `striatal_microcircuit_requirements/cortical_firing_rates/cortical_drive_by_bold.py:27`
-  (`MIXING_FACTORS`)
+The duplication mattered because the numbers do two different jobs. In the
+microcircuit and `CorticalInputs` they set `N_eff = round(p * N_cortical_inputs)`,
+i.e. how many of a receiver's 7000 (SPN) or 2800 (FS) cortical afferents come
+from each region, and a region with `p <= 0` is skipped entirely. In
+`cortical_drive_by_bold.py` they are the weights of the linear mix that produces
+the `caudate_rate` / `putamen_rate` series in the rate `.npz`. So a copy that
+drifted would leave the mixed drive and the striatal input streams built from
+different anatomies, with nothing to catch it.
 
-They do two different jobs. In the microcircuit and `CorticalInputs` they set
-`N_eff = round(p * N_cortical_inputs)`, i.e. how many of a receiver's 7000 (SPN)
-or 2800 (FS) cortical afferents come from each region, and a region with `p <= 0`
-is skipped entirely. In `cortical_drive_by_bold.py` they are the weights of the
-linear mix that produces the stored `caudate_rate` / `putamen_rate` series. That
-third use is the reason this cannot be changed casually: the committed
-`firing_rates_matlab_condition-{on,off}.npz` was generated with the current
-weights — verified, `corr(stored caudate_rate, old mix) = 1.0000` — and
-regenerating it needs MATLAB (`matlabengine`). Editing the constant without
-regenerating leaves code and data silently disagreeing.
+**Note the rate `.npz` is *not* in git** — `.gitignore:25` excludes
+`cortical_firing_rates_data/`. It is a regenerable artefact, but there is no
+committed copy to fall back on, so back the folder up before rerunning
+`cortical_drive_by_bold_run.py` (`create_data_raw_folder` deletes it after a
+`y/n` prompt with a 60 s timeout).
 
 **What the quantity should be.** For loop L and cortical ROI r, the fraction of
 corticostriatal afferents onto a striatal neuron in L that originate in r,
@@ -594,12 +598,43 @@ depends on. It is the
 honest number, not a reason to keep the old one, but it means the loop separation
 is doing less work than the current table implies.
 
-**Not applied.** Changing it means editing all three sites *and* regenerating both
-`firing_rates_matlab_condition-{on,off}.npz` under MATLAB, and it invalidates
-every v07 input cache (none exist right now, so that part is free — same window
-that made the striatal-rate change in §20 cheap). Given the 0.98-0.995 correlation
-above, the defensible order is: do it when MATLAB is next in hand, before the
-caches are built, not as a standalone errand.
+**What was applied on 2026-08-06.** The recommended table is now live in
+`parameters.py`, threaded through `get_loss.v07_model_creation_kwargs` as
+`mc.cortical_proportions_dict` into both `Microcircuit` and `CorticalInputs`, and
+imported by `cortical_drive_by_bold.py`. Verified end to end: both columns sum to
+1, and the kwargs produce the intended per-region afferent counts (caudate dSPN
+3850 dlPFC / 1260 PMd / 1050 preSMA / 420 SMA / 280 PMv / 140 M1 / 0 S1). No v07
+cache existed, so nothing was invalidated — the same free window as §20.
+
+**Still open: the rate `.npz` has not been regenerated.** MATLAB R2025b is
+installed on the laptop but `matlab.engine.start_matlab()` does not come up
+unattended — it hangs for 8+ min with `MathWorksServiceHostWindow` spinning at
+~79% CPU off-screen, i.e. waiting on an interactive MathWorks sign-in, and a
+`-nodisplay` attempt returned `License Error: Licensing shutdown`. So
+`firing_rates_matlab_condition-{on,off}.npz` still holds `caudate_rate` /
+`putamen_rate` mixed with the **old** proportions.
+
+Who this actually affects is narrower than it looks:
+
+- **v07 is unaffected.** It is driven by the seven per-region `<region>_rate`
+  series, which the proportions do not touch; it reads `caudate_rate` only for
+  its *length*, to derive the run duration.
+- **v08 is stale**, since `mixed_rates[loop]["rate"]` is its entire cortical
+  drive. Given `corr(old mix, new mix)` = 0.995 / 0.982 the practical error is
+  small, and v08 is only the pipeline smoke test — but it is wrong.
+
+To close it, run `cortical_drive_by_bold_run.py` from
+`striatal_microcircuit_requirements/cortical_firing_rates/` in a session where
+MATLAB can sign in interactively. It now records the proportions in
+`__data_raw_meta__`. **Back the data folder up first** — see the `.gitignore`
+note above.
+
+A guard was added so this cannot go unnoticed again: `cortical_drive_by_bold.py`
+writes `cortical_proportions_json` into both `.npz` files, and
+`get_loss.infer_max_sim_time_ms` raises if that record disagrees with
+`parameters.py`. The existing files predate the key, so for now they trigger a
+printed warning instead of an error — which is what the current runs will show
+until the regeneration happens.
 
 ### 22. The spike-count generator runs at `concentration = 1.0`, and nothing checks the result
 

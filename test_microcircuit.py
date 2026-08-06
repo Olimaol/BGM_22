@@ -1,6 +1,13 @@
+import sys
+from pathlib import Path
+
 from CompNeuroPy import Microcircuit
 from CompNeuroPy import CompNeuroModel, print_df, CompNeuroMonitors, PlotRecordings
 from ANNarchy import setup
+
+# the cortical proportions live in one place only, see parameters.py
+sys.path.insert(0, str(Path(__file__).resolve().parent / "BOLD_optimization"))
+from parameters import parameters_test_microcircuit as paramsS
 
 
 if __name__ == "__main__":
@@ -13,6 +20,7 @@ if __name__ == "__main__":
     mc = Microcircuit(
         name=NAME,
         dbs_condition=DBS_CONDITION,
+        cortical_proportions_dict=paramsS["cortical_proportions_dict"][NAME],
         build_connectivity=True,
         build_missing_gaba_input=True,
         build_cortical_input=True,
