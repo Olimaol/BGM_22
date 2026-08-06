@@ -92,7 +92,7 @@ postsynaptic type, so it is exactly lossless today.
 
 `Microcircuit._simulate_distance_dependent_spike_counts` generates the missing
 local GABA input assuming the surrounding striatal neurons fire at
-`{"FS": 10.0, "dSPN": 25.0, "iSPN": 33.0}` Hz. Those are baked into the cache.
+`{"FS": 10.5, "dSPN": 25.0, "iSPN": 33.0}` Hz. Those are baked into the cache.
 
 `get_firing_rate_loss` scores the simulated rates against bands centred on exactly
 those values (12.67-37.33 and 21.22-44.78), so the design is coherent at the band
@@ -433,8 +433,8 @@ been built, so treat it as arithmetic, not measurement.
 
 ### 20. The FS rate is not on a stated dopamine condition — RESOLVED 2026-08-06
 
-All five sources were read. **10.0 Hz is confirmed for the unmedicated
-parkinsonian condition** and the derivation is written up in
+All five sources were read. **The FS rate is now 10.5 Hz on a stated condition,
+the unmedicated parkinsonian one**, and the derivation is written up in
 `experimental_data/activity_striatum/README.md` §"The FS rate". In short:
 
 - The three primate sources (Marche & Apicella 2021, Yamada 2016, Adler 2013) are
@@ -444,9 +444,10 @@ parkinsonian condition** and the derivation is written up in
   Yamada cite as the reference for FSI changes in parkinsonism — they agree the
   FSI **baseline** rate is unaltered by chronic depletion. He's large drop is
   transient (weeks 2–3, gone by >3 weeks). Factor 1.0.
-- The `str_fsi` band was `(5, 15)`, hand-set. It is now `(3.25, 16.75)` —
-  mean ± 1 SD like the SPN bands, with the relative spread from the only source
-  that reports an SD (Marche, CV 0.675).
+- The value moved 10.0 -> **10.5 Hz**, the pooled estimate, which was free because
+  no cache existed to invalidate. The `str_fsi` band was `(5, 15)`, hand-set; it is
+  now `(3.42, 17.58)` — mean ± 1 SD like the SPN bands, with the relative spread
+  from the only source that reports an SD (Marche, CV 0.6746).
 
 **What is left, and it is not small.** The dopamine condition is *imported from
 rodents*, not measured in primates: no parkinsonian-primate striatal FSI recording
@@ -457,7 +458,7 @@ same striatum. Hernandez shows exactly that dissociation within one dataset, but
 rat, where the MSN elevation is far smaller. If the striatal rates ever become a
 suspect in a bad fit, this is a place to look, alongside §4.
 
-Sensitivity bound: 8–12 Hz. Changing the value invalidates the v07 caches exactly
-as the SPN rates did — free right now, since none exist.
+Sensitivity bound: 8–12 Hz. Any further change invalidates the v07 caches exactly
+as the SPN rates did — still free while none exist.
 
 

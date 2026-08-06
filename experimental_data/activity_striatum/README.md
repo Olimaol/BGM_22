@@ -15,7 +15,7 @@ and mirrored as the `Microcircuit` default:
 |---|---|---|---|
 | dSPN | **25.0 Hz** | (12.67, 37.33) | Liang et al. 2008, Table 1 |
 | iSPN | **33.0 Hz** | (21.22, 44.78) | Liang et al. 2008, Table 1 |
-| FS | **10.0 Hz** | (3.25, 16.75) | normal-primate level (Marche & Apicella 2021; Yamada 2016; Adler 2013) × a chronic dopamine-depletion factor of 1.0 (Mallet 2006; Hernandez 2013; He 2024) — see [The FS rate](#the-fs-rate) |
+| FS | **10.5 Hz** | (3.42, 17.58) | normal-primate level (Marche & Apicella 2021; Yamada 2016; Adler 2013) × a chronic dopamine-depletion factor of 1.0 (Mallet 2006; Hernandez 2013; He 2024) — see [The FS rate](#the-fs-rate) |
 
 Files here: `Liang_etal_2008_extraction - MSN.csv` is the spreadsheet transcription
 of the paper's tables ([online copy](https://docs.google.com/spreadsheets/d/1FYXBhNQJZx-MvGt7IpQZi1EVFxsDKHEMx73uF5hI4pE/edit?usp=sharing)),
@@ -229,13 +229,10 @@ n-weighted, taking Adler at 9 Hz:
 
 Dropping Adler, which contributes no published number, gives 11.2 Hz.
 
-**We keep 10.0 Hz.** It is inside one pooled SEM of 10.6, and well inside the
-honest uncertainty (see the sensitivity bound below), so moving it would be
-precision the sources do not support. 10.5 Hz would be the value if you wanted the
-constant to *be* the pooled estimate rather than merely agree with it; that is a
-one-line change in the three places listed under
-[Changing these values](#changing-these-values), and it is free only while no v07
-cache exists.
+**We use 10.5 Hz** — the pooled estimate, rounded to the half-Hertz the sources can
+carry. It was 10.0 Hz before this derivation existed; the move is small enough to be
+inside one pooled SEM either way, and it was made because no v07 cache existed at
+the time and so cost nothing. Do not read 10.5 as more precise than 10.6 ± 0.7.
 
 ### The dopamine condition: no chronic change
 
@@ -266,7 +263,7 @@ chronic PD, so the relevant regime is He's ">3 weeks", where the factor is 1.0.
 ```
 
 **Sensitivity bound:** if He's >3 week trend (x0.76) is a real effect rather than an
-underpowered null, the floor is ~8 Hz. Treat **8–12 Hz** as the range. 10.0 sits in
+underpowered null, the floor is ~8 Hz. Treat **8–12 Hz** as the range. 10.5 sits in
 the middle of it.
 
 ### The band
@@ -277,7 +274,7 @@ the population mean. Marche & Apicella is the only one of the three that reports
 SD, so the relative spread comes from there and is applied to the value we use:
 
 ```
-CV = 8.5 / 12.6 = 0.675  ->  SD = 0.675 * 10.0 = 6.75  ->  (3.25, 16.75)
+CV = 8.5 / 12.6 = 0.6746  ->  SD = 0.6746 * 10.5 = 7.08  ->  (3.42, 17.58)
 ```
 
 This is looser than the `(5, 15)` it replaces, which was hand-set and not derived

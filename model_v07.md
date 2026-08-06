@@ -684,10 +684,11 @@ counts, not currents.
 
 The rates driving this come from `parameters.py: mc.firing_rate_dict`, threaded
 through `v07_model_creation_kwargs` so evaluation and cache building cannot
-disagree: `{FS: 10.0, dSPN: 25.0, iSPN: 33.0}` Hz. dSPN/iSPN are the parkinsonian
-**medication-off** state of Liang et al. 2008; FS is from a separate literature on
-an unstated dopamine condition (`TODO.md` §20). The derivation, the assumption it
-rests on and the alternatives rejected are in
+disagree: `{FS: 10.5, dSPN: 25.0, iSPN: 33.0}` Hz. dSPN/iSPN are the parkinsonian
+**medication-off** state of Liang et al. 2008, measured in MPTP monkeys. FS has no
+parkinsonian-primate measurement at all: it is the normal-primate level times a
+chronic dopamine-depletion factor of 1.0 taken from rodents. The derivations, the
+assumptions they rest on and the alternatives rejected are in
 `experimental_data/activity_striatum/README.md`. Alongside them,
 `correlation_dict = {FS: 0.06, dSPN: 0.004, iSPN: 0.004}` (Adler et al. 2013).
 

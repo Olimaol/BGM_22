@@ -35,7 +35,7 @@ parameters_test_microcircuit["update_time"] = 110.0
 # both derivations, and keep these in sync with the plausible bands in
 # get_loss.get_firing_rate_loss.
 parameters_test_microcircuit["mc.firing_rate_dict"] = {
-    "FS": 10.0,
+    "FS": 10.5,
     "dSPN": 25.0,
     "iSPN": 33.0,
 }
