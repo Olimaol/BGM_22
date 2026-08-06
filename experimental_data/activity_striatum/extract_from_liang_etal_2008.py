@@ -7,7 +7,7 @@ was considered and rejected; it is kept because it is the evidence for that
 decision and it supplies the sensitivity bound on dSPN (22.37 vs 25.0 Hz).
 See ./README.md for why.
 
-data extracted from paper https://doi.org/10.1523/JNEUROSCI.1176-08.2008 (local: ./7537.full.pdf)
+data extracted from paper https://doi.org/10.1523/JNEUROSCI.1176-08.2008
 extraction here: https://docs.google.com/spreadsheets/d/1FYXBhNQJZx-MvGt7IpQZi1EVFxsDKHEMx73uF5hI4pE/edit?usp=sharing (local: ./Liang_etal_2008_extraction - MSN.csv)
 
 Compute estimated means and standard deviations for true D1 and D2 groups

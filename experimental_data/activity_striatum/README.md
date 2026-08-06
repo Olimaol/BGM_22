@@ -17,11 +17,12 @@ and mirrored as the `Microcircuit` default:
 | iSPN | **33.0 Hz** | (21.22, 44.78) | Liang et al. 2008, Table 1 |
 | FS | 10.0 Hz | (5, 15) | Yamada 2016; Marche & Apicella 2021; Adler 2013; Hernandez 2013; He 2024 |
 
-Files here: `7537.full.pdf` is the paper,
-`Liang_etal_2008_extraction - MSN.csv` is the spreadsheet transcription of its
-tables ([online copy](https://docs.google.com/spreadsheets/d/1FYXBhNQJZx-MvGt7IpQZi1EVFxsDKHEMx73uF5hI4pE/edit?usp=sharing)),
+Files here: `Liang_etal_2008_extraction - MSN.csv` is the spreadsheet transcription
+of the paper's tables ([online copy](https://docs.google.com/spreadsheets/d/1FYXBhNQJZx-MvGt7IpQZi1EVFxsDKHEMx73uF5hI4pE/edit?usp=sharing)),
 and `extract_from_liang_etal_2008.py` is a deconvolution that we
-**do not use** — see [What we rejected](#what-we-rejected).
+**do not use** — see [What we rejected](#what-we-rejected). The paper itself is not
+in the repository; get it from the DOI below. Publisher PDFs in this directory are
+gitignored.
 
 ---
 
