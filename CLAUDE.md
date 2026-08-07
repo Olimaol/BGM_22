@@ -118,19 +118,31 @@ python build_input_caches.py --dbs off --n-trs 5 --cache-dir <abs path>
 **A cache is only loadable if its `n_steps` equals `int(t.duration/dt)` exactly**,
 so it is built for one `--n-trs` and usable only at that `--n-trs`. It must also
 cover the fixed 9900 ms firing-rate probe, which is the binding constraint below 5
-TRs; the script refuses that case up front. A cache also has to match the
-`firing_rate_dict` and `correlation_dict` it was drawn at, and one written before
-those were recorded is refused outright.
+TRs; the script refuses that case up front. A cache also has to match everything
+it was drawn at — `firing_rate_dict`, `correlation_dict`, `shared_fraction`,
+`cortical_correlation`, `correlation_window_ms`, `correlation_timescale_ms`,
+`source_multiplicity` — and one written before any of those were recorded is
+refused outright. Each stream is checked against the statistics its own
+parameters imply as it is written, **raising** on a mismatch, and the measured
+mean, Fano factor and pairwise correlation are stored in the state file so a
+cache can be audited without regenerating it.
+
+**What the streams are required to reproduce is written down** in
+`experimental_data/input_streams/README.md`, together with what this approach
+deliberately cannot represent and what the model may therefore be used to claim.
+Read it before changing anything about the inputs.
 
 **No cache currently exists.** `mc_ci_cache/`, `mc_ci_cache_5tr/` and
 `mc_caudate_off_cache/` were deleted on 2026-08-06 when the striatal rates moved to
 the medication-off values, which invalidated the missing-GABA streams in all of
 them. `mc_ci_cache_dir` in `parameters.py` still points at the now-absent
 `../mc_ci_cache`, so a v07 run without `--cache-dir` fails immediately rather than
-loading something stale. Rebuilding for `--n-trs 5` costs **24 min per loop per DBS
-condition** (~1.6 h for all four) and ~42 GB; at full length it is ~25 h per loop
-and ~1.25 TiB per DBS condition in the current `float64`/per-region layout — see
-`PLAN.md` for the agreed smaller one.
+loading something stale. Since the generator was rebuilt on 2026-08-07
+(`TODO.md` §22) generation is **~6x faster**: roughly **4 min per loop per DBS
+condition** at `--n-trs 5` and ~7 h per DBS condition at full length, against 24
+min and ~42 h before. Sizes are unchanged — ~42 GB for `--n-trs 5` and ~1.25 TiB
+per DBS condition in the current `float64`/per-region layout; see `PLAN.md` for
+the agreed smaller one.
 
 `storage_dir` is resolved **relative to the working directory you launch from**,
 which is how `mc_ci_cache/` and `mc_caudate_off_cache/` came to hold overlapping

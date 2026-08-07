@@ -647,189 +647,196 @@ stream a build run would have been on.
 
 ### 7.3 Missing-GABA compensation — built once, cached
 
-The simulated cube contains only the inner sphere of each neuron's potential
-presynaptic partners. Everything outside is replaced by synthetic input, in three
-steps (`Microcircuit._missing_local_input()`):
+The simulated cube is 227.6 µm across; the connection kernel reaches
+`Rout = 3σ`, which is 568 µm for FS and ~1.2 mm for both SPN types. So each
+neuron is wired only out to `Rin = 113.8 µm` (§7.2) and everything beyond that is
+real striatum that is not in the simulation. It is replaced by synthetic
+spike-count streams, in two steps (`Microcircuit._missing_local_input()`).
 
-1. **How much is missing.** For each pair, integrate the kernel over the outer
-   shell from the neighbourhood radius `Rin` to `Rout = 3σ_max`:
+**Step 1: how much is missing** (`_define_expected_input_counts`). For each pair,
+integrate the kernel over the outer shell:
 
-   ```
-   E_outer = 4π ρ ∫_{Rin}^{Rout} p(r) r² dr
-   ```
+```
+E_outer = 4π ρ ∫_{Rin}^{Rout} p(r) r² dr
+```
 
-   with `ρ = props[pre] · density`. The same integral over `[0, Rin]` gives
-   `E_inner`, used only as a sanity check against the connections actually made.
+with `ρ = props[pre] · density`. The same integral over `[0, Rin]` gives
+`E_inner`, a sanity check against the connections actually made.
 
-   `Rin` is the neighbourhood radius, clamped to 113.8 µm for all three post
-   types (§7.2); `Rout = 3σ_max(post)`, which is 568 µm for FS and ~1.2 mm for
-   both SPN types. The gap is large, and so is what falls into it:
+| pair | `E_inner` | `E_outer` | pre rate | spikes/s delivered |
+|---|---|---|---|---|
+| FS → FS | 1.9 | 12.4 | 10.5 Hz | 126 |
+| FS → dSPN | 8.8 | 500.0 | 10.5 Hz | 5 250 |
+| FS → iSPN | 9.6 | 25.3 | 10.5 Hz | 262 |
+| dSPN → dSPN | 26.2 | 1568.5 | 25.0 Hz | 39 200 |
+| dSPN → iSPN | 25.0 | 1500.3 | 25.0 Hz | 37 500 |
+| iSPN → dSPN | 31.8 | 505.4 | 33.0 Hz | 16 665 |
+| iSPN → iSPN | 32.5 | 948.1 | 33.0 Hz | 31 284 |
 
-   | pair | `E_inner` | `E_outer` | `N_eff` | pre rate | mean counts per receiver per dt |
-   |---|---|---|---|---|---|
-   | FS → FS | 1.9 | 12.4 | 12 | 10.5 Hz | 0.013 |
-   | FS → dSPN | 8.8 | 500.0 | 500 | 10.5 Hz | 0.525 |
-   | FS → iSPN | 9.6 | 25.3 | 25 | 10.5 Hz | 0.026 |
-   | dSPN → dSPN | 26.2 | 1568.5 | 1568 | 25.0 Hz | 3.920 |
-   | dSPN → iSPN | 25.0 | 1500.3 | 1500 | 25.0 Hz | 3.750 |
-   | iSPN → dSPN | 31.8 | 505.4 | 505 | 33.0 Hz | 1.667 |
-   | iSPN → iSPN | 32.5 | 948.1 | 948 | 33.0 Hz | 3.128 |
+Read the first two columns together: **a dSPN gets ~67 simulated GABAergic
+afferents against ~2573 synthetic ones, so the microcircuit is about 2 % circuit
+and 98 % open-loop stream.** Note also that `fitted_params.json` has no
+`dSPN→FS` or `iSPN→FS` pair, so **FS neurons receive GABA only from other FS
+neurons** — 126 spikes/s, against 61 115 for a dSPN and 69 046 for an iSPN. What
+this forecloses is set out in `experimental_data/input_streams/README.md` §4.1.
 
-   Read the first two columns together: **a dSPN neuron gets ~26 simulated dSPN
-   afferents and ~1568 synthetic ones.** The lattice is a small window on the
-   striatum and most of each neuron's GABAergic input is the compensation, not
-   the simulated circuit. That is worth keeping in mind whenever a striatal rate
-   comes out wrong — `TODO.md` §4 is about exactly this loop being untested.
+**Step 2: realise the pool** (`_simulate_distance_dependent_spike_counts`). Per
+pair, virtual source neurons are scattered at density `ρ` through a box extending
+`Rout` beyond the lattice, and each receiver connects to each source at distance
+`d ∈ [Rin, Rout]` with probability `p(d)` — the same kernel §7.2 uses. The
+mechanics of the draw are §7.4.
 
-2. **How much of it is shared between two receivers.** Two nearby neurons see
-   largely the same distant presynaptic pool. For a receiver pair separated by
-   `d`:
+This is the part that changed on 2026-08-07. It used to compute the shared
+fraction analytically,
 
-   ```
-   E_shared(d) = 2π ρ ∫_{Rin}^{Rout} r² ∫_0^π p(r) p(r_B) sin θ dθ dr,
-                 r_B = √(r² + d² − 2 r d cos θ)
-   ```
+```
+E_shared(d) = 2π ρ ∫_{Rin}^{Rout} r² ∫_0^π p(r) p(r_B) sin θ dθ dr
+```
 
-   evaluated at 50 distances up to the half space-diagonal and stored as a cubic
-   interpolant of `f(d) = E_shared(d) / E_outer`. It is 0 for `d ≥ 2·Rout`.
-   Applied to the actual receiver positions this yields, per pair, an `(R, R)`
-   float32 matrix of shared fractions with unit diagonal, clipped to [0, 1].
+at 50 distances, interpolate `f(d) = E_shared(d)/E_outer` onto the receiver
+positions, and then *impose* that matrix on the draw through a Gaussian copula.
+Realising the pool instead means **`f(d)` emerges from the overlap**, so the
+double quadrature is gone and the result is exact at any lattice size or density
+— which is what keeps `TODO.md` §24 (a larger, sparser cube) reachable without
+another rewrite.
 
-3. **Simulate it.** Per pair, `N_eff = int(round(E_outer))` presynaptic sources
-   firing at `firing_rate_dict[pre]` are drawn into a memmap, correlated between
-   receivers according to the shared-fraction matrix of step 2 — the mechanics
-   are §7.4. `correlation_dict[pre]` enters as that call's `rho`: the pairwise
-   spike correlation reported for those cells is reproduced by letting the whole
-   outer pool's rate fluctuate together, redrawn every step from a Beta with the
-   right mean and a variance of `rho·p·(1−p)`. A pair whose `N_eff` rounds to 0
-   is skipped and gets no stream at all; with the current parameters all seven
-   survive.
+Two things the construction is checked on, because both are predictions rather
+than inputs. The realised mean degree must reproduce `E_outer`; it is one random
+realisation of the source cloud, so the tolerance is 20 %, about 4σ of a spread
+measured at 1.6 % (dSPN→dSPN) to 4.8 % (FS→dSPN) with a bias below 1 %. And the
+realised shared fractions must match the analytic `f(d)`:
+
+| pair | `f(0)` analytic | `f(dmax)` analytic | realised (near / mid / far) |
+|---|---|---|---|
+| dSPN → dSPN | 0.0372 | 0.0318 | 0.0361 / 0.0341 / 0.0310 |
+
+Note `f(0)` is **not 1**: two receivers at the same point each connect to a given
+distant neuron only with probability `p(r)`, independently, so the shared
+fraction is the `p`-weighted mean of `p` — 0.03 to 0.21 depending on the pair.
+
+`source_multiplicity` lets one virtual source stand for `k` real neurons, which
+keeps the cloud small. It is capped per pair so no receiver has fewer than 50
+sources: at `k = 10` the 12-afferent FS→FS pair would have barely one source per
+receiver and both its degree and its shared fraction would be rounded away.
 
 Finally the **mean** of 10 000 samples from each pair's weight sampler is stored
-as `mean_weights_by_type[(pre, post)]`. That scalar is what the streamed spike
-counts get multiplied by at simulation time (§7.7): the stream says *how many
-spikes arrived*, the scalar says *what one of them is worth*. So the whole outer
-shell — up to 1568 neurons — collapses onto one mean synaptic weight, where the
-inner shell keeps its individually sampled weights (§7.2). The compensation is
-right on average and carries none of the weight heterogeneity.
+as `mean_weights_by_type[(pre, post)]`. That scalar is what the streamed counts
+are multiplied by at simulation time (§7.7): the stream says *how many spikes
+arrived*, the scalar says *what one is worth*. So the whole outer shell collapses
+onto one mean weight, where the inner shell keeps individually sampled ones.
 
-The rates driving this come from `parameters.py: mc.firing_rate_dict`, threaded
-through `v07_model_creation_kwargs` so evaluation and cache building cannot
-disagree: `{FS: 10.5, dSPN: 25.0, iSPN: 33.0}` Hz. dSPN/iSPN are the parkinsonian
-**medication-off** state of Liang et al. 2008, measured in MPTP monkeys. FS has no
-parkinsonian-primate measurement at all: it is the normal-primate level times a
-chronic dopamine-depletion factor of 1.0 taken from rodents. The derivations, the
-assumptions they rest on and the alternatives rejected are in
-`experimental_data/activity_striatum/README.md`. Alongside them,
-`correlation_dict = {FS: 0.06, dSPN: 0.004, iSPN: 0.004}` (Adler et al. 2013).
+The rates come from `parameters.py: mc.firing_rate_dict`, threaded through
+`v07_model_creation_kwargs`: `{FS: 10.5, dSPN: 25.0, iSPN: 33.0}` Hz, the
+parkinsonian **medication-off** state of Liang et al. 2008 (see
+`experimental_data/activity_striatum/README.md`). Alongside them
+`mc.correlation_dict`, which is **`{FS: 0, dSPN: 0, iSPN: 0}`** — see §7.4.
 
 Cached in `inputs/missing_input_state.pkl`. On load, the pair-key set, `dt`,
-**`n_steps` exactly**, `firing_rate_dict` and `correlation_dict` must match, every
-`.dat` must exist, and the RNG state is restored. A state file written before the
-last two were recorded is refused rather than trusted.
+**`n_steps` exactly**, `firing_rate_dict`, `correlation_dict`,
+`correlation_window_ms`, `correlation_timescale_ms` and `source_multiplicity`
+must all match, every `.dat` must exist, and the RNG state is restored. A state
+file written before any of those were recorded is refused rather than trusted.
 
 ### 7.4 How one spike-count stream is drawn
 
-Everything cached in §7.3 and §7.5 is the same kind of object, produced by the
-same code — `striatal_microcircuit/spike_input_cortex.py`. Understanding it once
-covers the missing-GABA streams, the striatal cortical streams and all of
-`CorticalInputs` (§8).
+Everything cached in §7.3 and §7.5 is the same kind of object, produced by
+`striatal_microcircuit/spike_input_cortex.py`. Understanding it once covers the
+missing-GABA streams, the striatal cortical streams and all of `CorticalInputs`.
 
 **What a stream is.** One `(R, n_steps)` matrix for one `(pre, post)` pair. Row
-`i` is receiver neuron `i` of the postsynaptic population; column `t` is one
-simulation step of `dt = 0.1 ms`. The entry is a **count**: how many of that
-pair's presynaptic neurons spiked into receiver `i` during that 0.1 ms bin. It is
-not a rate, not a current, and not a spike train — the presynaptic neurons are
-never represented individually, only their per-bin total. What turns a count into
-a current is a single mean weight, applied later at simulation time (§7.7).
+`i` is receiver `i`; column `t` is one `dt = 0.1 ms` step. The entry is a
+**count**: how many of that pair's presynaptic neurons spiked into receiver `i`
+in that bin. The presynaptic neurons are never represented individually — no
+spike trains, no individual synapses, no per-synapse weights. What turns a count
+into a current is a single mean weight applied later (§7.7).
 
-**What it is standing in for.** `N_eff` presynaptic neurons firing at some rate.
-Everything below is a way of drawing `Binomial(N_eff, p)` per receiver per bin
-while imposing the right amount of *sharing* — two receivers do not each own a
-private pool of `N_eff` neurons, the pools overlap, and that overlap is what
-makes their inputs correlated. `shared_input` is that overlap: 1.0 would mean two
-receivers see the identical presynaptic population, 0.0 that they see disjoint
-ones.
+**What it must reproduce.** A stream stands in for `N_eff` presynaptic neurons
+firing at a stated rate, whose pools overlap between receivers by `f_ij`, and
+which may themselves be pairwise correlated at `ρ`. Three things then follow with
+no modelling freedom:
 
-**The three stages** (`ReceiverSimulator`, called via
-`simulate_receiver_counts_*_to_memmap`):
+```
+mean = N · p(t)                       p(t) = rate(t) · dt / 1000
+Fano = (1 − p) · ((1 − ρ) + N·ρ)
+corr = (f·(1 − ρ) + N·ρ) / ((1 − ρ) + N·ρ)
+```
 
-1. `get_global_p(dt, rate, rho)` → one probability per time step, shared by all
-   receivers. This is where a firing rate becomes a spike probability:
-   `p(t) = rate(t) · dt / 1000`. Two branches, and which one runs depends only on
-   whether `rate` is an array or a scalar:
-   - **`rate` is a time series** (all cortical streams): `p(t) = rate(t)·dt/1000`
-     exactly, and **`rho` is ignored entirely** — the function returns before it
-     is read. The cortical callers pass `rho = 0.0` anyway, so this is harmless
-     today, but a non-zero value there would be silently discarded rather than
-     applied.
-   - **`rate` is a scalar** (all missing-GABA streams): with `rho = 0` a flat
-     `p`; with `rho > 0`, `p(t)` is redrawn every step from a Beta with mean `p`
-     and variance `rho·p·(1−p)`. This is the `correlation_dict` entry — a
-     population-wide rate fluctuation shared by every receiver of the pair.
-2. `generate_p_matrix(global_p, shared_input, concentration)` → an `(R, n_steps)`
-   matrix of *per-receiver* probabilities. Correlated uniforms come from a
-   Gaussian copula whose correlation matrix **is the shared-fraction matrix**,
-   and each uniform is pushed through `Beta.ppf(·, p·c, (1−p)·c)`.
-3. `simulate(p_matrix, shared_input)` → the counts, as
-   `Binomial.ppf(u, N_eff, p_matrix)` with a **second, independently drawn** set
-   of copula uniforms at the same correlation matrix.
+**These are the target statistics**, and the generator is checked against them at
+build time. `experimental_data/input_streams/README.md` is the full contract.
 
-So sharing is injected twice — once into the probabilities, once into the draw —
-and the shared fraction is used directly as a Gaussian correlation coefficient.
-That is an approximation: the correlation you get out in the counts is not the
-number you put in. It is in the right direction and monotone, nothing more.
+**The principle.** Every construction realises the presynaptic pool explicitly
+and lets overlaps produce the correlations, rather than computing a correlation
+and imposing it. That is the difference from the pre-2026-08-07 code, which drew
+correlated uniforms from a Gaussian copula at the shared-fraction matrix, pushed
+them through a Beta inverse-CDF and then a Binomial inverse-CDF, and got a
+correlation of 0.00009 where 0.014 was intended and a Fano factor of 1922 where
+1 was.
 
-**What is *not* correlated: time.** Every bin is drawn independently of every
-other. `shared_input` and `rho` both act *across receivers within one bin*.
-Nothing in the generator produces autocorrelation, burst structure or refractory
-effects — the only structure along the time axis is whatever the rate series
-itself carries, which for the cortical streams is one value per 2.31 s TR.
+**Three constructions:**
 
-| argument | missing-GABA (§7.3) | cortical, striatum (§7.5) | cortical, BG (§8) |
+1. **Cortical, striatal** (`simulate_cortical_axon_pool_streams_to_memmap`). All
+   receiver types of one region sample the same pool of `M = N_eff/f` axons.
+   Per bin, `k ~ Binomial(M, p(t))` axons fire and receiver `i` sees
+   `Hypergeometric(M, N_i, k)` of them. Marginals are exactly `Binomial(N_i, p)`
+   and the correlation between *any* two receivers is `√(N_i N_j)/M`, same type
+   or not — so the cross-type shared fractions are **derived, not free**.
+2. **Missing GABA** (`simulate_receiver_counts_geometric_to_memmap`). Per bin,
+   draw how many of the `n_sources · k` real neurons fired, scatter those spikes
+   uniformly over the sources, and add each to every receiver that source feeds.
+3. **`CorticalInputs`** (`simulate_receiver_counts_homogeneous_to_memmap`). One
+   population, flat `f`: split each receiver's afferents into `round(f·N)` shared
+   and the rest private, and draw each with a Binomial.
+
+**The shared rate modulation, and why it needs a timescale.** `ρ` is a
+fluctuation all the presynaptic neurons ride on. A spike-count correlation `r_sc`
+is only defined together with the **window** it was measured at: it grows with
+the window and saturates once the window exceeds the correlation timescale
+`τ_c`. Everything the model calibrates against (Cohen & Kohn 2011, *Nat Neurosci*
+14:811, Table 1) is measured at 66–3000 ms; nothing at `dt`.
+
+So the modulation is an AR(1)/OU process with `a = exp(−dt/τ_c)`, pushed through
+a Gaussian copula onto a Gamma marginal of mean 1 and variance `σ²`, and `σ` is
+solved so the *presynaptic* pair correlation equals `r_sc` at the window
+`T_meas`, using `W(m) = m + 2Σ(m−k)a^k`. It costs `O(n_steps)`, not
+`O(R · n_steps)`, because it is one trace per stream. `τ_c = 0` recovers a white
+modulation, which is what the old code did unconditionally — and which cannot be
+right at both ends, since it makes `r_sc` the same number at every window.
+
+**All three correlation parameters are currently 0** (`mc.correlation_dict`,
+`mc.cortical_correlation`, `ci.shared_fraction_dict`). That is deliberate, not an
+oversight: the input correlation is the dominant determinant of the simulated
+BOLD amplitude (`Var(Σ I_i) = N·v·(1 + (N−1)r)`, a 481× swing at `N = 486`
+between `r = 0` and `r = 0.99`), and the model cannot decorrelate the way a real
+striatum does. `TODO.md` §25 has the reasoning and the scan that is meant to set
+them.
+
+**What is *not* correlated: time.** Bins are drawn independently. Nothing
+produces autocorrelation, burst structure or refractory effects except the rate
+series itself and the shared modulation above.
+
+| argument | missing GABA (§7.3) | cortical, striatum (§7.5) | cortical, BG (§8) |
 |---|---|---|---|
-| `N_eff` | `round(E_outer)`, 12–1568 | `round(proportion · N_total)` | `round(proportion · N_total)` |
-| `rate` | scalar, `firing_rate_dict[pre]` | per-step array from the drive | per-step array from the drive |
-| `rho` | `correlation_dict[pre]` | 0.0 (ignored) | 0.0 (ignored) |
-| `shared_input` | `(R, R)` matrix, `f(d)` | scalar 0.014 | scalar 0.0 |
-| `concentration` | default 1.0 | default 1.0 | default 1.0 |
+| pool | geometric, from the kernel | `M = N_eff/f` axons | flat `f` |
+| `N_eff` | `E_outer`, 12–1568 | `round(proportion · N_total)` | `round(proportion · N_total)` |
+| `rate` | scalar, `firing_rate_dict[pre]` | per-step array from the drive | per-step array |
+| `f` | emerges, 0.02–0.21 | 0.014 (Kincaid) | `ci.shared_fraction_dict`, 0 |
+| `r_sc` | `correlation_dict[pre]`, 0 | `cortical_correlation`, 0 | `cortical_correlation`, 0 |
 
-**`concentration` is the one to watch.** It is the Beta dispersion in stage 2, it
-is never passed by any caller, and in both call sites an explicit
-`concentration=1000.0` sits commented out one line below. At the default of 1.0,
-`Beta(p·1, (1−p)·1)` with `p ≈ 5·10⁻⁴` has the correct mean but a variance of
-`p(1−p)/2` — a standard deviation ~30× its own mean. The per-receiver
-probability is therefore not "p with jitter"; it is almost always ≈ 0 and rarely
-≈ 1. Measured on a cortical stream (`N_eff = 3150`, 5 Hz, `dt = 0.1 ms`, so 1.575
-expected counts per bin):
+**Self-check.** After each stream is written, a sample from a stationary stretch
+is measured and compared with the closed forms above; a mismatch **raises**, and
+the measured values are written into the cache state so every cache carries an
+audit trail. Two subtleties are baked into the check. The mean tolerance widens
+to four standard errors of the sample mean, because a sparse stream like M1→FS
+(29 receivers, 56 afferents, 0.02 counts per bin) has a 1 % standard error and a
+flat 2 % would fire on a good draw. And the receivers entering the correlation
+are drawn at random, not taken from the front: receiver index order follows the
+x-major lattice, so the leading rows are spatially clustered, which biased the
+measured FS→iSPN correlation up by 25 %.
 
-| | expected | mean | SD | max | bins that are exactly 0 | Fano | realized corr (target 0.014) |
-|---|---|---|---|---|---|---|---|
-| `concentration = 1.0` | 1.575 | 1.540 | 48.65 | 3131 | 99.6 % | 1537 | 0.0002 |
-| `concentration = 1000.0` | 1.575 | 1.574 | 2.55 | 42 | 49.1 % | 4.2 | 0.0083 |
-
-and on a missing-GABA stream (`N_eff = 1568`, 25 Hz, `rho = 0.004`, shared
-fraction 0.5 for the illustration):
-
-| | expected | mean | SD | max | bins that are exactly 0 | Fano | realized corr (target 0.5) |
-|---|---|---|---|---|---|---|---|
-| `concentration = 1.0` | 3.920 | 3.793 | 54.44 | 1567 | 98.1 % | 781 | 0.15 |
-| `concentration = 1000.0` | 3.920 | 3.907 | 5.82 | 75 | 37.6 % | 8.7 | 0.85 |
-
-Read the `max` column: at the default, single 0.1 ms bins in which **the entire
-presynaptic pool fires at once** are routine. The drive is delivered as rare
-enormous conductance jumps rather than a dense stream, and the shared fractions
-of §7.3 are largely washed out on the way. The mean is right throughout, which is
-why nothing downstream ever complained. Nothing here has been validated against a
-target input statistic — see `TODO.md` §22.
-
-**How it is written.** `simulate_receiver_counts_*_to_memmap` never materialises
-the full `(R, n_steps)` array. It slices the time axis into chunks sized so the
-four internal float64 `(R, chunk)` arrays stay near 128 MB, builds a fresh
-`ReceiverSimulator` per chunk on the **same** `rng`, and writes each result
-straight into the memmap. Chunking is therefore invisible in the output: the
-random stream continues across boundaries, and the boundaries are not aligned to
-anything the simulation later does.
+**How it is written.** The `*_to_memmap` functions never materialise the full
+`(R, n_steps)` array; they slice the time axis into chunks near 128 MB, carry the
+AR(1) state across chunk boundaries, and write each result straight into the
+memmap.
 
 ### 7.5 Cortical input — built once, cached
 
@@ -841,29 +848,58 @@ values, one per TR, per cortical region (§2). The step is inferred from the
 matching `<region>_time` array — 2.31 s — and each value is repeated
 `TR/dt = 23 100` times, then truncated to `n_steps`. A drive finer than `dt`, or
 one whose spacing is not an integer multiple of it, raises. Every region's series
-averages exactly 5 Hz — they are normalised to it — and spans roughly
-0.14–119 Hz across regions, so the drive is a slow, strongly modulated envelope
-around a common mean, not a stationary rate.
+averages exactly 5 Hz.
 
-**Step 2: how many presynaptic neurons each region supplies.** Every receiver
-type is assigned a total afferent count, and each region gets its share:
+**Step 2: how many presynaptic neurons each region supplies.**
 
 ```
 N_eff = round(cortical_proportions_dict[region] · N_cortical_inputs_dict[receiver])
 ```
 
-with `N_cortical_inputs_dict = {FS: 2800, dSPN: 7000, iSPN: 7000}`. The
-proportions sum to 1, so the per-region counts sum back to the total — a caudate
-dSPN's 7000 cortical afferents are split 3850 dlPFC, 1260 PMd, 1050 preSMA, 420
-SMA, 280 PMv, 140 M1, 0 S1. A region with `N_eff = 0` is skipped and gets no
-stream, which is the only reason the two loops differ in stream count.
+with `N_cortical_inputs_dict = {FS: 2800, dSPN: 7000, iSPN: 7000}` — whose
+derivation is **not yet written down**, see `TODO.md` §23. A caudate dSPN's 7000
+afferents split 3850 dlPFC, 1260 PMd, 1050 preSMA, 420 SMA, 280 PMv, 140 M1, 0
+S1. A region with `N_eff = 0` gets no stream, which is the only reason the two
+loops differ in stream count (caudate 25, putamen 28).
 
-**Step 3: the draw**, for **dSPN and iSPN only**, one stream per region per
-receiver type, through §7.4 with `shared_input = shared_fraction = 0.014`
-(Kincaid et al. 1998) and `rho = 0.0`. Concretely for dlPFC → caudate dSPN:
-`N_eff = 3850` sources at a mean 5 Hz give `p = 5·10⁻⁴` and 1.925 expected counts
-per 0.1 ms bin per receiver — see §7.4 for what the realised distribution around
-that mean actually looks like.
+**Step 3: the draw.** All three receiver types of a region are drawn **together**,
+sampling one pool of
+
+```
+M = round(N_eff(dSPN) / shared_fraction)
+```
+
+axons. `shared_fraction = 0.014` comes from Kincaid et al. 1998 (*J Neurosci*
+18:4722): one corticostriatal axon contacts ≤1.4 % of the cells in its
+arborization, and the shared fraction between two SPNs equals that same figure.
+For dlPFC that gives `M = 3850/0.014 = 275 000` axons — the same order as the
+~380 000 cortical axons Kincaid reports innervating one spiny cell's dendritic
+volume, which is mild corroboration of both numbers.
+
+Drawing the region's types together is what fixes the cross-type sharing. Drawn
+separately — as they were before 2026-08-07 — a dSPN and an iSPN sitting in the
+same tissue and sampling the same axons would share **nothing at all**. With one
+pool the shared fractions follow from `M`:
+
+| pair | shared fraction | how |
+|---|---|---|
+| dSPN ↔ dSPN, iSPN ↔ iSPN, dSPN ↔ iSPN | 0.0140 | `N_SPN/M`, i.e. Kincaid |
+| FS ↔ SPN | 0.00885 | `√(N_FS·N_SPN)/M = f·√(N_FS/N_SPN)` |
+| FS ↔ FS | 0.0056 | `N_FS/M = f·N_FS/N_SPN` |
+
+Note FS↔FS overlap is *smaller* than FS↔SPN — 15.7 axons against 39.2 — because
+an SPN samples more of the pool. No nested block construction can represent that,
+which is why the pool is realised explicitly. Ramanathan et al. 2002 and Choi et
+al. 2018 both report higher cortical convergence onto FS interneurons than onto
+SPNs, which this derivation does not capture; see `TODO.md` §26.
+
+**FS cortical input is drawn like the SPNs'.** It used to be *derived* — the
+weighted sum of the cortical counts of the SPNs each FS projects onto, rescaled
+and Poisson-resampled. That asserted an FS↔SPN input correlation of about 1,
+which nothing measures; it broke at larger cube sizes (FS→iSPN falls below one
+connection per iSPN at 800 µm); and an FS with no outgoing connections got
+scaling factor 0 and hence **no cortical input at all, silently**. All three go
+away with a drawn stream.
 
 The cortical proportions are **the only physical difference between the two
 loops**:
@@ -878,65 +914,18 @@ loops**:
 | M1 | 0.02 | 0.28 |
 | S1 | 0.00 | 0.13 |
 
-S1 contributes nothing to the caudate, so the caudate loop has one cortical
-stream fewer per receiver type than the putamen loop.
+They are defined in exactly one place, `BOLD_optimization/parameters.py` under
+`cortical_proportions_dict`, and reach the model as
+`mc.cortical_proportions_dict` (§3.3), which `model_creation_functions.py` hands
+to both `Microcircuit` and `CorticalInputs`. Neither class has a default; both
+call `spike_input_cortex.validate_cortical_proportions()`. The *same* numbers
+weight the mix producing `caudate_rate`/`putamen_rate` inside the rate `.npz`, so
+**changing them means regenerating that file**. The derivation is in
+`experimental_data/cortical_proportions/README.md` and `TODO.md` §21.
 
-**They are defined in exactly one place**, `BOLD_optimization/parameters.py`
-under `cortical_proportions_dict`, and reach the model as
-`mc.cortical_proportions_dict` in the creation kwargs (§3.3), which
-`model_creation_functions.py` hands to both `Microcircuit` and `CorticalInputs`.
-Neither class has a default any more — both call
-`spike_input_cortex.validate_cortical_proportions()`, which raises if the mapping
-is missing, negative, or does not sum to 1. The reason for the strictness is that
-the *same* numbers weight the mix producing `caudate_rate`/`putamen_rate` inside
-the cortical rate `.npz` (`cortical_drive_by_bold.py`, which imports them from
-`parameters.py` too), so a second copy could silently disagree with the file the
-model is driven by. **Changing them means regenerating that `.npz`** —
-`cortical_drive_by_bold_run.py`, which needs MATLAB and records the proportions
-in `__data_raw_meta__`.
-
-The values come from quantitative macaque retrograde tracing — Borra et al. 2022
-for the caudate/putamen region groups, Borra et al. 2021 for the per-area split
-of the motor putamen — nudged toward the two ratios that survive the coarse
-parcellation of the one human study reporting per-pathway percentages (Cacciola
-et al. 2017). `TODO.md` §21 has the derivation, the alternatives considered, and
-the sensitivity measurements; the short version is that the mixed drive is nearly
-invariant to the choice (`corr` 0.98–0.995 against the previous hand-set numbers)
-while the per-region stream sizes are not, and that putamen PMv is the one entry
-worth arguing about (plausible range 0.10–0.24).
-
-**FS cortical input is not drawn — it is derived**
-(`Microcircuit._derive_fs_cortical_inputs()`). The FS streams never go through
-§7.4 at all. Instead, per cortical region, each FS neuron's cortical input is the
-weighted sum of the cortical counts of the SPNs *it projects onto*,
-
-```
-input_FS = W_{FS→dSPN} · counts_dSPN + W_{FS→iSPN} · counts_iSPN
-```
-
-rescaled per FS neuron by `N_FS / ((Σw_dSPN + Σw_iSPN) · N_SPN)`, then
-Poisson-resampled and written chunkwise. The rationale is anatomical: an FS
-neuron and the SPNs it inhibits sit in the same place and sample the same
-cortical territory.
-
-The rescaling looks region-blind but is not, and it is worth following once. For
-region `r`, each SPN count has mean `N_eff(r)·p(t) = proportion(r)·7000·p(t)`, so
-per FS neuron `i` the weighted sum has mean `(Σ_j w_ij)·proportion(r)·7000·p(t)`.
-Multiplying by `2800/((Σ_j w_ij)·7000)` cancels both the weight sum and the 7000,
-leaving `proportion(r)·2800·p(t)`. **Each region therefore delivers exactly its
-own share of the 2800 FS target, with one scaling factor that does not depend on
-the region** — and summed over regions the FS neuron sees 2800 afferents' worth
-of drive, as intended.
-
-Two consequences to be aware of. FS drive is not an independent quantity: it is a
-deterministic linear function of the SPN streams plus independent Poisson noise,
-so an FS neuron and its SPN targets share cortical fluctuation by construction.
-And an FS neuron with **no** outgoing connections gets scaling factor 0 and hence
-no cortical input at all, silently — the code masks the division rather than
-raising. With 29 FS neurons on a periodic lattice this has not been observed, but
-nothing checks it.
-
-Cached in `inputs/cortical_input_state.pkl`.
+Cached in `inputs/cortical_input_state.pkl`, which also records
+`shared_fraction`, `cortical_correlation`, `correlation_window_ms` and
+`correlation_timescale_ms`; a mismatch on any of them raises.
 
 ### 7.6 What the cache actually is
 
