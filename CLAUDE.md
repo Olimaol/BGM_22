@@ -54,7 +54,7 @@ parameters in the `BGM_v07_p01` / `BGM_v08_p01` columns of `parameters.csv`.
   neurons, distance-dependent connectivity fitted from data, correlated cortical
   input, missing-GABA compensation). `CorticalInputs` drives thal/gpe_arky/gpe_cp/stn.
   Both stream **precomputed spike counts** from disk caches via `TimedArray`s that a
-  Python `update()` refreshes every `update_time` (100 ms). 28 projections.
+  Python `update()` refreshes every `update_time` (110 ms). 28 projections.
   Striatal populations are named `caudate_dSPN`, `putamen_FS`, … (created by
   `Microcircuit`, so no `:loop` appendix).
 - **v08 — a reduced fallback** written under time pressure in Dec 2025. Plain
@@ -211,7 +211,8 @@ half a generation, and a CMA-ES checkpoint per generation for `--resume`.
   the run, the firing-rate probe — must be a whole number of chunks or
   `simulate_model` raises. `update_time` is 110 ms because it divides the TR
   (2310 ms, 21 chunks), the full run and the 9900 ms probe. The old 100 ms divided
-  none of them, which is why the ramp-up would have failed on the first call.
+  the full run and the probe but not the TR, which is why the ramp-up (one TR)
+  would have failed on the first call.
 - The cortical drive has one value per TR, coarser than `dt`. `Microcircuit` and
   `CorticalInputs` repeat each value `TR/dt` times; a drive finer than `dt`, or one
   whose spacing is not an integer multiple, is rejected.

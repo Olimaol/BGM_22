@@ -1,4 +1,4 @@
-# Striatal firing rates: where dSPN 25 Hz, iSPN 33 Hz and FS 10 Hz come from
+# Striatal firing rates: where dSPN 25 Hz, iSPN 33 Hz and FS 10.5 Hz come from
 
 The model needs a resting firing rate for each striatal cell type. Two places
 consume it, and they have to agree:
@@ -20,9 +20,12 @@ and mirrored as the `Microcircuit` default:
 Files here: `Liang_etal_2008_extraction - MSN.csv` is the spreadsheet transcription
 of the paper's tables ([online copy](https://docs.google.com/spreadsheets/d/1FYXBhNQJZx-MvGt7IpQZi1EVFxsDKHEMx73uF5hI4pE/edit?usp=sharing)),
 and `extract_from_liang_etal_2008.py` is a deconvolution that we
-**do not use** — see [What we rejected](#what-we-rejected). The paper itself is not
-in the repository; get it from the DOI below. The five FS sources are here as
-publisher PDFs, which are gitignored — cite them, do not expect them in a clone.
+**do not use** — see [What we rejected](#what-we-rejected). Publisher PDFs in
+this directory are all gitignored — present locally, never in a clone, so cite
+them by DOI. Locally present: Liang itself (`7537.full.pdf`) and five of the
+six FS sources (Marche & Apicella, Yamada, Adler for the level; Hernandez, He
+for the depletion factor); **Mallet et al. 2006 is not here** and must be
+fetched from its DOI.
 
 ---
 
@@ -203,7 +206,7 @@ paper reports the dose sets showed "similar distributions of changes".
 
 ## The FS rate
 
-10 Hz does not come from Liang at all; that study excluded interneurons by design
+10.5 Hz does not come from Liang at all; that study excluded interneurons by design
 ("Units that could be classified as interneurons […] were not selected"). **No
 recording of parkinsonian primate striatal FSIs exists in this literature.** So FS
 has a different logical structure from the two SPN rates, and the difference

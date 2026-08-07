@@ -63,9 +63,12 @@ corr = (f·(1 − ρ) + N·ρ) / ((1 − ρ) + N·ρ)
 
 **These are the target statistics.** They are not a choice — they are what the
 definition arithmetically implies. Any generator standing in for that pool must
-reproduce them, and `build_input_caches.py` now checks each stream against them
-and raises rather than warning. The measured values are written into the cache
-state file so every cache carries an audit trail of what it actually contains.
+reproduce them, and the generators check each stream against them as it is
+written (`spike_input_cortex.check_stream_statistics`, called from inside
+`Microcircuit` and `CorticalInputs`) and **raise** rather than warn —
+`build_input_caches.py` is only the entry point that triggers them. The measured
+values are written into the cache state file so every cache carries an audit
+trail of what it actually contains.
 
 All three were confirmed against direct simulation to within 1 %:
 
@@ -76,7 +79,7 @@ All three were confirmed against direct simulation to within 1 %:
 | iSPN→iSPN | 4.77 / 4.73 | 0.802 / 0.800 |
 | dlPFC→dSPN | 1.00 / 1.00 | 0.014 / 0.014 |
 
-### The five inputs, and where each comes from
+### The input quantities, and where each comes from
 
 | quantity | value | source |
 |---|---|---|
@@ -84,9 +87,9 @@ All three were confirmed against direct simulation to within 1 %:
 | `N_eff`, missing GABA | 12–1568, from `E_outer = 4πρ∫p(r)r²dr` | `fitted_params.json` kernel × del Rey et al. 2022 density |
 | `rate(t)`, cortical | one value per 2.31 s TR per ROI, normalised to mean 5 Hz | the subject's own cortical BOLD, deconvolved |
 | `rate`, missing GABA | FS 10.5, dSPN 25.0, iSPN 33.0 Hz | Liang et al. 2008 med-off — see `../activity_striatum/README.md` |
-| `f_ij`, cortical | 0.014, flat | Kincaid et al. 1998 |
-| `f_ij`, missing GABA | 0.022–0.206, distance-dependent | emerges from the same kernel and density |
-| `ρ` + timescale `τ_c` | FS 0.06, SPN 0.004 | Adler et al. 2013 — **but see §5** |
+| `f_ij`, cortical | 0.014 SPN↔SPN; FS↔SPN 0.00885 and FS↔FS 0.0056 follow from the single axon pool `M = N_SPN/0.014` | Kincaid et al. 1998; cross-type derived, `model_v07.md` §7.5 |
+| `f_ij`, missing GABA | ≈ 0.02–0.21, distance-dependent | emerges from the same kernel and density |
+| `ρ` + timescale `τ_c` | **0 in force**, pending the §5 scan. Candidates: SPN 0.004 ± 0.0003, FS 0.06 ± 0.009 (Adler et al. 2013, Fig 4A/4C right — **signal** correlations, see §5) | `parameters.py`; Adler et al. 2013 |
 
 **Kincaid's 0.014 is well founded and worth spelling out.** Kincaid, Zheng &
 Wilson 1998 (*J Neurosci* 18:4722) report that *"each axon must contact ≤1.4 % of
@@ -191,12 +194,23 @@ afferents against 2573 synthetic ones — about 2 %**. Even the FS pathway is
 open-loop: only 8.8 of a dSPN's 509 FS afferents come from the 29 simulated FS
 neurons.
 
+One asymmetry of the connectivity data compounds this for the FS population.
+`fitted_params.json` has no `dSPN→FS` or `iSPN→FS` pair, so **FS neurons receive
+GABA only from other FS neurons** — ~130 spikes/s, against ~61 000 for a dSPN.
+Since the compensation streams can only replay what the kernel data contain,
+this is not repairable by the surround: any SPN→FS feedback that exists in a
+real striatum is absent here entirely, in both the simulated circuit and the
+streams. Conclusions that depend on FS excitability tracking SPN activity, or on
+GABAergic control of FS firing, are therefore outside what this model can
+support.
+
 ### 4.2 One mean weight per pathway
 
 The whole outer shell — up to 1568 neurons — collapses onto a single scalar,
 while the inner shell keeps individually sampled weights. FS→SPN weights are
-drawn from a mixture spanning 0–58.6, one to two orders of magnitude above
-SPN→SPN. All of that heterogeneity is lost in the compensation.
+drawn from a mixture spanning 0–58.6, an order of magnitude above SPN→SPN
+(mixture means 6.06 vs 0.41; only the tails reach two orders). All of that
+heterogeneity is lost in the compensation.
 
 ### 4.3 No single-neuron temporal structure
 
@@ -257,18 +271,35 @@ refit DBS-on, and read off what changed in the drive. But it means:
   synchronisation arising from striatal connectivity, or about anything that
   requires the recurrent loop to be doing work.
 
-It also means `ρ` cannot be set by citation alone. Adler et al. 2013 measured
-striatal **output** correlation, and the presynaptic pool of the missing-GABA
-streams consists of striatal neurons of exactly the kind being simulated — so `ρ`
-is a **fixed point**, not a free input: the correlation assumed for the surround
-must equal the correlation the simulated neurons produce. That is the same
-self-consistency condition `TODO.md` §4 states for the firing rates, and it is
-currently unchecked in both directions.
+It also means `ρ` cannot be set by citation alone, for two separate reasons.
+
+First, the quantity. The Adler et al. 2013 values are **signal correlations,
+not spike-count (noise) correlations** (verified against the paper's Methods
+and Figure 4, read from the local PDF, 2026-08-07): the correlation coefficient
+between two neurons' trial-averaged PSTH vectors (100 ms bins across all
+behavioral events), computed over *all* pairs including non-simultaneously
+recorded ones — a measure of how similarly two neurons are tuned to task
+events, not of how their spike counts co-fluctuate moment to moment. MSN–MSN
+0.004 ± 0.0003 (Fig 4A right), FSI–FSI 0.06 ± 0.009 (Fig 4C right). The
+paper's spike-to-spike CCH analyses (Figs 5–8) cover only MSN–TAN, MSN–FSI and
+TAN–TAN pairs, so **it reports no MSN–MSN or FSI–FSI spike-count correlation at
+all** — the quantity `ρ` actually is (the Cohen & Kohn `r_sc` the §2 machinery
+is built around) does not appear in Adler for either cell type. The 0.004 and
+0.06 are order-of-magnitude anchors, not calibration targets, unless the
+simulated analysis is deliberately matched to the paper's.
+
+Second, the direction. Adler measured striatal **output**, and the presynaptic
+pool of the missing-GABA streams consists of striatal neurons of exactly the
+kind being simulated — so `ρ` is a **fixed point**, not a free input: the
+correlation assumed for the surround must equal the correlation the simulated
+neurons produce. That is the same self-consistency condition `TODO.md` §4 states
+for the firing rates, and it is currently unchecked in both directions.
 
 The intended procedure is therefore to **measure rather than assume**: scan the
 input correlation against the simulated SPN output correlation and the simulated
-BOLD amplitude, and choose from that scan, with Adler's 0.004 as a validation
-target on the output. Note the warning in Baker et al. 2019
+BOLD amplitude, and choose from that scan, with Adler's 0.004 as an
+order-of-magnitude plausibility check on the output (subject to the
+quantity-mismatch caveat above). Note the warning in Baker et al. 2019
 (*Phys Rev E* 99:052414): with *correlated* feedforward input, a recurrent network
 produces **much larger** correlations than the asynchronous-state results would
 suggest. Bernacchia & Wang predict zero-lag correlations of order `K^(−1/2)` and
@@ -284,7 +315,7 @@ longer-timescale ones of order `K^(−1)`; at `K ≈ 2640` afferents that is 0.0
 | `N_cortical_inputs_dict` = 7000 / 2800 has no written derivation | `TODO.md` |
 | A larger, sparser cube would make `f(d)` vary meaningfully | `TODO.md` |
 | Open-loop compensation forecloses active decorrelation | `TODO.md` |
-| `f_FS_SPN` starts at 0.014 but is a lower bound | `TODO.md` |
+| `f_FS↔SPN` is now derived from the pool (0.00885) but assumes FS and SPN sample it with equal per-axon contact probability; Ramanathan 2002 / Choi 2018 suggest higher FS convergence | `TODO.md` §26 |
 | No number for corticosubthalamic / corticothalamic overlap | `TODO.md` |
 | `ρ` and `τ_c` values await the scan described in §5 | `TODO.md` |
 
@@ -300,12 +331,18 @@ per DBS condition at full length.
 ## Sources
 
 Read in full: none of the below — all statements above are taken from abstracts,
-except Cohen & Kohn, whose Table 1 was read directly from the publisher PDF. That
-PDF is deliberately **not** in the repository: this remote is public and the paper
-is not ours to redistribute, so it is cited by DOI like every other source here.
-Anything used for a numeric value in the model must be checked against the full
-text before it is relied on.
+with two exceptions. Cohen & Kohn's Table 1 was read directly from the publisher
+PDF; that PDF is deliberately **not** in the repository (this remote is public
+and the paper is not ours to redistribute, so it is cited by DOI like every
+other source here). And Adler et al. 2013's Methods and Figures 4–8 were read
+from the local PDF in `../activity_striatum/` (2026-08-07), which is where the
+signal-vs-noise-correlation caveat of §5 comes from. Anything used for a numeric
+value in the model must be checked against the full text before it is relied on.
 
+- Adler A, Katabi S, Finkes I, Prut Y, Bergman H (2013). Different correlation
+  patterns of cholinergic and GABAergic interneurons with striatal projection
+  neurons. *Front Syst Neurosci* 7:47. doi:10.3389/fnsys.2013.00047. Methods and
+  Figs 4–8 read from the local PDF.
 - Kincaid AE, Zheng T, Wilson CJ (1998). Connectivity and convergence of single
   corticostriatal axons. *J Neurosci* 18:4722–4731.
 - Cohen MR, Kohn A (2011). Measuring and interpreting neuronal correlations.

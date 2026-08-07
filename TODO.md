@@ -411,16 +411,16 @@ Derivation, cross-checked against the cache that exists. The streams total
 
 | layout | rows | `n_steps` | per DBS condition |
 |--------|--------|--------|--------|
-| current, `--n-trs 5` | 24 084 | 115 500 | 22.28 GB derived / **22.28 GB measured** |
-| current, 310 TRs | 24 084 | 7 161 000 | 1 380 GB = **1.26 TiB** |
+| current, `--n-trs 5` | 24 084 | 115 500 | 22.25 GB derived / **22.28 GB measured** (the ~30 MB gap is state pickles and connectivity files) |
+| current, 310 TRs | 24 084 | 7 161 000 | 1 380 GB = **1.25 TiB** |
 | planned (`uint16`, pre-summed), 310 TRs | 8 684 | 7 161 000 | 124 GB = 116 GiB |
 
-The derived and measured 5-TR figures agree to four digits, so the extrapolation
+The derived and measured 5-TR figures agree to ~0.1 %, so the extrapolation
 is sound, and the planned-layout row confirms that §3's ~138 GiB is the right
 order for what it describes. `CLAUDE.md` and `PLAN.md` already carry the correct
 current figure (~1.25 TiB); `parameters.py` is the only outlier.
 
-**What to do.** Either qualify the comment ("~1.26 TiB today, ~120 GiB after the
+**What to do.** Either qualify the comment ("~1.25 TiB today, ~120 GiB after the
 layout change of TODO §3") or leave it until §3 actually lands and the number
 becomes true. Not corrected here, because changing it in isolation invites the
 opposite confusion.
@@ -838,10 +838,26 @@ network can decorrelate. Subject to §24's van Albada limitation.
 **Meanwhile**, `mc.correlation_dict` and `mc.cortical_correlation` are **0**, and
 the intended procedure is the scan in `input_streams/README.md` §5: sweep input
 correlation against simulated SPN output correlation and simulated BOLD
-amplitude, and choose from that, with Adler's 0.004 as a validation target on the
-**output**. Note this is the same self-consistency condition as §4 for the rates:
-the missing-GABA presynaptic pool *is* striatal neurons of the kind being
-simulated, so its assumed correlation must equal the one the model produces.
+amplitude, and choose from that, with Adler's 0.004 as an order-of-magnitude
+anchor on the **output**. Note this is the same self-consistency condition as §4
+for the rates: the missing-GABA presynaptic pool *is* striatal neurons of the
+kind being simulated, so its assumed correlation must equal the one the model
+produces.
+
+**Addendum 2026-08-07 — the Adler values are signal correlations, not `r_sc`.**
+Read from the local PDF (Methods + Fig 4): the 0.004 (MSN–MSN, Fig 4A right,
+± 0.0003 SEM) and 0.06 (FSI–FSI, Fig 4C right, ± 0.009) are correlations between
+trial-averaged PSTH vectors (100 ms bins across all behavioral events), computed
+over all pairs *including non-simultaneously recorded ones* — tuning similarity,
+not moment-to-moment spike-count co-fluctuation. The paper's spike-to-spike CCH
+analyses (Figs 5–8) cover only MSN–TAN, MSN–FSI and TAN–TAN, so it contains no
+MSN–MSN or FSI–FSI spike-count correlation at all. Consequence for the scan:
+0.004/0.06 can serve as order-of-magnitude anchors or output-side plausibility
+checks, but not as calibration targets for `ρ`, unless the simulated analysis is
+deliberately matched to the paper's (signal correlation over matched windows).
+This also resolves where the FS 0.06 came from — it was never untraceable, just
+uncited; `input_streams/README.md` §5 now carries the precise citation and the
+caveat.
 
 ### 26. Two shared fractions have no measurement behind them
 
@@ -866,3 +882,72 @@ interneurons is *higher* than onto SPNs, which the current derivation does not
 capture — it assumes FS and SPN sample the same pool with the same per-axon
 contact probability. If FS sample more broadly, `N_FS` is right but `M` should be
 smaller for FS, raising both FS correlations.
+
+## From the session on 2026-08-07 (verifying model_v07.md against the code)
+
+### 27. The realised `f(d)` of the geometric pools is not checked at build time
+
+The geometric source pools of the missing-GABA streams are checked on exactly
+one prediction: the realised mean degree against `E_outer`, 20 % tolerance,
+raising (`microcircuit.py → _simulate_distance_dependent_spike_counts`). The
+realised shared fractions are computed (`realised_shared_fractions`) but only to
+feed the step-4 statistics check their mean; their agreement with the analytic
+`f(d)` was verified **once, manually**, at the current 10×10×10 geometry
+(commits `fd2cbde`/`148aec2` — analytic 0.0372→0.0318, realised
+0.0364/0.0344/0.0314 for dSPN→dSPN), and no analytic `f(d)` code remains in the
+tree.
+
+**Why it matters:** the whole point of the geometric construction is that `f(d)`
+emerges correctly at *any* geometry, which is what keeps §24 (the larger,
+sparser cube) reachable. That property is currently only verified at one
+geometry; a future `nx`/`density` change would silently trust it.
+
+**Proposal:** re-add the analytic double quadrature (it exists in git history,
+pre-`fd2cbde`) as a build-time check — it runs once per pair per build, so the
+cost is negligible against the stream generation itself.
+
+**Caveats:** the 20 % degree check already catches gross pool errors (a degree
+that is right and a shared fraction that is badly wrong requires a subtle bug,
+not a gross one); and the tolerance for the `f(d)` comparison would need the
+same care as the step-4 tolerances — the realised values scatter across source
+clouds, so a naive tight bound would fire on good draws.
+
+### 28. The striatal populations start at `v = 0` — a synchronous spike at t = 0
+
+`Microcircuit.create_populations_annarchy` passes no `init`, and nothing else
+assigns `v`/`u` to the striatal populations (`_set_params` skips mc components),
+so all 2000 striatal neurons start at ANNarchy's defaults `v = 0, u = 0` —
+80 mV above `v_r`, and above `v_peak` for the FSI. Every striatal neuron fires
+one synchronous spike on the first step, `reset()` restores exactly that state,
+and the volley therefore recurs at the start of **every** evaluation. The six BG
+populations, by contrast, get deliberate `v_init`/`u_init` from `parameters.csv`.
+
+**Effect:** the BOLD run absorbs it in the 2310 ms ramp-up. The 9900 ms
+firing-rate probe does not — the artefactual spike sits inside the probed window
+(~0.1 Hz upward bias per neuron, small against the 12.67–37.33 Hz bands), and
+the synchronous volley kicks the whole recurrent circuit at t = 0.
+
+**Fix, when wanted:** give the striatal populations inits near `v_r` (and
+`u ≈ 0`) like every other population. Constraints: (a) it is a behavior change —
+capture a baseline first per the convention, and expect every striatal spike
+train to shift; (b) the init must be set **before** compile or re-applied after
+every reset site, per the reset trap (`model_v07.md` §11); (c) bounded benefit —
+the probe bias is ~0.1 Hz, so this is hygiene, not a suspect for bad fits.
+
+### 29. `CorticalInputs`' cache validation is strictly weaker than `Microcircuit`'s
+
+`CorticalInputs._save_cortical_input_state` records neither
+`shared_fraction_dict` nor any correlation field
+(`cortical_correlation`/`correlation_window_ms`/`correlation_timescale_ms`), so
+`_load_cortical_input_state` cannot check them: **changing any of those
+parameters silently reuses a stale CI cache**, while the same change correctly
+invalidates the MC cache (`microcircuit.py` records and checks all of them, and
+hard-fails on state files that predate the fields). Also, the CI state's "key
+set" comparison checks keys taken from the same pickle against themselves — it
+catches a corrupted state file, not a configuration change.
+
+**Fix:** record the missing fields in `_save_cortical_input_state` and compare
+them in `_load_cortical_input_state`, mirroring `microcircuit.py`, including the
+hard fail on their absence. **Do it before the next cache build:** no cache
+currently exists, so adding fields now invalidates nothing; every day it waits,
+the next cache is one parameter change away from being silently stale.

@@ -51,9 +51,9 @@ Everything the model needs before a single ANNarchy object exists.
 | artefact | consumed by | contents | produced by |
 |---|---|---|---|
 | `CompNeuroPy/.../bgm_22/parameters.csv`, column `BGM_v07_p01` | `BGM._get_params()`, at `BGM.__init__` time | population sizes, Izhikevich parameters, noise, and per-projection connectivity/number/weights/delays | hand-maintained |
-| `BOLD_optimization/parameters.py` | `get_loss.py` throughout | `dt`, seed, durations, `update_time`, lattice size, cache dir, the two data paths | hand-maintained |
+| `BOLD_optimization/parameters.py` | `get_loss.py` throughout | `dt`, seed, durations, `update_time`, lattice size, cache dir, the two data paths, and every stream parameter baked into the caches (the full list is the §3.3 table) | hand-maintained |
 | `striatal_microcircuit_requirements/connectivity_parameters/connectivity_fit_data/fitted_params.json` | `Microcircuit.__init__` | 7 pre→post pairs, each an amplitude and a σ in µm | `connectivity_fit_run.py` (skopt `gp_minimize`), BGM_22 commit `a59a5eb` |
-| `striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data/firing_rates_matlab_condition-{on,off}.npz` | `Microcircuit`, `CorticalInputs`, and `get_loss.infer_max_sim_time_ms` | 9 regions × `{_time, _rate}`, each 310 values | `cortical_drive_by_bold_run.py` (SPM HRF deconvolution, needs MATLAB), BGM_22 commit `76d3867` |
+| `striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data/firing_rates_matlab_condition-{on,off}.npz` | `Microcircuit`, `CorticalInputs`, and `get_loss.infer_max_sim_time_ms` | 9 regions × `{_time, _rate}` (310 values each) plus the `cortical_proportions_json` record | `cortical_drive_by_bold_run.py` (SPM HRF deconvolution, needs MATLAB), BGM_22 commit `1fe78dc` (regenerated 2026-08-06 for the current proportions) |
 | `<cache-dir>/{mc,ci}_<loop>_cache_<dbs>/` | `Microcircuit`, `CorticalInputs` | pickled state + raw memmaps of precomputed spike counts | `build_input_caches.py` |
 
 Both data directories carry a `__data_raw_meta__` file recording the producing
@@ -85,7 +85,12 @@ follows.
 
 Keys are `<region>_time` and `<region>_rate` for `M1, PMd, PMv, preSMA, SMA, S1,
 dlPFC, caudate, putamen`, each 310 float64 values. `_time` is in **seconds** and
-spaced 2.31 s apart — one TR. `_rate` is in Hz.
+spaced 2.31 s apart — one TR. `_rate` is in Hz. A 19th array,
+`cortical_proportions_json`, records the proportion weights the striatal mixes
+were built with; `get_loss.infer_max_sim_time_ms` compares it against
+`parameters.py` and **raises** on a mismatch (older files that lack the key only
+warn). The same folder holds a `firing_rates_scipy_*` variant from a second
+deconvolution route; nothing uses it.
 
 The seven cortical series drive the model. The `caudate_rate` / `putamen_rate`
 series are the anatomically mixed striatal drive; v07 does not use them for
@@ -131,16 +136,28 @@ build a cache that an evaluation is guaranteed to accept.
 | key | value | note |
 |---|---|---|
 | `build_mc`, `build_ci` | `False` for evaluations | `True` only in `build_input_caches.py` |
-| `mc.name` | `caudate` / `putamen` | selects the cortical proportion mix and names every mc object |
+| `mc.name` | `caudate` / `putamen` | names every mc/ci object; validated against `("caudate", "putamen")`. The proportion mix arrives separately, below |
 | `mc.nx`, `mc.b` | 10, 10 | 1000 lattice sites |
-| `dbs` | `on` / `off` | **selects the rate file and cache dir only** — see `DBS.md` |
+| `dbs` | `on` / `off` | the rate file and cache dirs are resolved from `dbs_condition` into the separate keys below; this key is forwarded only to be validated against the cache state — see `DBS.md` |
 | `timestep` | 0.1 | |
 | `t.duration` | inferred above | |
 | `update_time` | 110.0 | the chunk size the inputs are streamed in — see §7.7 |
 | `mc.storage_dir`, `ci.storage_dir` | `<cache-dir>/{mc,ci}_<loop>_cache_<dbs>` | |
 | `mc.seed`, `ci.seed` | 42 | numpy RNG, independent of ANNarchy's |
 | `mc.fitted_params_path`, `mc.cortical_rate_path` | the two data files | |
+| `mc.cortical_proportions_dict` | the loop's column of `cortical_proportions_dict` | the only physical difference between the loops (§7.5) |
+| `mc.firing_rate_dict` | `{FS: 10.5, dSPN: 25.0, iSPN: 33.0}` | surround rates, baked into the caches (§7.3) |
+| `mc.shared_fraction` | 0.014 | Kincaid; fixes the axon pool size (§7.5) |
+| `mc.correlation_dict`, `mc.cortical_correlation` | all 0.0 | pending the TODO §25 scan (§7.4) |
+| `mc.correlation_window_ms`, `mc.correlation_timescale_ms` | `None`, 0.0 | required as soon as any correlation is non-zero |
+| `mc.source_multiplicity` | 10 | virtual-source coarsening for the missing-GABA pools (§7.4 1b) |
+| `ci.shared_fraction_dict` | all 0.0 | per-population overlap for the BG streams (§8) |
 | `ci.n_thal` / `n_gpe_arky` / `n_gpe_cp` / `n_stn` | 1000 / 500 / 500 / 500 | cortical afferents per receiver neuron |
+
+One number the table does **not** contain: `N_cortical_inputs_dict`
+(`{FS: 2800, dSPN: 7000, iSPN: 7000}`) is a `Microcircuit` class default, not a
+`parameters.py` entry — `v07_model_creation_kwargs` never passes it, so the
+default is what runs (derivation still unwritten, `TODO.md` §23).
 
 ### 3.4 `BGM(...)` per loop
 
@@ -162,10 +179,12 @@ survive `reset()` (see §11).
 `add_dbs_mechanisms(populations=…, projections=…)` rewrites the equations of the
 6 putamen BG populations and 6 putamen projections in place, and
 `DBSstimulator(auto_implement=False)` creates the `pulse()` function and the
-`dbs_pulse_*` constants. `dbs_stimulator.on()` runs here, **before** compile, so
-the on-state becomes the compile-time state that every later `reset()` restores.
+`dbs_pulse_*` constants. In the **on condition only** (`if dbs_condition ==
+"on"`), `dbs_stimulator.on()` runs here, **before** compile, so the on-state
+becomes the compile-time state that every later `reset()` restores.
 
-Both conditions run this block. `DBS.md` has the complete account, including why
+Both conditions run the retrofit and construct the stimulator; only the guard on
+`on()` differs. `DBS.md` has the complete account, including why
 `auto_implement=True` cannot be used, why the stimulator must exist in the off
 condition too, and what the added terms are. Measured consequence, from the
 reports of §10: off and on compile the *same network*, differing only in the
@@ -188,29 +207,35 @@ populations with `mapping={"I_CBF": input_var}` and `normalize_input=2000`:
 | VAp | `thal:putamen` | — |
 
 A `—` means no `scale_factor` is passed, so `BoldMonitor` falls back to weighting
-each population by its share of the pooled neuron count
-(`BoldMonitor.py:113-122`).
+each population by its share of the pooled neuron count (the size-share fallback
+in `BoldMonitor.__init__`).
 
 **No striatal scale factors in v07.** `Microcircuit` already sizes dSPN/iSPN/FS by
-the del Rey et al. (2022) proportions (`microcircuit.py:180`), so the size-
-proportional default *is* the del Rey weighting and passing it explicitly would
-only restate it. The explicit `props_delRey` factors are therefore applied in v08
-only, where all three striatal populations have 100 neurons and the default would
-weight them equally. The two are not bit-identical: the default uses the integer
-cell counts after `int()` truncation and the remainder fix-up
-(`microcircuit.py:237-242`), which at `nx = b = 10` gives 486 / 485 / 29 →
-0.486 / 0.485 / 0.029 against the exact 0.485327 / 0.485327 / 0.029345.
+the del Rey et al. (2022) proportions (`microcircuit.py → props_delRey`), so the
+size-proportional default *is* the del Rey weighting and passing it explicitly
+would only restate it. The explicit `props_delRey` factors are therefore applied
+in v08 only, where all three striatal populations have 100 neurons and the
+default would weight them equally. The two are not bit-identical: the default
+uses the integer cell counts after `int()` truncation and the remainder fix-up
+(the type assignment in `Microcircuit.__init__`), which at `nx = b = 10` gives
+486 / 485 / 29 → 0.486 / 0.485 / 0.029 against the exact
+0.485327 / 0.485327 / 0.029345.
 
-**The GPe factors have no recorded source.** They appear only in
-`get_loss.py:1235` and `test_microcircuit_bgm.py:472`, both introduced whole in
-commit `76d3867`, uncited; they sum to 0.77, not 1, which would fit fractions of
-all GPe cells with the rest belonging to types the model does not have. These do
-change the pooling, since `gpe_proto/arky/cp` are all 100 neurons. The source
-still has to be found.
+**The GPe factors have no recorded source.** They appear only as
+`gpe_proportions` in `get_loss.py` and in `test_microcircuit_bgm.py`, both
+introduced whole in commit `76d3867`, uncited; they sum to 0.77, not 1, which
+would fit fractions of all GPe cells with the rest belonging to types the model
+does not have. These do change the pooling, since `gpe_proto/arky/cp` are all 100
+neurons. Note the normalization runs over all **six** pooled populations at once
+(both loops, factors summing to 1.54), so each `gpe_proto` effectively weighs
+≈ 0.325 — not 0.5, and not 0.5/0.77. The source still has to be found.
 
 **The input variable differs by population family.** BGM populations expose the
 total current as `I`; the Humphries striatal populations expose it as `I_v`. Cau
-and Put therefore map `I_CBF` to `I_v`, everything else to `I`.
+and Put therefore map `I_CBF` to `I_v`, everything else to `I`. One subtlety: for
+the three GPe populations the quantity entering `dv/dt` is `f(I, nonlin)` (§6.1),
+but the monitor maps the **raw** `I` — the BOLD signal sees the uncompressed
+input current.
 
 **`I_base` is deliberately outside `I`.** The BGM populations add
 `I_base = base_mean + offset_base` on the `dv/dt` line, not inside `I`, so the
@@ -230,9 +255,11 @@ One call, both loops. See §10.
 
 ## 4. `BGM.create()`: from `parameters.csv` to ANNarchy objects
 
-`BGM_v07` itself sets **no parameter, no weight, no connectivity**. It only
-instantiates bare `Population` and `Projection` objects with names. Everything
-numeric arrives afterwards, from the CSV. The sequence in `bgm.py → BGM.create()`
+`BGM_v07` itself sets **no weight and no connectivity**, and almost no parameter:
+it instantiates bare `Population` and `Projection` objects with names, reading
+from the CSV only the six `*.size` values it needs to construct the populations,
+and forwarding the `model_creation_kwargs` of §3.3 to `Microcircuit` and
+`CorticalInputs`. Everything else numeric arrives afterwards, from the CSV. The sequence in `bgm.py → BGM.create()`
 is:
 
 1. `CompNeuroModel.create(do_compile=False)` → runs `BGM_v07` (§5), then diffs
@@ -255,9 +282,10 @@ projection `name=` strings in `model_creation_functions.py` must be exactly
 `pre__post`: `str_d1__snr.weights` only finds its projection because that
 projection is named `str_d1__snr`.
 
-Value parsing in `BGM._get_params()`: rows starting with `###` are section
-headers and skipped; **empty cells are skipped**, which is how the v07 column
-omits `str_d1.size` and the intra-striatal projection rows; a value is an `int`
+Value parsing in `BGM._get_params()`: rows whose first cell contains `###`
+(a substring test, not a prefix) are section headers and skipped; **empty cells
+are skipped**, which is how the v07 column omits `str_d1.size` and the
+intra-striatal projection rows; a value is an `int`
 if integral, else a `float`; a value wrapped in `$…$` is `eval`'d as a formula;
 anything else stays a string.
 
@@ -331,9 +359,10 @@ In order (`model_creation_functions.py → BGM_v07`):
 | `gpe_cp:<loop>` | same | 100 | `gpe_cp.size` |
 | `thal:<loop>` | `Izhikevich2003NoisyBaseNonlin(stabilize=True, use_nonlin=False)` | 100 | `thal.size` |
 
-**The striatal sizes are not parameters.** The v07 CSV column deliberately has no
-`str_d1.size` / `str_d2.size` / `str_fsi.size` rows; those counts fall out of the
-lattice (§7.1).
+**The striatal sizes are not parameters.** The `str_d1.size` / `str_d2.size` /
+`str_fsi.size` rows exist in the CSV (v08 uses them), but their `BGM_v07_p01`
+cells are deliberately empty and empty cells are skipped (§4); those counts fall
+out of the lattice instead (§7.1).
 
 `exp_input` is left at its default `0.0` for every v07 population, so **no v07
 neuron carries the `Exponential(lambda)` drive term**. The cortical drive arrives
@@ -393,7 +422,12 @@ which is exactly what v07 exists to do.
 Equation strings are given as they are assembled by the neuron-model classes.
 Parameter tables give the **effective compiled value**; entries marked † are
 overridden by `parameters.csv` after creation, all others are class defaults
-baked into the equation string.
+interpolated into the parameter block of the neuron definition. (The only things
+baked into the equation *string* itself are the fixed `-50` driving force, the
+choice between `I` and `f(I, nonlin)`, and the presence or absence of the
+`exp_input` line.) The two `*_noise` values take a separate path —
+`_set_noise_values`, not `_set_params` — and setting `base_mean` also writes
+`I_base` (§4); the † marks cover both routes.
 
 ### 6.1 `Izhikevich2003NoisyBaseNonlin` — the six BG populations
 
@@ -426,11 +460,15 @@ is `sign(x) · |x|^(1/nonlin)` written without a `sign` function: the divisor is
 populations see a mildly compressed input current, and `nonlin = 1` reduces it to
 the identity.
 
-Two things `stabilize=True` does, both visible in the `I` line: it makes
+Three things `stabilize=True` does, all visible in the `I` line. It makes
 excitation **current-based** with a fixed 50 mV driving force (`-g_ampa*(-50)`
-rather than `-g_ampa*(v - E_ampa)`), and it divides each conductance term by
-`1 + g*dt`. That divisor is what bounds the effective conductance, and it is
-where the optimizer's weight ceilings come from (§11).
+rather than `-g_ampa*(v - E_ampa)`) — which also leaves `E_ampa` declared but
+unused, like `lambda` below. It divides each conductance term by `1 + g*dt`; that
+divisor is what bounds the effective conductance, and it is where the optimizer's
+weight ceilings come from (§11). And it drops the `neg()`/`pos()` rectifiers the
+non-stabilized line wraps around both terms
+(`I = I_app - neg(g_ampa*(v - E_ampa)) - pos(g_gaba*(v - E_gaba))`) — so nothing
+clips the GABA term any more, and at `v < E_gaba = -70` it turns depolarizing.
 
 The `offset_base` line is a resampled current offset: at every step a uniform
 draw decides, with probability `rate_base_noise * dt / 1000`, to redraw the
@@ -510,11 +548,15 @@ C * dv/dt = k*(v - v_r)*(v - v_t) - u + I_v + phi_1 * c_da * (v - E_da)
 du/dt     = a*(b*(v - v_r) - u)
 ```
 
-iSPN differs in two places — the AMPA term carries the D2 attenuation factor and
-the quadratic term is scaled:
+iSPN differs in three places — the AMPA term carries the D2 attenuation factor,
+the NMDA term **lacks** the `(1 + beta_1 * phi_1)` factor (`beta_1` is not even
+declared in `SPND2`), and the quadratic term is scaled:
 
 ```
-I_v       = g_ampa * E_exc * (1 - beta_2 * phi_2) / (1 + g_ampa * dt / C) + …
+I_v       = g_ampa * E_exc * (1 - beta_2 * phi_2) / (1 + g_ampa * dt / C)
+          + g_nmda * B_nmda * E_exc / (1 + g_nmda * dt / C)
+          + g_gaba * (E_gaba - v) / (1 + g_gaba * dt / C)
+          + I_app
 C * dv/dt = k * (1 - alpha * phi_2) * (v - v_r) * (v - v_t) - u + I_v
 ```
 
@@ -527,7 +569,7 @@ machinery is present in the equations but not used by this project.
 | parameter | dSPN | iSPN | note |
 |---|---|---|---|
 | `tau_ampa` / `tau_nmda` / `tau_gaba` | 6 / 160 / 4 | 6 / 160 / 4 | ms |
-| `E_ampa` / `E_nmda` / `E_gaba` | 0 / 0 / −60 | 0 / 0 / −60 | mV |
+| `E_ampa` / `E_nmda` / `E_gaba` | 0 / 0 / −60 | 0 / 0 / −60 | mV; `E_ampa`/`E_nmda` inert — `current_based_excitation=True` puts `E_exc` in their place |
 | `E_exc` | 50 | 50 | fixed driving force, from `current_based_excitation=True` |
 | `C` | 50 | 50 | pF |
 | `k` | 1.14 | 1.14 | |
@@ -539,9 +581,22 @@ machinery is present in the equations but not used by this project.
 | `I_app` | 0 | 0 | |
 | `lambda` / `exp_input_weight` | 0.0 / 1.0 | 0.0 / 1.0 | inert in v07 |
 
-**None of these are in `parameters.csv`.** The striatal populations belong to the
-Microcircuit, so `_set_params` skips them entirely; every value above is a
+**None of these come from `parameters.csv`.** The `str_d1.*` / `str_d2.*` /
+`str_fsi.*` rows exist in the file, but their v07 cells are empty, and
+`_set_params` skips Microcircuit components anyway; every value above is a
 CompNeuroPy class default.
+
+**Nor are any initial values.** `create_populations_annarchy` passes no `init`,
+and nothing else assigns `v` or `u`, so all three striatal populations start at
+ANNarchy's defaults `v = 0, u = 0` — 80 mV above `v_r`, and above `v_peak` for
+the FSI. Every striatal neuron therefore fires one synchronous spike on the first
+step, and since `reset()` restores exactly this state, the volley recurs at the
+start of **every** evaluation. The BOLD run absorbs it in the 2310 ms ramp-up;
+the 9900 ms firing-rate probe starts straight after reset, so the artefactual
+spike sits inside the probed window (~0.1 Hz upward bias per neuron, small
+against the 12.7–37.3 Hz bands, plus whatever the t = 0 volley does to the
+recurrent circuit). Contrast the six BG populations, whose `v_init`/`u_init` the
+CSV sets deliberately (§6.1). `TODO.md` §28.
 
 ### 6.3 `Izhikevich2007Humphries2009FSI`
 
@@ -565,12 +620,14 @@ to an FS neuron is routed to `ampa` rather than `glut`, both in
 | parameter | value |
 |---|---|
 | `tau_ampa` / `tau_gaba` | 6 / 4 ms |
-| `E_gaba` / `E_exc` | −60 / 50 mV |
+| `E_ampa` / `E_gaba` / `E_exc` | 0 / −60 / 50 mV (`E_ampa` inert, as in §6.2) |
 | `C` / `k` | 80 pF / 1.0 |
 | `v_r` / `v_t` / `v_b` / `v_peak` | −70 / −50 / −55 / 25 mV |
 | `a` / `b` / `c` / `d` | 0.2 / 0.025 / −60 / 0 |
 | `eta` / `epsilon` | 0.1 / 0.625 |
 | `phi_1` / `phi_2` | 0.0 / 0.0 |
+| `I_app` | 0 |
+| `lambda` / `exp_input_weight` | 0.0 / 1.0 — inert, as in §6.2 |
 
 ---
 
@@ -625,9 +682,10 @@ while `L_max/2` is only 113.8 µm — **so the radius is clamped to half the box
 all three post types.** The simulated cube is far smaller than the kernel's
 reach, and that gap is precisely what §7.3 has to compensate for.
 
-Each accepted connection draws its weight from a `CombinedSampler`
-(`get_weights.py`) over a pair-specific mixture of literature distributions, each
-component carrying its own weight in the mixture:
+Each accepted connection draws its weight from a `CombinedSampler` (the class
+lives in `extra_functions.py`; the mixture definitions in `get_weights.py`) over
+a pair-specific mixture of literature distributions, each component carrying its
+own weight in the mixture:
 
 | pair | mixture |
 |---|---|
@@ -635,15 +693,19 @@ component carrying its own weight in the mixture:
 | FS → SPN | 41-bin empirical histogram over 0–58.57 (w 75) + truncated Gaussian μ 1.57, σ 2.68 (w 31) + truncated Gaussian μ 3.84, σ 3.04 on [0.64, 8.14] (w 9) |
 | FS → FS | single truncated Gaussian μ 1.1, σ 1.5 on [0, 10.1] |
 
-Note the scale: **FS→SPN weights are one to two orders of magnitude larger than
-SPN→SPN weights**, which is what makes the 29 FS neurons matter at all. Weights
-land in a `lil_matrix` per pair, indexed by **type-local** indices.
+Note the scale: **FS→SPN weights are an order of magnitude larger than SPN→SPN
+weights** (mixture means 6.06 against 0.41, a factor of ~15; only the tails reach
+two orders, 58.6 against 1.9), which is what makes the 29 FS neurons matter at
+all. Weights land in a `lil_matrix` per pair, indexed by **type-local** indices.
 
 Cached in `connectivity/connectivity_state.pkl` plus seven
 `connectivity/weights_<pre>_<post>.npz`. On load, `n_total`, `nx` and the full
 type vector must match, all seven weight files must exist, and **the numpy RNG
 bit-generator state is restored** so that a load run continues on the same random
-stream a build run would have been on.
+stream a build run would have been on. One hole: `b`, `density` and the fitted
+kernel parameters are *stored* in the state but never compared on load, so a
+connectivity cache built at a different density or from a different
+`fitted_params.json` would load silently as long as the type vector matches.
 
 ### 7.3 Missing-GABA compensation — built once, cached
 
@@ -665,26 +727,27 @@ with `ρ = props[pre] · density`. The same integral over `[0, Rin]` gives
 
 | pair | `E_inner` | `E_outer` | pre rate | spikes/s delivered |
 |---|---|---|---|---|
-| FS → FS | 1.9 | 12.4 | 10.5 Hz | 126 |
+| FS → FS | 1.9 | 12.4 | 10.5 Hz | 130 |
 | FS → dSPN | 8.8 | 500.0 | 10.5 Hz | 5 250 |
-| FS → iSPN | 9.6 | 25.3 | 10.5 Hz | 262 |
-| dSPN → dSPN | 26.2 | 1568.5 | 25.0 Hz | 39 200 |
-| dSPN → iSPN | 25.0 | 1500.3 | 25.0 Hz | 37 500 |
-| iSPN → dSPN | 31.8 | 505.4 | 33.0 Hz | 16 665 |
-| iSPN → iSPN | 32.5 | 948.1 | 33.0 Hz | 31 284 |
+| FS → iSPN | 9.6 | 25.3 | 10.5 Hz | 266 |
+| dSPN → dSPN | 26.2 | 1568.5 | 25.0 Hz | 39 212 |
+| dSPN → iSPN | 25.0 | 1500.3 | 25.0 Hz | 37 507 |
+| iSPN → dSPN | 31.8 | 505.4 | 33.0 Hz | 16 678 |
+| iSPN → iSPN | 32.5 | 948.1 | 33.0 Hz | 31 286 |
 
 Read the first two columns together: **a dSPN gets ~67 simulated GABAergic
 afferents against ~2573 synthetic ones, so the microcircuit is about 2 % circuit
 and 98 % open-loop stream.** Note also that `fitted_params.json` has no
 `dSPN→FS` or `iSPN→FS` pair, so **FS neurons receive GABA only from other FS
-neurons** — 126 spikes/s, against 61 115 for a dSPN and 69 046 for an iSPN. What
+neurons** — 130 spikes/s, against 61 139 for a dSPN and 69 059 for an iSPN. What
 this forecloses is set out in `experimental_data/input_streams/README.md` §4.1.
 
 **Step 2: realise the pool** (`_simulate_distance_dependent_spike_counts`). Per
-pair, virtual source neurons are scattered at density `ρ` through a box extending
-`Rout` beyond the lattice, and each receiver connects to each source at distance
-`d ∈ [Rin, Rout]` with probability `p(d)` — the same kernel §7.2 uses. The
-mechanics of the draw are §7.4.
+pair, virtual source neurons are scattered at density `ρ/k_mult` (each standing
+for `k_mult` real neurons, see §7.4 1b) through a box extending `Rout` beyond the
+lattice, and each receiver connects to each source at distance `d ∈ [Rin, Rout]`
+with probability `p(d)` — the same kernel §7.2 uses. The mechanics of the draw
+are §7.4.
 
 This is the part that changed on 2026-08-07. It used to compute the shared
 fraction analytically,
@@ -700,19 +763,22 @@ double quadrature is gone and the result is exact at any lattice size or density
 — which is what keeps `TODO.md` §24 (a larger, sparser cube) reachable without
 another rewrite.
 
-Two things the construction is checked on, because both are predictions rather
-than inputs. The realised mean degree must reproduce `E_outer`; it is one random
-realisation of the source cloud, so the tolerance is 20 %, about 4σ of a spread
-measured at 1.6 % (dSPN→dSPN) to 4.8 % (FS→dSPN) with a bias below 1 %. And the
-realised shared fractions must match the analytic `f(d)`:
+One property of the construction is **checked at build time**, because it is a
+prediction rather than an input: the realised mean degree must reproduce
+`E_outer`, and a deviation beyond 20 % raises. The pool is one random realisation
+of the source cloud, so that tolerance is about 4σ of a spread measured at 1.6 %
+(dSPN→dSPN) to 4.8 % (FS→dSPN) with a bias below 1 %. The realised shared
+fractions were verified against the analytic `f(d)` too, but only **once,
+manually, at the current geometry** (commit `148aec2`) — nothing enforces it at
+build time, and no analytic `f(d)` code remains (`TODO.md` §27):
 
 | pair | `f(0)` analytic | `f(dmax)` analytic | realised (near / mid / far) |
 |---|---|---|---|
-| dSPN → dSPN | 0.0372 | 0.0318 | 0.0361 / 0.0341 / 0.0310 |
+| dSPN → dSPN | 0.0372 | 0.0318 | 0.0364 / 0.0344 / 0.0314 |
 
 Note `f(0)` is **not 1**: two receivers at the same point each connect to a given
 distant neuron only with probability `p(r)`, independently, so the shared
-fraction is the `p`-weighted mean of `p` — 0.03 to 0.21 depending on the pair.
+fraction is the `p`-weighted mean of `p` — ≈ 0.02–0.21 depending on the pair.
 
 `source_multiplicity` lets one virtual source stand for `k` real neurons, which
 keeps the cloud small. It is capped per pair so no receiver has fewer than 50
@@ -766,6 +832,19 @@ build time. `experimental_data/input_streams/README.md` is the full contract —
 what each input quantity is, where it comes from, and what this whole approach
 deliberately cannot represent.
 
+The checker (`stream_target_statistics`) states the same law in an equivalent
+parameterisation: instead of ρ it works with the shared-modulation variance σ²,
+
+```
+var  = N·p·(1 − p·(1 + σ²)) + (N·p)²·σ²          Fano = var / (N·p)
+cov  = f·N·p·(1 − p·(1 + σ²)) + (N·p)²·σ²        corr = cov / var
+```
+
+with `ρ = p·σ²/(1 − p)`; `solve_modulation_amplitude` maps a measured `r_sc` at
+window `T_meas` onto σ² (step 2b below). Substituting recovers the forms above
+exactly, and at ρ = σ = 0 — the shipped configuration — both reduce to
+`Fano = 1 − p`, `corr = f`.
+
 **The principle.** Every construction realises the presynaptic pool explicitly
 and lets overlaps produce the correlations, rather than computing a correlation
 and imposing it. That is the difference from the pre-2026-08-07 code, which drew
@@ -778,8 +857,9 @@ correlation of 0.00009 where 0.014 was intended and a Fano factor of 1922 where
 
 #### The procedure, step by step
 
-Four steps. Step 1 runs once per stream; steps 2 and 3 run once per time chunk;
-step 4 once at the end.
+Four steps. Step 1 runs once per stream — except in variant 1a, where it runs
+once per cortical region, covering all of the region's receiver types at once;
+steps 2 and 3 run once per time chunk; step 4 once at the end.
 
 ##### Step 1 — fix the presynaptic pool
 
@@ -828,15 +908,17 @@ The box extends `Rout` beyond the receiver bounding box in every direction, so n
 receiver sees an edge. This construction is **not periodic**, unlike the lattice
 of §7.1 — the surrounding box does the job the periodicity did.
 
-Two things are then checked, because both are predictions rather than inputs:
+One thing is then checked, because it is a prediction rather than an input:
 
 ```
 |mean_degree · k_mult − E_outer|  ≤  0.20 · E_outer
 ```
 
-and the realised shared fractions against the analytic `f(d)`. The 20 % is about
-4σ of a spread measured at 1.6 % (dSPN→dSPN) to 4.8 % (FS→dSPN) across source
-clouds, with a bias below 1 %.
+The 20 % is about 4σ of a spread measured at 1.6 % (dSPN→dSPN) to 4.8 %
+(FS→dSPN) across source clouds, with a bias below 1 %. The realised shared
+fractions are computed (`realised_shared_fractions`) but only to feed the
+statistics check of step 4 their mean; their agreement with the analytic `f(d)`
+was verified once, manually (§7.3, `TODO.md` §27).
 
 **(1c) `CorticalInputs` — a flat split.**
 `simulate_receiver_counts_homogeneous_to_memmap`.
@@ -918,7 +1000,9 @@ c_i(t)    ~ Hypergeometric(ngood = N_i, nbad = M − N_i, nsample = k(t))
 This is exact in every respect. Marginals are `Binomial(N_i, p)`, and the
 correlation between **any** two receivers is `√(N_i·N_j)/M` whether they are the
 same type or not — so the cross-type shared fractions are derived from `M`
-rather than being free parameters. Within a type it reduces to `N/M = f`.
+rather than being free parameters. For the reference type (the SPNs, whose count
+sets `M`) it reduces to `N/M = f`; the FS within-type overlap is smaller,
+`N_FS/M = f·N_FS/N_SPN = 0.0056` (§7.5).
 
 **(3b) Geometric source pool.** Per bin, draw how many of the real neurons fired,
 assign each spike to a source, and add it to every receiver that source feeds:
@@ -948,8 +1032,10 @@ literally what a shared sub-pool plus a private sub-pool means.
 ##### Step 4 — write, then check
 
 Counts go straight into the `(R, n_steps)` memmap; the full array is never
-materialised. The time axis is chunked so the working set stays near 128 MB, and
-the AR(1) `carry` crosses the boundaries so chunking is invisible in the output.
+materialised. The time axis is chunked so the working set stays near 128 MB
+(32 MB for the geometric missing-GABA streams, which carry more per-bin state),
+and the AR(1) `carry` crosses the boundaries so chunking is invisible in the
+output.
 
 The first `min(chunk, 20 000)` bins of the first chunk are kept as the check
 sample. The drive is constant across a TR (23 100 bins), so a sample that size
@@ -979,8 +1065,9 @@ Fano is checked at 10 % relative, the correlation at `max(0.02, 20 %)`.
 produces autocorrelation, burst structure or refractory effects except the rate
 series itself and the shared modulation of step 2b.
 
-**All three correlation parameters are currently 0** (`mc.correlation_dict`,
-`mc.cortical_correlation`, `ci.shared_fraction_dict`), so step 2b is skipped and
+**All three of these knobs are currently 0** — the two presynaptic correlations
+`mc.correlation_dict` and `mc.cortical_correlation`, and the overlap fraction
+`ci.shared_fraction_dict` — so step 2b is skipped and
 `f` is the only source of receiver correlation. That is deliberate, not an
 oversight: the input correlation is the dominant determinant of the simulated
 BOLD amplitude (`Var(Σ I_i) = N·v·(1 + (N−1)r)`, a 481× swing at `N = 486`
@@ -992,7 +1079,7 @@ striatum does. `TODO.md` §25 has the reasoning and the scan meant to set them.
 | pool | geometric, from the kernel (1b) | `M = N_eff/f` axons (1a) | flat `f` (1c) |
 | `N_eff` | `E_outer`, 12–1568 | `round(proportion · N_total)` | `round(proportion · N_total)` |
 | `rate` | scalar, `firing_rate_dict[pre]` | per-step array from the drive | per-step array |
-| `f` | emerges, 0.02–0.21 | 0.014 (Kincaid) | `ci.shared_fraction_dict`, 0 |
+| `f` | emerges, ≈ 0.02–0.21 | 0.014 SPN↔SPN (Kincaid); cross-type from the pool (§7.5) | `ci.shared_fraction_dict`, 0 |
 | `r_sc` | `correlation_dict[pre]`, 0 | `cortical_correlation`, 0 | `cortical_correlation`, 0 |
 
 ### 7.5 Cortical input — built once, cached
@@ -1016,8 +1103,11 @@ N_eff = round(cortical_proportions_dict[region] · N_cortical_inputs_dict[receiv
 with `N_cortical_inputs_dict = {FS: 2800, dSPN: 7000, iSPN: 7000}` — whose
 derivation is **not yet written down**, see `TODO.md` §23. A caudate dSPN's 7000
 afferents split 3850 dlPFC, 1260 PMd, 1050 preSMA, 420 SMA, 280 PMv, 140 M1, 0
-S1. A region with `N_eff = 0` gets no stream, which is the only reason the two
-loops differ in stream count (caudate 25, putamen 28).
+S1. A region contributing nothing gets no stream (`Microcircuit` skips on the
+proportion being ≤ 0, `CorticalInputs` on `N_eff = 0` — same outcome at the
+current numbers), which is the only reason the two loops differ in stream count.
+The counts here — caudate 25, putamen 28 — are the **Microcircuit's own** streams
+(7 compensation + 18/21 cortical); `CorticalInputs` adds its own on top (§7.7).
 
 **Step 3: the draw.** All three receiver types of a region are drawn **together**,
 sampling one pool of
@@ -1049,6 +1139,11 @@ an SPN samples more of the pool. No nested block construction can represent that
 which is why the pool is realised explicitly. Ramanathan et al. 2002 and Choi et
 al. 2018 both report higher cortical convergence onto FS interneurons than onto
 SPNs, which this derivation does not capture; see `TODO.md` §26.
+
+Regions, by contrast, are drawn **apart**: each has its own axon pool, so within
+a bin the streams of different regions are independent. Their co-fluctuation
+comes only through the correlated BOLD-derived rate series each pool is driven
+by.
 
 **FS cortical input is drawn like the SPNs'.** It used to be *derived* — the
 weighted sum of the cortical counts of the SPNs each FS projects onto, rescaled
@@ -1102,13 +1197,19 @@ The checks that bite in practice:
 - **`n_steps` must match exactly.** A cache is built for one duration and is
   usable at that duration only. This is why `mc_ci_cache_5tr` (115 500 steps) can
   only serve `--n-trs 5`.
-- **`cortical_rate_path` is compared as a verbatim string.** `parameters.py`
-  stores it relative (`../striatal_microcircuit_requirements/...`), so build and
+- **`cortical_rate_path` is compared as a string** (after `Path()`
+  normalisation and `~` expansion on both sides). `parameters.py` stores it
+  relative (`../striatal_microcircuit_requirements/...`), so build and
   evaluation must be launched from the same working directory —
   `BOLD_optimization/`. See `TODO.md` §13.
 - `dbs_condition`, `dt`, the proportions dict, `N_cortical_inputs_dict`,
-  `shared_fraction` and the key set are all compared too.
-- Any mismatch **raises**; nothing is silently rebuilt.
+  `shared_fraction` and the correlation fields are compared too. The stored "key
+  set" is also compared, but against keys taken from the **same pickle**, so
+  that check only catches a corrupted state file, not a configuration change.
+- Any **mismatch** raises; nothing is silently rebuilt. An *absent* field is a
+  different story: most of these checks are skipped when an old state file
+  simply lacks the field — only the three correlation fields hard-fail on a
+  pre-recording pickle. The missing-input state of §7.3 is stricter throughout.
 
 Sizes follow directly from the row counts. Across both loops the streams total
 24 084 rows (caudate 11 342, putamen 12 742), so one DBS condition costs
@@ -1116,8 +1217,8 @@ Sizes follow directly from the row counts. Across both loops the streams total
 
 | | `n_steps` | per DBS condition |
 |---|---|---|
-| `--n-trs 5` | 115 500 | 22.3 GB (20.7 GiB) — measured: 22.28 GB |
-| full run, 310 TRs | 7 161 000 | 1 380 GB (**1.26 TiB**) |
+| `--n-trs 5` | 115 500 | 22.25 GB (20.7 GiB) derived — measured 22.28 GB, the ~30 MB gap being state pickles and connectivity files |
+| full run, 310 TRs | 7 161 000 | 1 380 GB (**1.25 TiB**) |
 
 A single full-length dSPN cortical stream is `486 × 7 161 000 × 8 B ≈ 27.8 GB` on
 its own. Note that `mc_ci_cache_5tr/` holds **both** conditions and so measures
@@ -1226,7 +1327,8 @@ This is also why **v07 can only be simulated in whole `update_time` chunks**.
 calling every stream's `update(run_simulation=False)` and letting the last call
 run `simulate(update_time)`. `update_time = 110.0` was chosen because it divides
 the TR (2310 ms, 21 chunks), the full run, and the 9900 ms firing-rate probe; the
-earlier 100 ms divided none of them.
+earlier 100 ms divided the full run and the probe but **not the TR**, which is
+why the 2310 ms ramp-up would have failed on the first call.
 
 An iterator that runs off the end raises `StopIteration` rather than looping or
 zero-padding, so simulating past `n_steps` fails loudly. That is the same
@@ -1249,29 +1351,46 @@ literals.
 
 Three differences from `Microcircuit` matter:
 
-- **`shared_input = 0.0`.** The copula correlation matrix of §7.4 becomes the
-  identity, so receivers of the same cortical region share no presynaptic
-  neurons at all, where the striatal streams share 1.4 %. This does *not* make
-  the inputs independent over time — every receiver of a region is still driven
-  by the same `p(t)`, so the slow, BOLD-derived co-fluctuation is fully present.
-  What is removed is only the extra, within-bin correlation on top of it.
+- **The streams use the flat split of §7.4 (1c), with every overlap at zero.**
+  `shared_fraction_dict` is a *required* per-population argument (no default),
+  and `parameters.py` sets all four entries to 0.0, so
+  `simulate_receiver_counts_homogeneous_to_memmap` splits each receiver's `N`
+  afferents into `round(f·N) = 0` shared and `N` private — receivers of the same
+  cortical region share no presynaptic neurons at all, where the striatal
+  streams share 1.4 %. This does *not* make the inputs independent over time —
+  every receiver of a region is still driven by the same `p(t)`, so the slow,
+  BOLD-derived co-fluctuation is fully present. What is removed is only the
+  extra, within-bin correlation on top of it. (`TODO.md` §26: zero is certainly
+  wrong physically; there is simply no measurement to put there.)
 - **The target is always `ampa`**, with none of the per-type dispatch of §7.7 —
   correct, since all four are `Izhikevich2003NoisyBaseNonlin` populations with a
   single excitatory conductance and no `g_glut` term, so the streamed value lands
   on the decaying `g_ampa` directly.
-- **Nothing is derived.** Every one of the four gets its own drawn stream per
-  region; there is no analogue of the FS derivation.
+- **Each population is drawn alone.** `Microcircuit` draws all three striatal
+  receiver types of a region jointly from one shared axon pool (§7.5), which is
+  what fixes their cross-type overlaps; here each of the four populations gets
+  its own independent generator call per region, so there is no cross-population
+  structure at all — consistent with every overlap being 0 anyway.
 
 Everything else — the per-TR expansion, `N_eff = round(proportion · N_total)`
-with zero-skip, `rho = 0.0` and `concentration` left at its default, the float64
-`(R, n_steps)` memmaps, the `TimedArray` + `CurrentInjection` pair per stream,
-the fitted `mean_weights_by_type` multiplication in `update()`, and `reset()` —
-is the same, and so is the cache validation, plus one extra field: the stored
-`name` must match the loop.
+with zero-skip, the shared-modulation parameters `r_sc` / `tau_c_ms` /
+`t_meas_ms` wired from `mc.cortical_correlation` / `mc.correlation_timescale_ms`
+/ `mc.correlation_window_ms` (all 0 / 0 / `None`), the float64 `(R, n_steps)`
+memmaps, the `TimedArray` + `CurrentInjection` pair per stream, the fitted
+`mean_weights_by_type` multiplication in `update()`, and `reset()` — is the
+same.
 
-The smallest stream is M1 → gpe/stn in the caudate: `round(0.01 · 500) = 5`
+**The cache validation is *weaker* than the Microcircuit's, not the same.** It
+checks one extra field — the stored `name` must match the loop — plus `dt`,
+`n_steps`, `dbs_condition`, the rate path, the proportions dict and
+`N_cortical_inputs_dict`. But `CorticalInputs._save_cortical_input_state`
+records neither `shared_fraction_dict` nor any correlation field, so **changing
+those silently reuses a stale CI cache** while the same change correctly
+invalidates the MC cache. `TODO.md` §29; the fix is free while no cache exists.
+
+The smallest stream is M1 → gpe/stn in the caudate: `round(0.02 · 500) = 10`
 presynaptic neurons. It survives the zero-skip, but a bin can then only take the
-values 0–5, so that stream is far coarser than the 3150-source striatal ones.
+values 0–10, so that stream is far coarser than the 3150-source striatal ones.
 
 `snr` and `gpe_proto` are deliberately **not** in the list. They receive no
 cortical drive; their excitation is a fitted baseline current instead (§11).
@@ -1323,12 +1442,14 @@ Two global `Constant`s exist, `dbs_pulse_frequency_Hz = 125` and
 `dbs_pulse_width_us = 100`, together with the single global function `pulse()` —
 all three from `DBSstimulator`, in both conditions.
 
-The compile folder is `bgm_v07_<dbs>[_<appendix>]`, passed at `BGM(...)`
+The compile folder name is `bgm_v07_<dbs>[_<appendix>]`, passed at `BGM(...)`
 construction; `--compile-appendix` gives each optimizer individual its own so
-parallel jobs do not race. **ANNarchy resolves
-`compile(directory=…)` relative to the cwd**, so the name must be relative and
-the process must `chdir` first — passing an absolute path joins it onto the cwd
-and fails.
+parallel jobs do not race. The on-disk path is
+`annarchy_folders/bgm_v07_<dbs>[_<appendix>]`: CompNeuroPy's `compile_in_folder`
+prepends `annarchy_folders/` by plain string concatenation
+(`model_functions.py`), and ANNarchy then resolves the result relative to the
+cwd — so the name must be relative and the process must `chdir` first; an
+absolute name is concatenated into a nonsense path and fails.
 
 To dump what was actually built:
 
@@ -1345,31 +1466,40 @@ pandoc rather than for GitHub.
 
 ### The off and on networks are the same network
 
-`DBS.md` asserts this; the two reports measure it. Running `--report` for both
-conditions gives files of **identical size**, with identical populations,
-projections, targets, connectivity patterns, monitors, neuron models and synapse
-models. Everything that differs is a parameter *value*, and every one of them is
-a DBS parameter:
+`DBS.md` asserts this; two generated reports measured it once. (The report files
+themselves were not retained — only the `annarchy_folders/bgm_v07_*_report_*`
+compile folders survive — and regenerating them requires a cache, which none
+currently exists.) Running `--report` for both conditions gave files of
+**identical size**, with identical populations, projections, targets,
+connectivity patterns, monitors, neuron models and synapse models. Everything
+that differed is a parameter *value*, and every one of them is a DBS parameter.
 
-| what differs | where |
+Where those parameters actually live, verifiable from `dbs.py` today:
+
+| parameter | set by `on()` on |
 |---|---|
-| `dbs_on`, `dbs_depolarization`, `antidromic`, `antidromic_prob`, `prob_axon_spike` | the 6 putamen BG populations |
-| `p_axon_spike_trans` | 5 putamen projections |
+| `dbs_on` | all 6 putamen BG populations (an array on `stn`, `1` elsewhere) |
+| `dbs_depolarization` | `stn` only — explicitly zeroed on every other population |
+| `antidromic`, `antidromic_prob`, `prob_axon_spike` | `stn` (efferent branch), `gpe_proto` (afferent branch), `snr` (passing-fibre pre) |
+| `p_axon_spike_trans` | all 6 putamen projections — the four `stn` efferents and `gpe_proto__stn` at 1, `snr__thal` at `passing_fibres_strength` |
 
-The report also confirms the footprint independently: of the 19 non-input
-populations, **exactly six carry any `dbs_*` parameter at all** — `stn`, `snr`,
-`gpe_proto`, `gpe_arky`, `gpe_cp` and `thal`, all `:putamen`. No caudate
-population and no microcircuit population has one.
+The reports showed `p_axon_spike_trans` differing on only **5** projections
+because they were generated with all three fitted DBS strengths at 0 (`--report`
+needs no parameter vector): at `passing_fibres_strength = 0` the sixth,
+`snr__thal`, is indistinguishable from off. For the same reason
+`dbs_depolarization` and `prob_axon_spike` read 0 in both files; with a real
+vector more values would differ, but still only values.
 
-Two things this does **not** show. First, the reports were generated with all
-three fitted DBS strengths at 0 (`--report` needs no parameter vector), so
-`dbs_depolarization` and `prob_axon_spike` read 0 in both files and only
-`dbs_on`, `antidromic` and `p_axon_spike_trans` visibly flip; with a real vector
-more values would differ, but still only values. Second, "identical" here means
-structure, equations and parameters — **not simulation output**. Retrofitting DBS
-adds random variables, and ANNarchy's RNG is one global stream, so the numbers
-every population receives shift, including in the caudate loop that carries no
-DBS terms at all (`CLAUDE.md`).
+The reports also confirmed the footprint independently: of the 18 non-input BG
+and striatal populations, **exactly six carry any `dbs_*` parameter at all** —
+`stn`, `snr`, `gpe_proto`, `gpe_arky`, `gpe_cp` and `thal`, all `:putamen`. No
+caudate population and no microcircuit population has one.
+
+One thing this does **not** show: "identical" here means structure, equations
+and parameters — **not simulation output**. Retrofitting DBS adds random
+variables, and ANNarchy's RNG is one global stream, so the numbers every
+population receives shift, including in the caudate loop that carries no DBS
+terms at all (`CLAUDE.md`).
 
 ---
 

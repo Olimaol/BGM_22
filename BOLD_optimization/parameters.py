@@ -23,8 +23,9 @@ parameters_test_microcircuit["mc.b"] = 10
 # v07 hands its cached inputs to ANNarchy one update_time chunk at a time, so
 # every simulated stretch has to be a whole number of chunks. The stretches are
 # the ramp-up (2310 ms = 1 TR), the rest of the run ((n_trs - 1) * 2310 ms) and
-# the firing-rate probe. 110 ms divides 2310 (21 chunks per TR) and 9900;
-# the previous 100 ms divided none of them.
+# the firing-rate probe. 110 ms divides 2310 (21 chunks per TR), 9900 and the
+# full run; the previous 100 ms divided everything except the TR, so the
+# ramp-up (one TR) failed.
 parameters_test_microcircuit["update_time"] = 110.0
 # Rates assumed for the striatal neurons that surround the simulated lattice but
 # are not themselves simulated; the missing-GABA spike counts are drawn at these,
@@ -48,8 +49,8 @@ parameters_test_microcircuit["mc.firing_rate_dict"] = {
 # ../experimental_data/input_streams/README.md section 2.
 parameters_test_microcircuit["mc.shared_fraction"] = 0.014
 # Pairwise spike-count correlation among the unsimulated striatal neurons feeding
-# the missing-GABA streams (Adler et al. 2013), and among the cortical neurons
-# feeding the cortical streams (Cohen & Kohn 2011 Table 1).
+# the missing-GABA streams, and among the cortical neurons feeding the cortical
+# streams (Cohen & Kohn 2011 Table 1).
 #
 # BOTH ARE 0 PENDING THE SCAN described in input_streams/README.md section 5.
 # These values set the simulated BOLD amplitude directly -- BOLD is driven by the
@@ -59,7 +60,12 @@ parameters_test_microcircuit["mc.shared_fraction"] = 0.014
 # so a literature value injected here would not be cancelled the way a real
 # striatum cancels it. The intended procedure is to scan input correlation
 # against simulated SPN output correlation and BOLD amplitude and choose from
-# that, with Adler's 0.004 as a validation target on the OUTPUT.
+# that, with Adler et al. 2013's MSN-MSN 0.004 (Fig 4A right) as an
+# order-of-magnitude anchor on the OUTPUT -- an anchor only, because Adler's
+# 0.004 and 0.06 are SIGNAL correlations (PSTH tuning similarity, including
+# non-simultaneous pairs), not spike-count correlations; the paper reports no
+# MSN-MSN or FSI-FSI spike-count correlation at all. See
+# input_streams/README.md section 5.
 parameters_test_microcircuit["mc.correlation_dict"] = {
     "FS": 0.0,
     "dSPN": 0.0,
