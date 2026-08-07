@@ -39,6 +39,55 @@ parameters_test_microcircuit["mc.firing_rate_dict"] = {
     "dSPN": 25.0,
     "iSPN": 33.0,
 }
+# Fraction of cortical afferents two SPNs have in common. Kincaid et al. 1998
+# (J Neurosci 18:4722): one corticostriatal axon contacts <=1.4 % of the cells in
+# its arborization, and the shared fraction between two SPNs equals that same
+# figure. It fixes the size of the cortical axon pool, M = N_eff / f, and every
+# other cortical shared fraction -- FS to FS, FS to SPN -- follows from that pool
+# rather than being a free parameter. See
+# ../experimental_data/input_streams/README.md section 2.
+parameters_test_microcircuit["mc.shared_fraction"] = 0.014
+# Pairwise spike-count correlation among the unsimulated striatal neurons feeding
+# the missing-GABA streams (Adler et al. 2013), and among the cortical neurons
+# feeding the cortical streams (Cohen & Kohn 2011 Table 1).
+#
+# BOTH ARE 0 PENDING THE SCAN described in input_streams/README.md section 5.
+# These values set the simulated BOLD amplitude directly -- BOLD is driven by the
+# summed synaptic input current, whose variance goes as 1 + (N-1)*r, so at
+# N = 486 receivers a correlation of 0.99 rather than 0 is a 481x change. The
+# model also cannot decorrelate (98 % of its GABA input is an open-loop stream),
+# so a literature value injected here would not be cancelled the way a real
+# striatum cancels it. The intended procedure is to scan input correlation
+# against simulated SPN output correlation and BOLD amplitude and choose from
+# that, with Adler's 0.004 as a validation target on the OUTPUT.
+parameters_test_microcircuit["mc.correlation_dict"] = {
+    "FS": 0.0,
+    "dSPN": 0.0,
+    "iSPN": 0.0,
+}
+parameters_test_microcircuit["mc.cortical_correlation"] = 0.0
+# The window a non-zero correlation above was measured at, and the timescale it
+# is realised with. A spike-count correlation is not defined without its window:
+# it grows with the window and saturates once the window exceeds the timescale.
+# Everything in Cohen & Kohn Table 1 is measured at 66-3000 ms; nothing at dt.
+# Required as soon as any correlation above is non-zero.
+parameters_test_microcircuit["mc.correlation_window_ms"] = None
+parameters_test_microcircuit["mc.correlation_timescale_ms"] = 0.0
+# How many real neurons one virtual source stands for when the missing-GABA pools
+# are realised geometrically. Larger is cheaper and coarsens the granularity of
+# the pool overlap without biasing it.
+parameters_test_microcircuit["mc.source_multiplicity"] = 10
+# Fraction of cortical afferents two neurons of the same BG population have in
+# common. Zero is certainly wrong physically -- neighbouring STN neurons do share
+# corticosubthalamic axons -- but there is no measurement of that overlap to put
+# here. Kept as a parameter rather than a hardcoded constant so the assumption is
+# visible; see input_streams/README.md section 4.6.
+parameters_test_microcircuit["ci.shared_fraction_dict"] = {
+    "thal": 0.0,
+    "gpe_arky": 0.0,
+    "gpe_cp": 0.0,
+    "stn": 0.0,
+}
 # Share of a striatal neuron's cortical afferents coming from each of the seven
 # cortical ROIs the Berlin data provides, per loop. This is the ONLY physical
 # difference between the caudate and the putamen loop, and it is used in two

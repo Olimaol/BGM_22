@@ -461,6 +461,16 @@ def v07_model_creation_kwargs(
         # shared by the Microcircuit and the CorticalInputs, and by the script
         # that mixed caudate_rate/putamen_rate into the cortical rate file
         "mc.cortical_proportions_dict": paramsS["cortical_proportions_dict"][loop],
+        # What the input streams are drawn to reproduce. All of these are baked
+        # into the caches and are compared on load; see
+        # ../experimental_data/input_streams/README.md.
+        "mc.shared_fraction": paramsS["mc.shared_fraction"],
+        "mc.correlation_dict": paramsS["mc.correlation_dict"],
+        "mc.cortical_correlation": paramsS["mc.cortical_correlation"],
+        "mc.correlation_window_ms": paramsS["mc.correlation_window_ms"],
+        "mc.correlation_timescale_ms": paramsS["mc.correlation_timescale_ms"],
+        "mc.source_multiplicity": paramsS["mc.source_multiplicity"],
+        "ci.shared_fraction_dict": paramsS["ci.shared_fraction_dict"],
         "dbs": dbs_condition,
         "timestep": paramsS["timestep"],
         "t.duration": duration_ms,
