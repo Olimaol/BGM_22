@@ -106,8 +106,8 @@ every measurement window**. Real `r_sc` grows with the window and saturates once
 the window exceeds the correlation timescale.
 
 This matters because every measurement we calibrate against is taken at a window
-of 66–3000 ms (Cohen & Kohn 2011, *Nat Neurosci* 14:811, Table 1 — the PDF is in
-`../cortical_correlations/`). Nothing is measured at 0.1 ms. A white-noise `ρ`
+of 66–3000 ms (Cohen & Kohn 2011, *Nat Neurosci* 14:811, Table 1,
+doi:10.1038/nn.2842). Nothing is measured at 0.1 ms. A white-noise `ρ`
 therefore cannot be right at both ends: calibrate it at the measured window and
 the fine timescale is wrong, and vice versa.
 
@@ -299,8 +299,10 @@ per DBS condition at full length.
 
 ## Sources
 
-Read in full: none of the below — all statements above are taken from abstracts
-and, for Cohen & Kohn, from Table 1 of the PDF in `../cortical_correlations/`.
+Read in full: none of the below — all statements above are taken from abstracts,
+except Cohen & Kohn, whose Table 1 was read directly from the publisher PDF. That
+PDF is deliberately **not** in the repository: this remote is public and the paper
+is not ours to redistribute, so it is cited by DOI like every other source here.
 Anything used for a numeric value in the model must be checked against the full
 text before it is relied on.
 

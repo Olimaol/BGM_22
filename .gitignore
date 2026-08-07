@@ -26,5 +26,9 @@ striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_d
 */data_BOLD_optimization/checkpoints/
 */data_BOLD_optimization/deap_cma_result/
 */data_BOLD_optimization/individual_logs/
-# publisher PDFs of cited papers -- cite the DOI instead of committing the file
-experimental_data/activity_striatum/*.pdf
+# Publisher PDFs of cited papers. This remote is PUBLIC, and the papers are not
+# ours to redistribute -- cite the DOI in the README instead of committing the
+# file. Keep the PDF locally if you need it; it just stays untracked. The rule is
+# deliberately repo-wide rather than per-folder, because it has now been needed
+# twice (activity_striatum, then cortical_correlations).
+**/*.pdf
