@@ -12,9 +12,11 @@ used to claim. It exists because `TODO.md` §22 found the generator silently
 producing a Fano factor of 1922 where 1 was intended, for four years, with
 nothing in the codebase able to notice.
 
-The values themselves live in `BOLD_optimization/parameters.py`. The mechanism is
-described build-order in `model_v07.md` §7.3–§7.5. This file is the contract
-between them.
+The values themselves live in `BOLD_optimization/parameters.py`. **The exact
+generation procedure, step by step and with every formula, is `model_v07.md`
+§7.4** — read that if you want to reimplement or verify the generator; §7.3 and
+§7.5 place it in the model's build order. This file is the contract between them:
+what the procedure has to come out as, and why.
 
 ---
 
