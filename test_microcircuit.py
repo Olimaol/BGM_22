@@ -21,6 +21,15 @@ if __name__ == "__main__":
         name=NAME,
         dbs_condition=DBS_CONDITION,
         cortical_proportions_dict=paramsS["cortical_proportions_dict"][NAME],
+        # what the input streams are drawn to reproduce, from the same single
+        # source the real runs use -- see experimental_data/input_streams/README.md
+        firing_rate_dict=paramsS["mc.firing_rate_dict"],
+        shared_fraction=paramsS["mc.shared_fraction"],
+        correlation_dict=paramsS["mc.correlation_dict"],
+        cortical_correlation=paramsS["mc.cortical_correlation"],
+        correlation_window_ms=paramsS["mc.correlation_window_ms"],
+        correlation_timescale_ms=paramsS["mc.correlation_timescale_ms"],
+        source_multiplicity=paramsS["mc.source_multiplicity"],
         build_connectivity=True,
         build_missing_gaba_input=True,
         build_cortical_input=True,
