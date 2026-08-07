@@ -275,10 +275,12 @@ it is a different limit from the December failure, which was OOM during
    band-crossing per population and set tight bounds, for both versions. Redo the
    sweep first: step 6 moved the numbers.
 2. Step 8 — get the patched ANNarchy and the two repos onto hinton/waikiki
-   (`TODO.md` §6), then build the caches there. Budget from the laptop: 24 min per
-   loop for 5 TRs means ~25 h per loop serially at 310 TRs, so ~50 h and ~138 GiB
-   **per DBS condition** — and both conditions are needed, which step 9 used to
-   assume without ever saying. Generation is embarrassingly parallel over
+   (`TODO.md` §6), then build the caches there. Budget from the laptop, **after
+   the generator rebuild of `TODO.md` §22**: 2.9 min (caudate) and 3.2 min
+   (putamen) for 5 TRs means ~3.5 h per loop serially at 310 TRs, so ~7 h and
+   ~138 GiB **per DBS condition** — and both conditions are needed, which step 9
+   used to assume without ever saying. That is ~6x faster than the 24 min per
+   loop this budget used to quote. Generation is embarrassingly parallel over
    (pre, post) pairs, and `TODO.md` §3's smaller layout should land at the same
    time.
 3. Step 9 — the five-generation mini-run.
