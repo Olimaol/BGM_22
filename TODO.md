@@ -951,3 +951,42 @@ them in `_load_cortical_input_state`, mirroring `microcircuit.py`, including the
 hard fail on their absence. **Do it before the next cache build:** no cache
 currently exists, so adding fields now invalidates nothing; every day it waits,
 the next cache is one parameter change away from being silently stale.
+
+### 30. `phi_1 = phi_2 = 0` — the striatal dopamine terms are switched off, uncheck against the source paper
+
+The three striatal neuron models
+(`Izhikevich2007Humphries2009SPND1`/`SPND2`/`FSI` in CompNeuroPy's
+`izhikevich_2007_like_nm.py`) carry dopamine-modulation terms — `phi_1` scales
+the D1 effects (NMDA boost `1 + beta_1*phi_1`, the `phi_1*c_da*(v - E_da)`
+current, the FSI `eta*phi_1` shift of `v_r`), `phi_2` the D2 effects (AMPA
+attenuation `1 - beta_2*phi_2`, the `1 - alpha*phi_2` quadratic scaling, the FSI
+`epsilon*phi_2` GABA attenuation). Both are class defaults `0.0`, nothing in
+either model version overrides them (`parameters.csv` striatal cells are empty
+and `_set_params` skips Microcircuit components; v08 instantiates the same
+classes with defaults), so **every dopamine term is inert** in v07 and v08 alike
+(`model_v07.md` §6.2–6.3).
+
+**Why this is not obviously right.** The subject is a PD patient, and the
+striatal target rates are deliberately the **medication-off** state of Liang et
+al. 2008 (§20). In the source paper's convention `phi` is the tonic dopamine
+level, so `phi = 0` means *no dopamine at all* — plausibly more extreme than the
+dopamine-depleted-but-not-zero PD off-medication state the rest of the model is
+calibrated to. Whether 0 is the right value for our condition, or the paper
+suggests something specific for dopamine depletion, has never been checked.
+
+**To do:** read the source paper — the docstrings link
+DOI `10.1016/j.neunet.2009.07.018` (labelled "Humphries et al. (2007)" in the
+docstring, but the class names and that DOI say Humphries, Wood & Gurney,
+*Neural Networks* 2009; resolve the label against the actual paper, do not trust
+memory) — and extract what `phi_1`/`phi_2` values it uses or suggests for a
+dopamine-depleted / PD state. Then decide whether to adopt them.
+
+**Constraints if the values change:** (a) behavior change — capture a baseline
+first per the convention; every striatal spike train will move. (b) The input
+caches stay *loadable* (their state checks stream parameters, not neuron
+parameters), but the missing-GABA compensation and the whole rate calibration
+assume the current neuron responses, so the realised rates will shift against
+the Liang bands — recheck the probe, and expect §4 (missing-GABA
+self-consistency) to be affected. (c) `phi` values must be set at class
+instantiation or before compile — the post-compile reset trap applies
+(`model_v07.md` §11).

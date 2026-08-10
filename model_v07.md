@@ -564,7 +564,9 @@ Both: spike `v >= v_peak`, reset `v = c; u = u + d`.
 
 **With `phi_1 = phi_2 = 0` every dopamine term above is inert** — `phi_1*c_da*(…)`
 is zero, `(1 + beta_1*phi_1)` and `(1 - beta_2*phi_2)` are one. The dopamine
-machinery is present in the equations but not used by this project.
+machinery is present in the equations but not used by this project. Whether 0 is
+the right value for a PD patient off medication is unchecked against the source
+paper — `TODO.md` §30.
 
 | parameter | dSPN | iSPN | note |
 |---|---|---|---|
