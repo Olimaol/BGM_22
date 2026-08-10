@@ -744,48 +744,105 @@ and 98 % open-loop stream.** Note also that `fitted_params.json` has no
 neurons** — 130 spikes/s, against 61 139 for a dSPN and 69 059 for an iSPN. What
 this forecloses is set out in `experimental_data/input_streams/README.md` §4.1.
 
-**Step 2: realise the pool** (`_simulate_distance_dependent_spike_counts`). Per
-pair, virtual source neurons are scattered at density `ρ/k_mult` (each standing
-for `k_mult` real neurons, see §7.4 1b) through a box extending `Rout` beyond the
-lattice, and each receiver connects to each source at distance `d ∈ [Rin, Rout]`
-with probability `p(d)` — the same kernel §7.2 uses. The mechanics of the draw
-are §7.4.
+**Step 2: realise the pool** (`_simulate_distance_dependent_spike_counts`,
+which builds the cloud with `build_geometric_source_pools` and draws the counts
+with `simulate_receiver_counts_geometric_to_memmap`; §7.4 (1b) and (3b) state
+the same steps as formulas). The missing striatum is not approximated by a rate
+or a correlation matrix — it is *built*, as a cloud of virtual sources around
+the lattice, and the stream is simply what that cloud delivers.
 
-This is the part that changed on 2026-08-07. It used to compute the shared
-fraction analytically,
+A **virtual source** is a fixed point in space standing for `k_mult` real
+out-of-cube neurons of the presynaptic type — nothing more. It has no neuron
+model, no membrane, no spike train of its own; once built it is just (a) a
+position and (b) the list of receivers it connects to. Spikes are attributed to
+it bin by bin, in step 2c. `k_mult` is `source_multiplicity` (10), capped per
+pair so that no receiver ends up with fewer than 50 sources: at `k_mult = 10`
+the 12-afferent FS→FS pair would have barely one source per receiver, and both
+its degree and its shared fraction would be rounded away by the coarse grain.
+
+**(2a) Place.** Scatter `S = ρ · V / k_mult` sources uniformly in the box that
+extends `Rout` beyond the lattice on every axis, so no receiver sits near an
+edge. This construction is **not periodic** — the surrounding box does for the
+outer shell what the periodicity of §7.1 does for the in-cube wiring.
+
+Worked through for dSPN→dSPN, the dominant pair (one realisation at the shipped
+geometry; the numbers move by ~2 % between realisations): the 227.6 µm cube
+padded by `Rout = 1.2 mm` per side gives a 2.61 mm box of 17.7 mm³. At
+`ρ = 0.485 · 84 900 ≈ 41 200 dSPN/mm³` and `k_mult = 10` that is **S ≈ 73 000
+sources standing for ~730 000 real dSPNs** — surrounding the 486 simulated
+dSPN receivers.
+
+**(2b) Wire.** Each receiver connects to each source at distance
+`d ∈ [Rin, Rout]` with probability `p(d)` — the same kernel §7.2 fitted for
+this pair. The out-of-cube world is wired by the same rule as the in-cube one;
+the only difference is that its neurons are points rather than Izhikevich
+models. For dSPN→dSPN this yields ~77 000 receiver–source connections: a mean
+degree of ~159 sources per receiver, i.e. ~1 590 stood-for afferents.
+
+That degree is the one property **checked at build time**, because it is a
+prediction rather than an input: `mean_degree · k_mult` must reproduce the
+`E_outer` integral of step 1 (here 1 593 against 1 568.5 — off by 1.5 %), and a
+deviation beyond 20 % raises. The pool is one random realisation of the source
+cloud, so that tolerance is about 4σ of a spread measured at 1.6 % (dSPN→dSPN)
+to 4.8 % (FS→dSPN) with a bias below 1 %; anything that actually breaks the
+construction — a wrong kernel, radius or density — is off by a factor, not by
+20 %.
+
+**(2c) Draw, per 0.1 ms bin.** One Binomial for the whole cloud, then scatter
+the spikes onto the receivers:
 
 ```
-E_shared(d) = 2π ρ ∫_{Rin}^{Rout} r² ∫_0^π p(r) p(r_B) sin θ dθ dr
+n_events(t) ~ Binomial(S · k_mult, p)         p = rate · dt / 1000
+source of each event ~ Uniform{0 … S−1}
+c_i(t)      = events whose source connects to receiver i
 ```
 
-at 50 distances, interpolate `f(d) = E_shared(d)/E_outer` onto the receiver
-positions, and then *impose* that matrix on the draw through a Gaussian copula.
-Realising the pool instead means **`f(d)` emerges from the overlap**, so the
-double quadrature is gone and the result is exact at any lattice size or density
-— which is what keeps `TODO.md` §24 (a larger, sparser cube) reachable without
-another rewrite.
+The first line asks *how many of the ~730 000 real dSPNs fired in this bin* —
+at 25 Hz, `p = 0.0025`, about 1 825 of them. Each of those spikes is assigned
+to a uniform-random source and delivered to **every receiver on that source's
+list**. A receiver wired to 159 of the 73 000 sources therefore catches on
+average `1 825 · 159 / 73 000 ≈ 4` spikes per bin, and its marginal count is
+exactly `Binomial(1 590, 0.0025)` — as if its ~1 590 missing afferents were
+individually simulated.
 
-One property of the construction is **checked at build time**, because it is a
-prediction rather than an input: the realised mean degree must reproduce
-`E_outer`, and a deviation beyond 20 % raises. The pool is one random realisation
-of the source cloud, so that tolerance is about 4σ of a spread measured at 1.6 %
-(dSPN→dSPN) to 4.8 % (FS→dSPN) with a bias below 1 %. The realised shared
-fractions were verified against the analytic `f(d)` too, but only **once,
-manually, at the current geometry** (commit `148aec2`) — nothing enforces it at
-build time, and no analytic `f(d)` code remains (`TODO.md` §27):
+**Sharing is never computed — it happens.** Take two nearby receivers A and B
+and five sources: A is wired to {s1, s2, s3}, B to {s2, s3, s4}. In some bin
+two spikes are drawn and land on s1 and s3. A's count is 2, B's is 1 — and the
+spike on s3 entered **both** counts, because both receivers are wired to the
+same point. That doubly-delivered spike *is* the shared input. Over many bins
+the correlation between `c_A` and `c_B` equals the fraction of their pools they
+share, `n_shared / √(deg_A · deg_B)`; receivers close together overlap in many
+sources, distant ones in few, so the shared fraction falls with distance —
+`f(d)`, reproduced by the geometry without ever being evaluated. That is what
+changed on 2026-08-07: the old code computed `f(d)` by double quadrature and
+*imposed* it on the draw through a Gaussian copula; realising the pool makes
+the overlap emerge instead, exact at any lattice size or density — which is
+what keeps `TODO.md` §24 (a larger, sparser cube) reachable without another
+rewrite.
+
+Note `f(0)` is **not 1**: two receivers at the same point each connect to a
+given distant source only with probability `p(r)`, independently, so even
+coincident receivers share just the `p`-weighted mean of `p` — ≈ 0.02–0.21
+depending on the pair (dSPN→dSPN: ~0.034 averaged over the lattice).
+
+**Two things could be called "shared input"; only one is active.** The overlap
+above is shared *membership* — one presynaptic spike arriving at several
+receivers. On top of that, the machinery can also make the sources themselves
+co-fluctuate: a pairwise spike-count correlation `r_sc` among the unsimulated
+neurons, realised as a shared modulation of `p(t)` (§7.4 step 2b). For the
+missing-GABA streams `correlation_dict` sets `r_sc = 0` for all three types, so
+that layer is **switched off** and step 2b is skipped entirely: the only
+correlation between two receivers' missing-GABA streams is the pool overlap
+`f(d)`.
+
+The realised shared fractions were verified against the analytic `f(d)` of the
+pre-rewrite code, but only **once, manually, at the current geometry** (commit
+`148aec2`) — nothing enforces it at build time (only the degree check above
+runs), and no analytic `f(d)` code remains (`TODO.md` §27):
 
 | pair | `f(0)` analytic | `f(dmax)` analytic | realised (near / mid / far) |
 |---|---|---|---|
 | dSPN → dSPN | 0.0372 | 0.0318 | 0.0364 / 0.0344 / 0.0314 |
-
-Note `f(0)` is **not 1**: two receivers at the same point each connect to a given
-distant neuron only with probability `p(r)`, independently, so the shared
-fraction is the `p`-weighted mean of `p` — ≈ 0.02–0.21 depending on the pair.
-
-`source_multiplicity` lets one virtual source stand for `k` real neurons, which
-keeps the cloud small. It is capped per pair so no receiver has fewer than 50
-sources: at `k = 10` the 12-afferent FS→FS pair would have barely one source per
-receiver and both its degree and its shared fraction would be rounded away.
 
 Finally the **mean** of 10 000 samples from each pair's weight sampler is stored
 as `mean_weights_by_type[(pre, post)]`. That scalar is what the streamed counts
@@ -797,7 +854,8 @@ The rates come from `parameters.py: mc.firing_rate_dict`, threaded through
 `v07_model_creation_kwargs`: `{FS: 10.5, dSPN: 25.0, iSPN: 33.0}` Hz, the
 parkinsonian **medication-off** state of Liang et al. 2008 (see
 `experimental_data/activity_striatum/README.md`). Alongside them
-`mc.correlation_dict`, which is **`{FS: 0, dSPN: 0, iSPN: 0}`** — see §7.4.
+`mc.correlation_dict`, the `r_sc` layer disentangled above —
+**`{FS: 0, dSPN: 0, iSPN: 0}`**.
 
 Cached in `inputs/missing_input_state.pkl`. On load, the pair-key set, `dt`,
 **`n_steps` exactly**, `firing_rate_dict`, `correlation_dict`,
