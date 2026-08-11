@@ -200,8 +200,9 @@ in Dec 2025 (`annarchy_folders/bgm_v08_on*`) and stopped there. Two defects were
 waiting:
 
 1. **v07 + `--dbs on` could not build the model at all.**
-   `DBSstimulator(auto_implement=True)` clears the network (`dbs.py:73`) and
-   recreates every projection through `_connector_methods_dict` (`dbs.py:8-21`),
+   `DBSstimulator(auto_implement=True)` clears the network (`mf.cnp_clear` in
+   `_CreateDBSmodel.__init__`) and recreates every projection through `dbs.py`'s
+   module-level `_connector_methods_dict`,
    which has no `"Specific"` key — and v07's `CurrentInjection` inputs keep
    `connector_name = "Specific"`. `KeyError`. The rate-coded rewrite would also
    have raised on the `TimedArray`s. v08 escaped only because its inputs are added

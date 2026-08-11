@@ -270,3 +270,19 @@ on the laptop first and then move on to the working machines.
   reused; resolved entries move to its Resolved section and leave a stub. The
   maintenance rules are at the top of that file — follow them when adding,
   updating or resolving an entry.
+- **Documentation maintenance** (from `TODO.md` §18, resolved 2026-08-11). The
+  living documents are `CLAUDE.md`, `PLAN.md`, `DBS.md`, `model_v07.md`,
+  `model_v08.md`, the `experimental_data/` READMEs, and code comments.
+  - **Targeted cross-reference check.** Whenever an artifact changes — a code
+    file, a function, a doc section, a TODO entry — grep the living documents
+    for references to it (filename, symbol names, `§N`) and update what the
+    change invalidated. Proportional, not a full re-read of everything.
+  - **Cite code by file + symbol** (function, class, method), never by bare line
+    numbers — they rot silently. Where no symbol exists (template strings,
+    generated code), cite the nearest named thing plus a short greppable quote.
+  - **Section numbers are stable identifiers** in `TODO.md`, `PLAN.md`,
+    `model_v07.md` and `model_v08.md`: never renumber existing sections; insert
+    with sub-numbers or append. A forced renumbering is itself a change under
+    the first rule and triggers a `§N` sweep of all living documents.
+  - **`TODO.md`'s historical Opened/Update/Resolved blocks are exempt** — they
+    stay as written; citations in them are accurate as of their timestamp.

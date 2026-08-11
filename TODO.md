@@ -421,27 +421,7 @@ entered the footprint, and it would do so silently. Worth a guard in
 
 ## From the session on 2026-08-05 (DBS.md corrections)
 
-### 18. DBS.md's line references drift silently
-
-*Opened 2026-08-05 08:24*
-
-**Opened 2026-08-05 08:24:**
-
-Two claims in `DBS.md` were wrong and were corrected on 2026-08-05: `c`/`d` were
-described as existing for the DBS axon reset (they are the ordinary Izhikevich
-reset parameters, used by every regular spike), and `post.dbs_on` was described
-as confining an axon volley to the VTA (it is 1 on every non-excluded population,
-so it only bites on projections into the stimulated population and into excluded
-ones — efferents and passing fibres carry the volley outside the VTA, which is
-the orthodromic effect).
-
-While fixing them, **every one of the 15 `dbs.py:NNN` references in `DBS.md` was
-stale** — some by −345 lines, some by +155, so `dbs.py` had been reordered as well
-as grown. The document was committed (`a8e0222`, 15:42) *after* the last `dbs.py`
-commit (`73481ab`, 15:14), so the numbers were already wrong when it claimed
-"everything cited here was checked against the code". They have been recomputed
-against the current 2100-line file. Re-verify them, or replace them with function
-names, whenever `dbs.py` changes.
+### 18. DBS.md's line references drift silently — resolved 2026-08-11, moved to Resolved
 
 ## From the session on 2026-08-05 (documenting the model creation)
 
@@ -975,6 +955,49 @@ probe — remain true and live in CLAUDE.md.
 The next cost measurement belongs to the §3 layout rebuild on the workstations
 (PLAN step 8), which waits on the §1 bounds (step 7); a fresh cost record
 should be taken there, not extrapolated from the laptop.
+
+### 18. DBS.md's line references drift silently
+
+*Opened 2026-08-05 08:24 · resolved 2026-08-11 08:56*
+
+**Opened 2026-08-05 08:24:**
+
+Two claims in `DBS.md` were wrong and were corrected on 2026-08-05: `c`/`d` were
+described as existing for the DBS axon reset (they are the ordinary Izhikevich
+reset parameters, used by every regular spike), and `post.dbs_on` was described
+as confining an axon volley to the VTA (it is 1 on every non-excluded population,
+so it only bites on projections into the stimulated population and into excluded
+ones — efferents and passing fibres carry the volley outside the VTA, which is
+the orthodromic effect).
+
+While fixing them, **every one of the 15 `dbs.py:NNN` references in `DBS.md` was
+stale** — some by −345 lines, some by +155, so `dbs.py` had been reordered as well
+as grown. The document was committed (`a8e0222`, 15:42) *after* the last `dbs.py`
+commit (`73481ab`, 15:14), so the numbers were already wrong when it claimed
+"everything cited here was checked against the code". They have been recomputed
+against the current 2100-line file. Re-verify them, or replace them with function
+names, whenever `dbs.py` changes.
+
+**Resolved 2026-08-11 08:56:**
+
+Generalized into a project-wide documentation-maintenance convention in
+`CLAUDE.md` Conventions: a targeted cross-reference check on every change (grep
+the living documents for the changed filename, symbols, `§N`), code citations by
+file + symbol instead of bare line numbers, section numbers as stable
+identifiers in `TODO.md`/`PLAN.md`/`model_v07.md`/`model_v08.md` (never
+renumber; insert with sub-numbers or append), and this file's historical blocks
+exempt. Manual convention only, no checker script — revisit if refs rot again.
+
+All line references migrated to symbol citations, each verified against the
+current code first: `DBS.md`'s ~28 (`dbs.py` was unchanged since the 2026-08-05
+recompute, so they were still accurate; the ANNarchy ones checked against
+`ANNarchy_compneuro` on `timedarray-fastbuffer`, template-string cites now name
+the containing template variable, e.g. `built_in_functions`, `spike_specific`,
+`cpp_11_rng`) and `PLAN.md`'s two, of which `dbs.py:73` had already rotted again
+— it pointed into `get_line_is_dvdt`; the clear is `mf.cnp_clear` in
+`_CreateDBSmodel.__init__`. The six line refs in this file's historical blocks
+stay as written per the exemption. `model_v07.md`, `model_v08.md`, `CLAUDE.md`
+and the `experimental_data/` READMEs already cited by symbol and needed nothing.
 
 ### 20. The FS rate is not on a stated dopamine condition
 

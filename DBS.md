@@ -4,8 +4,9 @@ Reference for the DBS mechanism as it is implemented in CompNeuroPy and as it is
 configured in this project. Written 2026-08-04 while making the DBS-on path
 actually work. Read alongside `CLAUDE.md`, `PLAN.md` and `TODO.md`.
 
-Everything cited here was checked against the code, not remembered. Line numbers
-refer to `CompNeuroPy/src/CompNeuroPy/dbs.py` unless stated otherwise.
+Everything cited here was checked against the code, not remembered. Code is
+cited by symbol name, not line number (see `CLAUDE.md` Conventions); bare
+symbols live in `CompNeuroPy/src/CompNeuroPy/dbs.py` unless stated otherwise.
 
 ## Where DBS lives
 
@@ -42,24 +43,26 @@ at run time. `on()` calls `_set_dbs_on`, `_set_depolarization`, `_set_axon_spike
 There are two ways to accomplish stage A:
 
 - `DBSstimulator(auto_implement=True)` — clears the whole network
-  (`dbs.py:589` `cnp_clear`) and recreates every population and projection from
-  introspected `__init__` kwargs. **This project does not use it**, because
-  recreation rebuilds every population as a plain `ann.Population` and every
-  projection through `_connector_methods_dict` (`dbs.py:8-21`), which has no
+  (`mf.cnp_clear` in `_CreateDBSmodel.__init__`) and recreates every population
+  and projection from introspected `__init__` kwargs. **This project does not
+  use it**, because recreation rebuilds every population as a plain
+  `ann.Population` and every projection through the module-level
+  `_connector_methods_dict`, which has no
   `"Specific"` key — so any `TimedArray` or `CurrentInjection` either raises a
   `KeyError` or silently loses its specific class. v07 is full of both.
 - `add_dbs_mechanisms(populations, projections)` — retrofits the terms onto the
   already-built objects before `compile()`, by swapping `neuron_type` /
   `synapse_type` and recomputing the five fields ANNarchy derives from them
-  (`parameters`, `variables`/`attributes`, `functions`, `init`;
-  `ANNarchy/core/Population.py:74-113`, `Projection.py:78-128`). Connectivity,
+  (`parameters`, `variables`/`attributes`, `functions`, `init`; derived in
+  `Population.__init__` and `Projection.__init__` in `ANNarchy/core/`).
+  Connectivity,
   object identity and `_specific_template` all survive, so `TimedArray`,
   `CurrentInjection` and every handle captured by `Microcircuit` /
   `CorticalInputs` stay valid. **This is what this project uses.**
 
 ## Exactly what is added to a spiking neuron model
 
-`add_DBS_to_spiking_neuron_model` (`dbs.py:129-205`).
+`add_DBS_to_spiking_neuron_model`.
 
 Five new parameters:
 
@@ -86,7 +89,8 @@ A term appended to **every** line containing `dv/dt` on the left:
 
 **This term hyperpolarizes, despite the parameter being called
 `dbs_depolarization`.** `neg(x)` is `#define negative(x) (x<0.0? x : 0.0)`
-(`ANNarchy/generator/Template/BaseTemplate.py:1470`), so for `v > -90` the term is
+(in `built_in_functions`, `ANNarchy/generator/Template/BaseTemplate.py`), so for
+`v > -90` the term is
 `dbs_depolarization*(-90 - v) < 0`: a shunting pull toward −90 mV that does
 nothing below −90 mV. `get_loss.py` says so inline. Bear this in mind when
 reading a fitted `dbs_depolarization` value.
@@ -108,14 +112,16 @@ i.e. a full Izhikevich spike reset (`v → c`, `u += d`) applied *without* the
 neuron having crossed threshold and *without* entering refractoriness. `c` and
 `d` are not DBS additions — they are the ordinary Izhikevich reset parameters
 every one of these neuron models already has for its regular spikes (`reset="v =
-c; u = u + d"`, e.g. `neuron_models/final_models/izhikevich_2007_like_nm.py:253-256`;
+c; u = u + d"`, e.g. `Izhikevich2007` in
+`neuron_models/final_models/izhikevich_2007_like_nm.py`;
 `d` may be 0 in a given parameter set, but the mechanism is always there). What
 DBS adds is the same reset fired by a pulse instead of by threshold crossing.
 
-`add_term_to_eq_line` (`dbs.py:40-63`) inserts before any `:` flag, so
+`add_term_to_eq_line` inserts before any `:` flag, so
 `: init=...` and `: population` survive.
 
-Rate-coded models get a parallel treatment (`dbs.py:206-269`): `axon_rate_amp`
+Rate-coded models get a parallel treatment
+(`add_DBS_to_rate_coded_neuron_model`): `axon_rate_amp`
 instead of `prob_axon_spike`, a new `axon_rate = axon_rate_amp*dbs_on` variable,
 and the same term on `dmp/dt` against −1 instead of −90. **It raises
 `ValueError("No line with dmp/dt found…")` on any rate model without `mp`** —
@@ -124,7 +130,7 @@ two reasons the input machinery must be kept out of the DBS footprint.
 
 ## Exactly what is added to a synapse model
 
-Spiking (`dbs.py:293-339`):
+Spiking (`add_DBS_to_spiking_synapse_model`):
 
 ```
 p_axon_spike_trans = 0 : projection
@@ -151,7 +157,8 @@ is an ordinary downstream population with `dbs_on = 1`, so the factor is a no-op
 the volley leaves the stimulated region and drives those targets. That is the
 whole point of the orthodromic effect — DBS is felt well outside the VTA.
 
-Rate-coded (`dbs.py:340-387`): `pre.r` is replaced by `pre_rate` everywhere and
+Rate-coded (`add_DBS_to_rate_coded_synapse_model`): `pre.r` is replaced by
+`pre_rate` everywhere and
 
 ```
 pre_rate = pre.r + p_axon_spike_trans*pre.axon_rate*post.dbs_on
@@ -161,7 +168,7 @@ with the same `post.dbs_on` factor and therefore the same reach.
 
 ## The pulse train
 
-`_set_constants` (`dbs.py:1353-1371`), called from `DBSstimulator.__init__`:
+`_set_constants`, called from `DBSstimulator.__init__`:
 
 ```python
 ann.Constant("dbs_pulse_frequency_Hz", dbs_pulse_frequency_Hz)
@@ -181,28 +188,29 @@ and compilation fails. `DBSstimulator` is no longer an on-only object.
 
 `axon_spikes_per_pulse` is converted to a per-timestep probability by
 `np.clip(axon_spikes_per_pulse * 1000 * dt / dbs_pulse_width_us, 0, 1)`
-(`dbs.py:1372-1388`). With this project's numbers that is the identity, so
+(`_axon_spikes_per_pulse_to_prob`). With this project's numbers that is the
+identity, so
 `axon_spikes_per_pulse` *is* the per-pulse spike probability.
 
 ## What `on()` writes, and where
 
-`_set_dbs_on` (`dbs.py:2006-2050`) — runs first:
+`_set_dbs_on` — runs first:
 - excluded populations → `dbs_on = 0`
 - stimulated population → the 0/1 `dbs_on_array`
 - every other population → `dbs_on = 1`
 
-The array (`_create_dbs_on_array`, `dbs.py:1311-1352`) has
+The array (`_create_dbs_on_array`) has
 `rng.choice([ceil, floor])` of `proportion * N` ones, shuffled with
 `np.random.default_rng(seed)`. **It is not `round(proportion*N)`** — assert
 against `dbs_stimulator.dbs_on_array`, not against a recomputed count.
 
-`_set_depolarization` (`dbs.py:1389-1415`) — `dbs_depolarization` on the
+`_set_depolarization` — `dbs_depolarization` on the
 stimulated population only, 0 everywhere else. The somatic effect is STN-only.
 
-`_set_axon_spikes` (`dbs.py:1416-1544`) — first `_deactivate_axon_DBS()` zeroes
+`_set_axon_spikes` — first `_deactivate_axon_DBS()` zeroes
 everything, then:
 
-*Orthodromic* (`dbs.py:1585-1688`):
+*Orthodromic* (`_set_orthodromic`):
 - `efferents` → for each `ann.projections(pre=stim_pop)`: `axon_transmission = 1`,
   `p_axon_spike_trans = 1`, and `proj.pre.prob_axon_spike = prob`
 - `afferents` → for each `ann.projections(post=stim_pop)`: the same, but
@@ -211,7 +219,7 @@ everything, then:
 - `passing_fibres` → per projection in `passing_fibres_list`:
   `p_axon_spike_trans = passing_fibres_strength[i]`
 
-*Antidromic* (`dbs.py:1689-1816`):
+*Antidromic* (`_set_antidromic`):
 - `efferents` → `stim_pop.antidromic = 1`, `antidromic_prob = 1`
 - `afferents` → each presynaptic population: `antidromic = 1`,
   `antidromic_prob = np.mean(stim_pop.dbs_on)`, i.e. the VTA coverage fraction
@@ -220,8 +228,8 @@ everything, then:
 
 ### `excluded_populations_list` is load-bearing
 
-Most setters guard with `hasattr` (`_set_dbs_on:2038-2044`,
-`_set_depolarization:1404-1410`, `_deactivate_axon_DBS:1545-1584`), so a
+Most setters guard with `hasattr` (`_set_dbs_on`,
+`_set_depolarization`, `_deactivate_axon_DBS`), so a
 population without the mechanisms is inert there. But the **efferent and afferent
 branches of `_set_orthodromic` and `_set_antidromic` are unguarded** — they set
 `proj.axon_transmission`, `proj.p_axon_spike_trans`, `proj.pre.prob_axon_spike`
@@ -235,7 +243,8 @@ Two consequences with a partial (selective) implementation:
    projections from the `TimedArray`s, and without the exclusion the afferent
    branch would set `axon_transmission = 1` on them.
 2. A population that *should* carry the mechanisms but does not gets a plain
-   Python attribute instead (`Population.__setattr__:331-332`) — no error, and
+   Python attribute instead (the `object.__setattr__` fall-through in
+   `Population.__setattr__`) — no error, and
    the DBS effect is silently dropped. This is why `add_dbs_mechanisms` ships
    with a validation pass that raises when the stimulator would write a DBS
    parameter to something that lacks it.
@@ -243,15 +252,18 @@ Two consequences with a partial (selective) implementation:
 ## How ANNarchy executes it
 
 - `axonal` is a separate event container from `spiked`
-  (`Population/SingleThreadTemplates.py:392-408`), cleared each step.
+  (`spike_specific` in `Population/SingleThreadTemplates.py`), cleared each step.
 - An axon spike is **suppressed on any timestep the neuron spikes naturally**,
-  and **ignores refractoriness** (`Population/SingleThreadGenerator.py:806-816`).
+  and **ignores refractoriness** (`_spike_gather` in
+  `Population/SingleThreadGenerator.py`).
 - Because the DBS `pre_axon_spike` string differs from the synapse's `pre_spike`,
   ANNarchy takes a separate-loop branch reading `pop.axonal` directly
-  (`Projection/SingleThreadGenerator.py:983-1013`, commented "quite hacky").
+  (`_computesum_spiking` in `Projection/SingleThreadGenerator.py`, commented
+  "quite hacky").
   **Axon spikes therefore bypass the synaptic delay line entirely** — regular
   spikes read `_delayed_spike[delay-1]`, axon spikes read the current step.
-- Learning rules are disabled on such synapses by design (`core/Synapse.py:24`).
+- Learning rules are disabled on such synapses by design (the `pre_axon_spike`
+  doc in `Synapse.__init__`, `core/Synapse.py`).
 
 ## This project's configuration
 
@@ -314,8 +326,8 @@ values, which is precisely the claim the inference rests on.
 
 The cost is that off-condition numerics changed when this landed: ANNarchy's RNG
 is a single global `std::vector<std::mt19937>` indexed `rng[0]` for every
-population (`Template/BaseTemplate.py:138`,
-`Population/SingleThreadTemplates.py:338`), so two extra `Uniform` draws anywhere
+population (`st_body_template` in `Template/BaseTemplate.py`; `cpp_11_rng` in
+`Population/SingleThreadTemplates.py`), so two extra `Uniform` draws anywhere
 shift the stream everywhere — including in the caudate loop, which carries no DBS
 terms at all. This was taken deliberately, before any real fit had been run. See
 `PLAN.md` for the recorded before/after values.
