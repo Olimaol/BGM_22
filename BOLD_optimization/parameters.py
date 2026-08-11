@@ -140,7 +140,9 @@ parameters_test_microcircuit["cortical_proportions_dict"] = {
     },
 }
 # where the precomputed input spike counts live; on the workstations point this
-# at /scratch/olmai/... , the caches are ~138 GiB per DBS condition
+# at /scratch/olmai/... . A full-length cache is ~1.25 TiB per DBS condition in
+# the current float64/per-region layout, ~120 GiB after the TODO §3 relayout
+# (arithmetic, not yet measured)
 parameters_test_microcircuit["mc_ci_cache_dir"] = "../mc_ci_cache"
 # number of cortical input neurons per receiver TODO use lit motivated values
 parameters_test_microcircuit["ci.n_thal"] = 1000

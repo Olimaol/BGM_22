@@ -1285,9 +1285,10 @@ A single full-length dSPN cortical stream is `486 × 7 161 000 × 8 B ≈ 27.8 G
 its own. Note that `mc_ci_cache_5tr/` holds **both** conditions and so measures
 44.6 GB in total.
 
-The `mc_ci_cache_dir` comment in `parameters.py` says "~138 GiB per DBS
-condition". That is the estimate for the *planned* `uint16`, pre-summed layout
-(`PLAN.md`, `TODO.md` §3), not for the caches that exist — see `TODO.md` §19.
+The `mc_ci_cache_dir` comment in `parameters.py` states both figures: ~1.25 TiB
+per DBS condition in this current `float64`/per-region layout, ~120 GiB after
+the planned `uint16`, pre-summed relayout (`PLAN.md`, `TODO.md` §3; the history
+of that number is `TODO.md` §19, resolved 2026-08-11).
 
 ### 7.7 What an evaluation does: `create_model()` and the streams
 

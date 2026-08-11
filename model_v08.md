@@ -26,7 +26,7 @@ repeated. What follows is what v08 does differently. Read alongside `CLAUDE.md`,
 | missing-GABA compensation | yes | none |
 | projections per loop | 28 | 35 |
 | optimized parameters | 19 (9 drive + 10 clusters) | 21 (9 drive + 12 clusters) |
-| input caches | required, ~138 GiB per DBS condition | none |
+| input caches | required, ~1.25 TiB per DBS condition (~120 GiB after the `TODO.md` §3 relayout) | none |
 | simulation granularity | whole `update_time` chunks (110 ms) | unconstrained, plain `simulate()` |
 
 Everything else is shared: the same six `Izhikevich2003NoisyBaseNonlin` BG

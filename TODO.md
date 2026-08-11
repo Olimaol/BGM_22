@@ -139,7 +139,7 @@ cross-loop projections. Only putamen weights + the 3 DBS parameters move.
 
 ### 3. Regenerate the input caches with a transposed layout
 
-*Opened 2026-08-04 06:24 · 1 update, 2026-08-11 08:31*
+*Opened 2026-08-04 06:24 · 2 updates, last 2026-08-11 09:16*
 
 **Opened 2026-08-04 06:24:**
 
@@ -169,6 +169,12 @@ argues is unchanged — the 8.2x transpose measurement, the ~138 GiB target, the
 pre-summing losslessness. As PLAN.md notes, cheaper generation makes the
 smaller layout *more* worth doing, not less: storage, not generation time, is
 now the bottleneck.
+
+**Update 2026-08-11 09:16:** the expected size converged on **~120 GiB per DBS
+condition** — §19's cross-checked arithmetic (8 684 rows x 7 161 000 steps x
+2 B = 124 GB = 116 GiB; arithmetic, not measured, with §19's pre-summing
+caveat). The ~138 GiB above had no recorded derivation and is superseded. §19
+(resolved today) propagated the figure to `parameters.py` and `PLAN.md`.
 
 ### 4. Check the missing-GABA self-consistency after the first fit
 
@@ -427,47 +433,7 @@ entered the footprint, and it would do so silently. Worth a guard in
 
 ## From the session on 2026-08-05 (documenting the model creation)
 
-### 19. `parameters.py` labels the *planned* cache size as the current one
-
-*Opened 2026-08-05 10:12 · 1 update, 2026-08-07 15:28*
-
-**Opened 2026-08-05 10:12:**
-
-The `mc_ci_cache_dir` comment says "the caches are ~138 GiB per DBS condition".
-That number is §3's estimate for the **layout we have not built yet** — `uint16`
-instead of `float64`, cortical regions pre-summed per postsynaptic type. The
-caches that exist today are ~11x larger. Anyone provisioning `/scratch` from that
-comment will under-allocate by an order of magnitude.
-
-Derivation, cross-checked against the cache that exists. The streams total
-**24 084 receiver rows** across both loops in the current layout — caudate 11 342
-(2942 compensation + 6000 cortical-striatal + 2400 `CorticalInputs`), putamen
-12 742 (2942 + 7000 + 2800) — each row `n_steps` values:
-
-| layout | rows | `n_steps` | per DBS condition |
-|--------|--------|--------|--------|
-| current, `--n-trs 5` | 24 084 | 115 500 | 22.28 GB derived / **22.28 GB measured** |
-| current, 310 TRs | 24 084 | 7 161 000 | 1 380 GB = **1.26 TiB** |
-| planned (`uint16`, pre-summed), 310 TRs | 8 684 | 7 161 000 | 124 GB = 116 GiB |
-
-The derived and measured 5-TR figures agree to four digits, so the extrapolation
-is sound, and the planned-layout row confirms that §3's ~138 GiB is the right
-order for what it describes. `CLAUDE.md` and `PLAN.md` already carry the correct
-current figure (~1.25 TiB); `parameters.py` is the only outlier.
-
-**What to do.** Either qualify the comment ("~1.26 TiB today, ~120 GiB after the
-layout change of TODO §3") or leave it until §3 actually lands and the number
-becomes true. Not corrected here, because changing it in isolation invites the
-opposite confusion.
-
-**Caveat.** The planned-layout row assumes pre-summing collapses all cortical
-regions to one stream per postsynaptic type and nothing else changes. It has not
-been built, so treat it as arithmetic, not measurement.
-
-**Update 2026-08-07 15:28:** the figures above were corrected against the cache:
-the derived 5-TR size is **22.25 GB** (the ~30 MB gap to the 22.28 GB measured is
-state pickles and connectivity files), so the agreement is ~0.1 %, not "four
-digits"; and the full-length figure is 1 380 GB = **1.25 TiB**, not 1.26.
+### 19. `parameters.py` labels the *planned* cache size as the current one — resolved 2026-08-11, moved to Resolved
 
 ## From the session on 2026-08-06 (striatal firing rates)
 
@@ -1000,6 +966,70 @@ the containing template variable, e.g. `built_in_functions`, `spike_specific`,
 `_CreateDBSmodel.__init__`. The six line refs in this file's historical blocks
 stay as written per the exemption. `model_v07.md`, `model_v08.md`, `CLAUDE.md`
 and the `experimental_data/` READMEs already cited by symbol and needed nothing.
+
+### 19. `parameters.py` labels the *planned* cache size as the current one
+
+*Opened 2026-08-05 10:12 · 1 update, 2026-08-07 15:28 · resolved 2026-08-11 09:16*
+
+**Opened 2026-08-05 10:12:**
+
+The `mc_ci_cache_dir` comment says "the caches are ~138 GiB per DBS condition".
+That number is §3's estimate for the **layout we have not built yet** — `uint16`
+instead of `float64`, cortical regions pre-summed per postsynaptic type. The
+caches that exist today are ~11x larger. Anyone provisioning `/scratch` from that
+comment will under-allocate by an order of magnitude.
+
+Derivation, cross-checked against the cache that exists. The streams total
+**24 084 receiver rows** across both loops in the current layout — caudate 11 342
+(2942 compensation + 6000 cortical-striatal + 2400 `CorticalInputs`), putamen
+12 742 (2942 + 7000 + 2800) — each row `n_steps` values:
+
+| layout | rows | `n_steps` | per DBS condition |
+|--------|--------|--------|--------|
+| current, `--n-trs 5` | 24 084 | 115 500 | 22.28 GB derived / **22.28 GB measured** |
+| current, 310 TRs | 24 084 | 7 161 000 | 1 380 GB = **1.26 TiB** |
+| planned (`uint16`, pre-summed), 310 TRs | 8 684 | 7 161 000 | 124 GB = 116 GiB |
+
+The derived and measured 5-TR figures agree to four digits, so the extrapolation
+is sound, and the planned-layout row confirms that §3's ~138 GiB is the right
+order for what it describes. `CLAUDE.md` and `PLAN.md` already carry the correct
+current figure (~1.25 TiB); `parameters.py` is the only outlier.
+
+**What to do.** Either qualify the comment ("~1.26 TiB today, ~120 GiB after the
+layout change of TODO §3") or leave it until §3 actually lands and the number
+becomes true. Not corrected here, because changing it in isolation invites the
+opposite confusion.
+
+**Caveat.** The planned-layout row assumes pre-summing collapses all cortical
+regions to one stream per postsynaptic type and nothing else changes. It has not
+been built, so treat it as arithmetic, not measurement.
+
+**Update 2026-08-07 15:28:** the figures above were corrected against the cache:
+the derived 5-TR size is **22.25 GB** (the ~30 MB gap to the 22.28 GB measured is
+state pickles and connectivity files), so the agreement is ~0.1 %, not "four
+digits"; and the full-length figure is 1 380 GB = **1.25 TiB**, not 1.26.
+
+**Resolved 2026-08-11 09:16:**
+
+The comment was replaced with the qualified form drafted above: ~1.25 TiB per
+DBS condition in the current `float64`/per-region layout, ~120 GiB after the
+TODO §3 relayout (arithmetic, not yet measured). Carrying both numbers is what
+defuses the "opposite confusion" that kept this entry from acting in isolation.
+Acting now rather than waiting for §3: every cache was deleted on 2026-08-06
+(the striatal-rate change), so the 22.28 GB measurement above survives only as
+recorded here; the §22 generator rebuild left storage, not generation time, as
+the bottleneck (§3, update 2026-08-11); and the workstation move — where
+`/scratch` actually gets provisioned from this comment — is the next phase.
+
+Two figure convergences landed with it. The planned-layout size is now stated
+as **~120 GiB per DBS condition** (the 116 GiB arithmetic above, rounded) in
+`parameters.py`, `PLAN.md` (both mentions), §3's new update block,
+`model_v07.md` §7.6 and `model_v08.md`'s comparison table, superseding the
+underived ~138 GiB. And `CLAUDE.md`'s "~42 GB for `--n-trs 5`",
+whose both-conditions scope ("all four") was dropped in commit `c0cbd0e` and
+which had become ambiguous next to the per-condition TiB figure beside it, was
+rescoped to ~22 GB per DBS condition (~44 GB for all four caches) — consistent
+with the measurement above.
 
 ### 20. The FS rate is not on a stated dopamine condition
 

@@ -39,8 +39,10 @@ right. So the fix was the transfer, not the algorithm.
 
 **Cache layout: pre-summed per postsynaptic type, `uint16`, on `/scratch/olmai`.**
 Summing the cortical regions is exactly lossless while every region shares one
-weight per post-type, which is what `set_opt_params` does. ~138 GiB per DBS
-condition. Also store `(time, receivers)` rather than `(receivers, time)`: the
+weight per post-type, which is what `set_opt_params` does. ~120 GiB per DBS
+condition (`TODO.md` §19's arithmetic, not yet measured; it supersedes the
+~138 GiB this used to say). Also store `(time, receivers)` rather than
+`(receivers, time)`: the
 current order forces a strided transpose on every chunk, measured 8.2x more
 expensive.
 
@@ -280,7 +282,9 @@ it is a different limit from the December failure, which was OOM during
    (`TODO.md` §6), then build the caches there. Budget from the laptop, **after
    the generator rebuild of `TODO.md` §22 (resolved 2026-08-07)**: 2.9 min (caudate) and 3.2 min
    (putamen) for 5 TRs means ~3.5 h per loop serially at 310 TRs, so ~7 h and
-   ~138 GiB **per DBS condition** — and both conditions are needed, which step 9
+   ~120 GiB **per DBS condition** in `TODO.md` §3's layout (arithmetic from
+   `TODO.md` §19, not yet measured; ~1.25 TiB if built in the current
+   `float64`/per-region layout instead) — and both conditions are needed, which step 9
    used to assume without ever saying. That is ~6x faster than the 24 min per
    loop this budget used to quote. Generation is embarrassingly parallel over
    (pre, post) pairs, and `TODO.md` §3's smaller layout should land at the same

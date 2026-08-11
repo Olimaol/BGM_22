@@ -140,9 +140,10 @@ them. `mc_ci_cache_dir` in `parameters.py` still points at the now-absent
 loading something stale. Since the generator was rebuilt on 2026-08-07
 (`TODO.md` §22, resolved 2026-08-07) generation is **~6x faster**: roughly **4 min per loop per DBS
 condition** at `--n-trs 5` and ~7 h per DBS condition at full length, against 24
-min and ~42 h before. Sizes are unchanged — ~42 GB for `--n-trs 5` and ~1.25 TiB
-per DBS condition in the current `float64`/per-region layout; see `PLAN.md` for
-the agreed smaller one.
+min and ~42 h before. Sizes are unchanged — ~22 GB per DBS condition (~44 GB for
+all four caches) at `--n-trs 5` and ~1.25 TiB per DBS condition at full length,
+in the current `float64`/per-region layout; see `PLAN.md` for the agreed smaller
+one.
 
 `storage_dir` is resolved **relative to the working directory you launch from**,
 which is how `mc_ci_cache/` and `mc_caudate_off_cache/` came to hold overlapping
