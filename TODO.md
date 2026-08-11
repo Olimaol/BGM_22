@@ -318,20 +318,7 @@ Decide together with the bounds, from a real mini-run at fitted parameters rathe
 than at the defaults. Inventing on-condition bands now would bake guessed values
 into an expensive fit.
 
-### 11. `run_script_parallel` is no longer used by the optimization
-
-*Opened 2026-08-04 09:39*
-
-**Opened 2026-08-04 09:39:**
-
-`deap_cma_opt.py` now runs its individuals itself. CompNeuroPy's version is
-unchanged and still has the behaviour that hid the December failure: any non-zero
-child exit sets an error flag, which terminates every sibling and calls a bare
-`exit(1)`. It also spawns `["python", script]`, i.e. whatever `python` resolves to
-rather than the running interpreter.
-
-Left alone deliberately — it is shared code with other users. Fix it there if anyone
-else hits the same wall.
+### 11. `run_script_parallel` is no longer used by the optimization — resolved 2026-08-11, not a BGM_22 task, moved to Resolved
 
 ### 12. Cost of building the input caches, measured
 
@@ -923,6 +910,43 @@ chronology of one decision across two entries (the 2026-08-06 band update
 landed here but bears directly on §1). §1's Update of 2026-08-11 summarizes
 what this entry established; the measurement tables remain here. Living-
 document references were repointed to §1.
+
+### 11. `run_script_parallel` is no longer used by the optimization
+
+*Opened 2026-08-04 09:39 · resolved 2026-08-11 08:11*
+
+**Opened 2026-08-04 09:39:**
+
+`deap_cma_opt.py` now runs its individuals itself. CompNeuroPy's version is
+unchanged and still has the behaviour that hid the December failure: any non-zero
+child exit sets an error flag, which terminates every sibling and calls a bare
+`exit(1)`. It also spawns `["python", script]`, i.e. whatever `python` resolves to
+rather than the running interpreter.
+
+Left alone deliberately — it is shared code with other users. Fix it there if anyone
+else hits the same wall.
+
+**Resolved 2026-08-11 08:11:**
+
+**Closed as not a task of this project.** The entry recorded a decision already
+taken ("left alone deliberately") rather than anything BGM_22 still owes, and
+its condition — the optimization no longer depending on `run_script_parallel` —
+was already true when it was opened. Nothing here can be acted on from this
+repo: the fix would be a CompNeuroPy change for its other users.
+
+Re-checked today, both observations still hold in CompNeuroPy
+(`system_functions.py`, `_ScriptRunner`): `run_script` spawns
+`["python", self.script_path]`, and a non-zero child return sets `error_flag`,
+which makes `run()` call `signal_handler`, terminate every sibling and
+`exit(1)`. `git log` shows the file untouched since.
+
+One correction to the heading, worth keeping: `run_script_parallel` is unused
+by the *optimization*, not by the repo. `cortical_drive_by_bold_run.py` and
+`connectivity_fit_run.py` still call it. Both are preprocessing scripts run by
+hand, and since there is no `python` on PATH they only work from a shell with
+the `compneuro` env activated — a trip hazard if either is ever rerun (the
+cortical drive regeneration in §21 is exactly such a case), but not a defect to
+fix here.
 
 ### 20. The FS rate is not on a stated dopamine condition
 
