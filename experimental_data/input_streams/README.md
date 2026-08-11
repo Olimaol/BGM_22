@@ -8,7 +8,7 @@ model.
 
 This document states what those streams are required to reproduce, what they are
 knowingly not able to reproduce, and therefore what the model may and may not be
-used to claim. It exists because `TODO.md` §22 found the generator silently
+used to claim. It exists because `TODO.md` §22 (resolved 2026-08-07) found the generator silently
 producing a Fano factor of 1922 where 1 was intended, for four years, with
 nothing in the codebase able to notice.
 

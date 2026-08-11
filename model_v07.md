@@ -1233,7 +1233,8 @@ to both `Microcircuit` and `CorticalInputs`. Neither class has a default; both
 call `spike_input_cortex.validate_cortical_proportions()`. The *same* numbers
 weight the mix producing `caudate_rate`/`putamen_rate` inside the rate `.npz`, so
 **changing them means regenerating that file**. The derivation is in
-`experimental_data/cortical_proportions/README.md` and `TODO.md` §21.
+`experimental_data/cortical_proportions/README.md` and `TODO.md` §21 (resolved
+2026-08-06).
 
 Cached in `inputs/cortical_input_state.pkl`, which also records
 `shared_fraction`, `cortical_correlation`, `correlation_window_ms` and

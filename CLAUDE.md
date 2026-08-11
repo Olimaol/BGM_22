@@ -79,7 +79,7 @@ BOLD monitors. Only the putamen loop is stimulated by DBS.
   plus `caudate_rate`/`putamen_rate` mixed by anatomical proportion. Regenerate with
   `cortical_drive_by_bold_run.py`, which needs MATLAB (`matlabengine`) and, on the
   laptop, an **interactive** MathWorks sign-in — `start_matlab()` hangs unattended
-  (`TODO.md` §21). The folder is **git-ignored**, so back it up before rerunning:
+  (`TODO.md` §21, resolved 2026-08-06). The folder is **git-ignored**, so back it up before rerunning:
   `create_data_raw_folder` deletes it after a `y/n` prompt.
 - Cortical proportions: `experimental_data/cortical_proportions/README.md` — how the
   per-region caudate/putamen input mixes were derived, which numbers are measured
@@ -138,7 +138,7 @@ the medication-off values, which invalidated the missing-GABA streams in all of
 them. `mc_ci_cache_dir` in `parameters.py` still points at the now-absent
 `../mc_ci_cache`, so a v07 run without `--cache-dir` fails immediately rather than
 loading something stale. Since the generator was rebuilt on 2026-08-07
-(`TODO.md` §22) generation is **~6x faster**: roughly **4 min per loop per DBS
+(`TODO.md` §22, resolved 2026-08-07) generation is **~6x faster**: roughly **4 min per loop per DBS
 condition** at `--n-trs 5` and ~7 h per DBS condition at full length, against 24
 min and ~42 h before. Sizes are unchanged — ~42 GB for `--n-trs 5` and ~1.25 TiB
 per DBS condition in the current `float64`/per-region layout; see `PLAN.md` for
@@ -266,3 +266,7 @@ on the laptop first and then move on to the working machines.
   and prove the change bit-identical. That is how the truncating-schedule bug in
   ANNarchy was found rather than shipped.
 - Deferred findings go in `TODO.md`, with the caveats that make them provisional.
+  Its entries are append-only chronological logs with numbers that are never
+  reused; resolved entries move to its Resolved section and leave a stub. The
+  maintenance rules are at the top of that file — follow them when adding,
+  updating or resolving an entry.

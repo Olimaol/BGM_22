@@ -340,5 +340,5 @@ code and data cannot silently diverge. Steps 1 and 3 are guarded by the cache
 state check. Nothing guards step 3 being *skipped* if you also skip step 1 —
 rebuild caches whenever this file changes.
 
-See `TODO.md` §21 for the change history and `model_v07.md` §7.5 for how the
+See `TODO.md` §21 (resolved 2026-08-06) for the change history and `model_v07.md` §7.5 for how the
 proportions are consumed inside the microcircuit.

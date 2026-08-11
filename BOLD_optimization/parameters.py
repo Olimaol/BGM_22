@@ -113,7 +113,8 @@ parameters_test_microcircuit["ci.shared_fraction_dict"] = {
 # per-pathway percentages (Cacciola et al. 2017, Front Neuroanat 11:85): more
 # prefrontal in the caudate, more S1 in the putamen. Full derivation, the
 # sensitivity measurements and the uncertainty on putamen PMv (the least certain
-# entry, plausible range 0.10-0.24) are in TODO.md section 21.
+# entry, plausible range 0.10-0.24) are in TODO.md section 21 (resolved
+# 2026-08-06, in its Resolved section).
 #
 # Each column must sum to 1: the seven rate series are each normalised to mean
 # 5 Hz, so a mix summing to 1 leaves the mean drive unchanged and moves only the
