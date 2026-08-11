@@ -3,7 +3,7 @@
 Step-by-step account of what happens between `setup()` and `compile()` when
 `get_loss.py --model-version v07` builds the model, and of where every number in
 the compiled network comes from. Read alongside `CLAUDE.md` (orientation),
-`PLAN.md`, `TODO.md` and `DBS.md` (the DBS mechanism, which this document only
+`TODO.md` and `DBS.md` (the DBS mechanism, which this document only
 places in the sequence). `model_v08.md` describes the reduced model as a delta
 against this one.
 
@@ -1287,7 +1287,7 @@ its own. Note that `mc_ci_cache_5tr/` holds **both** conditions and so measures
 
 The `mc_ci_cache_dir` comment in `parameters.py` states both figures: ~1.25 TiB
 per DBS condition in this current `float64`/per-region layout, ~120 GiB after
-the planned `uint16`, pre-summed relayout (`PLAN.md`, `TODO.md` §3; the history
+the planned `uint16`, pre-summed relayout (`TODO.md` §3; the history
 of that number is `TODO.md` §19, resolved 2026-08-11).
 
 ### 7.7 What an evaluation does: `create_model()` and the streams

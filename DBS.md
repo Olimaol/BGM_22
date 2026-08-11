@@ -2,7 +2,7 @@
 
 Reference for the DBS mechanism as it is implemented in CompNeuroPy and as it is
 configured in this project. Written 2026-08-04 while making the DBS-on path
-actually work. Read alongside `CLAUDE.md`, `PLAN.md` and `TODO.md`.
+actually work. Read alongside `CLAUDE.md` and `TODO.md`.
 
 Everything cited here was checked against the code, not remembered. Code is
 cited by symbol name, not line number (see `CLAUDE.md` Conventions); bare
@@ -330,7 +330,7 @@ population (`st_body_template` in `Template/BaseTemplate.py`; `cpp_11_rng` in
 `Population/SingleThreadTemplates.py`), so two extra `Uniform` draws anywhere
 shift the stream everywhere — including in the caudate loop, which carries no DBS
 terms at all. This was taken deliberately, before any real fit had been run. See
-`PLAN.md` for the recorded before/after values.
+`TODO.md` §33 for the recorded before/after values.
 
 ## Known limitations
 

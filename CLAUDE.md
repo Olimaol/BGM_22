@@ -5,8 +5,10 @@ simulated BOLD that is fitted to one subject's experimental BOLD under DBS on an
 off. The scientific goal is inference: fit DBS-off, refit DBS-on, and read off
 which parameters had to change — i.e. what DBS did inside the basal ganglia.
 
-Read `PLAN.md` for the current plan and where the work stands, `TODO.md` for
-findings we deliberately postponed, and `DBS.md` for exactly what differs between
+Read `TODO.md` for everything still to do — its Roadmap section holds the
+intended order, its entries the substance, and its Resolved section the
+project's history (`PLAN.md` was dissolved into it on 2026-08-11; `TODO.md`
+§33 maps the old step numbers). Read `DBS.md` for exactly what differs between
 the DBS-off and DBS-on model. `model_v07.md` walks through how the real model is
 built, step by step from `setup()` to `compile()`; `model_v08.md` does the same
 for the reduced model, as a delta against it.
@@ -142,8 +144,8 @@ loading something stale. Since the generator was rebuilt on 2026-08-07
 condition** at `--n-trs 5` and ~7 h per DBS condition at full length, against 24
 min and ~42 h before. Sizes are unchanged — ~22 GB per DBS condition (~44 GB for
 all four caches) at `--n-trs 5` and ~1.25 TiB per DBS condition at full length,
-in the current `float64`/per-region layout; see `PLAN.md` for the agreed smaller
-one.
+in the current `float64`/per-region layout; see `TODO.md` §3 for the agreed
+smaller one.
 
 `storage_dir` is resolved **relative to the working directory you launch from**,
 which is how `mc_ci_cache/` and `mc_caudate_off_cache/` came to hold overlapping
@@ -178,7 +180,13 @@ staged base + one putamen weight scaling per cluster + 3 DBS. The DBS parameters
 are always the **last three** — they used to be read at fixed indices 21-23, which
 only lined up with v08. `--dbs` is required on all three scripts on purpose.
 
-A rate probe gates the BOLD run: above `firing_rate_gate` (0.5) BOLD is skipped and
+The loss is the per-region BOLD time-course correlation — not functional
+connectivity: the cortical drive comes from the same recording, so the model is
+asked to reproduce what this subject's basal ganglia actually did, TR by TR —
+plus a firing-rate plausibility term. The cluster scalings multiply the
+literature weights rather than freeing them, which preserves their relative
+balance and conditions the search. A rate probe gates the BOLD run: above
+`firing_rate_gate` (0.5) BOLD is skipped and
 charged 1.0, since both loss terms are in [0, 1]. `--gate-threshold 1.0` disables it.
 The threshold is not yet calibrated (`TODO.md` §10).
 
@@ -272,7 +280,7 @@ on the laptop first and then move on to the working machines.
   maintenance rules are at the top of that file — follow them when adding,
   updating or resolving an entry.
 - **Documentation maintenance** (from `TODO.md` §18, resolved 2026-08-11). The
-  living documents are `CLAUDE.md`, `PLAN.md`, `DBS.md`, `model_v07.md`,
+  living documents are `CLAUDE.md`, `DBS.md`, `model_v07.md`,
   `model_v08.md`, the `experimental_data/` READMEs, and code comments.
   - **Targeted cross-reference check.** Whenever an artifact changes — a code
     file, a function, a doc section, a TODO entry — grep the living documents
@@ -281,7 +289,7 @@ on the laptop first and then move on to the working machines.
   - **Cite code by file + symbol** (function, class, method), never by bare line
     numbers — they rot silently. Where no symbol exists (template strings,
     generated code), cite the nearest named thing plus a short greppable quote.
-  - **Section numbers are stable identifiers** in `TODO.md`, `PLAN.md`,
+  - **Section numbers are stable identifiers** in `TODO.md`,
     `model_v07.md` and `model_v08.md`: never renumber existing sections; insert
     with sub-numbers or append. A forced renumbering is itself a change under
     the first rule and triggers a `§N` sweep of all living documents.

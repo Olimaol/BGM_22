@@ -1,10 +1,12 @@
 # TODO
 
-Things found while working on the project that we deliberately postponed. Each
-entry says what was observed, why it matters, and what still has to be decided
-or done. Open entries come first, grouped by the session that produced them,
-newest at the bottom; closed entries live in the **Resolved** section at the
-bottom of the file.
+The single home for future work on this project: findings we deliberately
+postponed *and* the tasks still ahead. Each entry says what was observed or
+what is to be done, why it matters, and what still has to be decided. The
+**Roadmap** section below holds the intended order; open entries follow,
+grouped by the session that produced them, newest at the bottom; closed
+entries live in the **Resolved** section at the bottom of the file, which
+doubles as the project's historical record.
 
 ## Maintaining this file
 
@@ -25,14 +27,54 @@ bottom of the file.
   move the whole entry to the Resolved section (ordered by number), and leave
   a one-line stub heading in its session position. Then check the
   cross-references: `§N` mentions in the living documents — `CLAUDE.md`,
-  `PLAN.md`, `DBS.md`, `model_v07.md`, `model_v08.md`, the
+  `DBS.md`, `model_v07.md`, `model_v08.md`, the
   `experimental_data/` READMEs, code comments — get annotated
   "(resolved <date>)". Historical Opened/Update blocks inside this file are
   never edited retroactively, so references in them stay as written.
+- **The Roadmap section is exempt from the append-only rules.** It is
+  rewritten freely in place as the ordering changes. It may only *order* the
+  entries and state blocking/enabling relations between them — the substance
+  stays in the entries, and nothing may reference the roadmap itself: only
+  `§N` entries are referenceable.
 
 All Opened/Update/Resolved timestamps up to 2026-08-10 were reconstructed on
 2026-08-11 from the git history of this file; they are commit times, which can
 lag the session that produced the finding by a few hours.
+
+## Roadmap
+
+The one part of this file that is rewritten freely in place (see the exemption
+above). It holds only ordering — which entries block which — with the reasons
+for the order; the substance lives in the entries. It replaced `PLAN.md`'s
+step sequence when that file was dissolved into this one on 2026-08-11; §33
+maps the old "step N" numbers that historical blocks and commit messages still
+use.
+
+1. **§1 — the bounds.** First, before anything expensive: the fits (§32) must
+   not start on unvalidated bounds, and the per-population sweep has to be
+   redone anyway because the DBS retrofit moved every number it was measured
+   on.
+2. **§29 — the CI cache validation gap.** Before the next cache build; free
+   while no cache exists. The same free window is the cheapest moment for
+   **§30** (the `phi` values — changing them after a build shifts the realised
+   rates against the bands and re-opens §4) and the natural time to land
+   **§27**'s build-time `f(d)` check.
+3. **§6 — workstation setup, then the full caches.** Push the repos and carry
+   the patched ANNarchy across, then build the full-length caches for both DBS
+   conditions in **§3**'s smaller layout (do the relayout in the same pass —
+   building 2 x 1.25 TiB in the old layout just to redo it is waste), timing
+   one evaluation per machine.
+4. **§31 — the five-generation mini-run.** The milestone green: proves the
+   whole pipeline on a workstation, and produces the numbers that calibrate
+   the **§10** gate threshold.
+5. **§32 — the fits: DBS-off, then DBS-on.** Blocked by everything above.
+6. **After the first fit:** **§4** (missing-GABA self-consistency against the
+   fitted rates), **§2** (the DBS-on inference design — decides what the
+   on-fit may claim), **§16** (sensitivity to the hard-coded DBS constants,
+   before anything is written up).
+
+No assigned order — each entry states its own trigger: §5, §8, §13, §14, §15,
+§17, §23, §24, §25, §26, §28.
 
 ---
 
@@ -40,7 +82,7 @@ lag the session that produced the finding by a few hours.
 
 ### 1. Validate the optimization bounds — for both v07 and v08
 
-*Opened 2026-08-04 06:24 · 1 update, 2026-08-11 06:54*
+*Opened 2026-08-04 06:24 · 2 updates, last 2026-08-11 10:04*
 
 **Opened 2026-08-04 06:24:**
 
@@ -112,9 +154,18 @@ section. What it established:
   `gpe_cp` and `snr` were far outside their bands throughout — driven by the
   base currents and cluster scalings, not by the drive weights.
 
+**Update 2026-08-11 10:04:**
+
+Carried over from the dissolution of `PLAN.md` (§33): the sweep has to be
+**redone on the current numerics** before bounds are read off it — the DBS
+retrofit (old plan step 6) moved every number the model produces (off-condition
+total 1.5430 → 1.5442 at the reference vector), and all tables in §9 predate
+it. The useful range those tables suggest for the seven v07 drive weights,
+roughly [5e-4, 2e-3], carries the same caveat.
+
 ### 2. Design the DBS-on inference properly
 
-*Opened 2026-08-04 06:24*
+*Opened 2026-08-04 06:24 · 1 update, 2026-08-11 10:04*
 
 **Opened 2026-08-04 06:24:**
 
@@ -136,6 +187,16 @@ thumb, not measured — treat as ±2x.
 Settled already: in the on condition the caudate loop keeps its off-condition
 weights, because caudate is excluded from all DBS effects and there are no
 cross-loop projections. Only putamen weights + the 3 DBS parameters move.
+
+**Update 2026-08-11 10:04:**
+
+Carried over from the dissolution of `PLAN.md` (§33), the flip side of the
+staging decision above: it buys a **free control**. Since the caudate loop is
+untouched by DBS and keeps its off-condition weights, its on-vs-off BOLD change
+must be explained entirely by its cortical drive — a falsifiable prediction the
+inference gets for free. Proven exact on v08 (same drive, only DBS parameters
+differing: every caudate population identical to 2 dp while nine putamen
+populations move; see §33's step-6 record).
 
 ### 3. Regenerate the input caches with a transposed layout
 
@@ -224,7 +285,7 @@ used.
 
 ### 6. Workstation setup, when we move off the laptop
 
-*Opened 2026-08-04 06:24 · 1 update, 2026-08-04 17:26*
+*Opened 2026-08-04 06:24 · 2 updates, last 2026-08-11 10:04*
 
 **Opened 2026-08-04 06:24:**
 
@@ -260,6 +321,14 @@ choosing lambda on hinton (125 GB) and waikiki (251 GB) — and note the
 per-individual compile folders mean lambda compilations run at once. If it
 binds, compile once with `--compile` and pass `--skip-compile` to the run, or
 stagger the compile phase.
+
+**Update 2026-08-11 10:04:**
+
+Push status, verified today while dissolving `PLAN.md` (§33): **nothing since
+2026-08-04 has been pushed** — `olimaol_develop` is 33 commits ahead of
+`origin` in BGM_22 and 8 in CompNeuroPy. Pushing both is how the code reaches
+the workstations, so it is the first item of this entry's move; the patched
+ANNarchy still needs the separate route described above.
 
 ### 7. Where the rebuild stands (state at the end of the session) — resolved 2026-08-04, moved to Resolved
 
@@ -733,6 +802,64 @@ the Liang bands — recheck the probe, and expect §4 (missing-GABA
 self-consistency) to be affected. (c) `phi` values must be set at class
 instantiation or before compile — the post-compile reset trap applies
 (`model_v07.md` §11).
+
+## From the session on 2026-08-11 (dissolving PLAN.md into this file)
+
+### 31. Run the five-generation mini-run on a workstation
+
+*Opened 2026-08-11 10:04*
+
+**Opened 2026-08-11 10:04:**
+
+Formerly `PLAN.md` step 9 (§33). A five-generation CMA-ES mini-run of
+`deap_cma_opt.py` on hinton or waikiki, with checkpointing exercised
+(`--resume` after a kill), against the full-length caches. **This green is the
+milestone**: it is the first time the whole pipeline — caches, gate, logging,
+penalize-and-continue, checkpoint — runs together at scale.
+
+What it must produce beyond a green:
+
+- **The §10 gate numbers.** Log how many individuals per generation are gated
+  (`bold_skipped` is in every loss file); the run is what calibrates
+  `firing_rate_gate`, which is untenable as configured (0.5 against measured
+  0.87 at the default vector). Run with `--gate-threshold 1.0` until decided.
+- **The lambda choice** (§6): physical vs logical cores, compile-phase peak
+  RSS, and the real per-evaluation time on both machines — every current
+  budget is a laptop extrapolation.
+
+Blocked by §1 (bounds — a mini-run on saturated or unmeasured bounds proves
+nothing about the search) and by §6 + §3 (the code, the environment and the
+caches have to be on the machines first).
+
+### 32. Launch the fits: DBS-off, then DBS-on
+
+*Opened 2026-08-11 10:04*
+
+**Opened 2026-08-11 10:04:**
+
+Formerly `PLAN.md` step 10 (§33). One straightforward DBS-off fit, then a
+DBS-on fit — deliberately simple; the proper inference design is §2 and comes
+after.
+
+Decisions already taken (from `PLAN.md`, recorded here so they survive its
+deletion):
+
+- **Seeds: fixed at 42 during fitting** — common random numbers, so CMA-ES
+  sees a deterministic objective. The winning parameter vector is then re-run
+  across ~10 seeds to report stability.
+- **The on fit is staged**: it seeds from the off fit's pickle
+  (`load_best_off_fit`) and searches only the putamen cluster scalings plus
+  the 3 DBS parameters (13 free for v07) against the fixed off-condition base.
+  The caudate loop keeps its off weights and serves as the free control —
+  §2's update of 2026-08-11 has the rationale.
+- Budgeted at ~25-40 min per evaluation on the workstations (laptop
+  extrapolation; §31 measures the real number).
+
+Blocked by §31. Feeds §4 (compare fitted rates against the missing-GABA
+surround assumption), §2 (inference design over the fitted result) and §16
+(DBS-constant sensitivity) — see the Roadmap.
+
+### 33. PLAN.md dissolved into this file — resolved 2026-08-11, moved to Resolved
 
 ---
 
@@ -1408,3 +1535,173 @@ layer of `spike_input_cortex`.
 
 Generation is also **~6x faster**: ~7 h per DBS condition at full length against
 ~42 h before, because `beta.ppf`, `binom.ppf` and both copula draws are gone.
+
+### 33. PLAN.md dissolved into this file
+
+*Opened 2026-08-11 10:04 · resolved 2026-08-11 10:04*
+
+**Opened 2026-08-11 10:04:**
+
+`PLAN.md` (started 2026-08-03, deleted today) mixed four kinds of content:
+project history, still-binding decisions, an ordered step sequence, and
+near-duplicates of open entries here. Oliver decided that everything
+forward-looking lives in this file alone: the ordering became the Roadmap
+section, decisions that describe current state moved to `CLAUDE.md`, decisions
+that were really inputs to open work merged into their entries (§1, §2, §3,
+§32), and the history is preserved below. This entry is resolved on arrival —
+it records history, not work owed.
+
+**The old step numbers**, for the historical "PLAN.md step N" references in
+resolved entries and commit messages: steps 1-6 are the completed work recorded
+below; step 7 = §1 (bounds); step 8 = §6 + §3 (workstations, full caches in the
+new layout); step 9 = §31 (mini-run); step 10 = §32 (the fits).
+
+**Why the plan existed.** The optimization was written in Dec 2025, ran on the
+workstations, and stopped without a message. The cause was a compound failure:
+
+1. `infer_max_sim_time_ms` computed `len(rates) * 2.31 * 1000 / dt_ms` =
+   7,161,000 ms instead of 716,100 — every evaluation simulated **10x too
+   long**.
+2. `BoldMonitor` recorded every 0.1 ms, so a run stored ≥4 GB of BOLD per
+   process.
+3. `run_optimization.sh` launched 2 x lambda=12 = **24 processes**; on hinton
+   that is ~96 GB against 125 GB of RAM before the vector-of-vector overhead
+   and before `get()` doubles it. The OOM killer took them.
+4. CompNeuroPy's `_ScriptRunner.run` turns any non-zero child exit into a bare
+   `exit(1)` — no message, no traceback — and the children's output went to a
+   console that `run_optimization.sh` had backgrounded with `&`.
+
+Separately, v07 had been abandoned as "too slow". It was not: its C++
+simulation runs at 1.81 s per simulated second versus v08's 1.16. **96% of
+v07's runtime was Python overhead** in the input-delivery machinery, and the
+projected 1.25 TiB of cache was the same design showing up as storage.
+
+**Decisions taken (with reasons), and where each now lives:**
+
+- **Model: v07, all three components** — structured/correlated cortical input,
+  the distance-dependent microcircuit, the missing-GABA compensation. v08 was
+  only ever a time-pressure fallback and stays alive purely as a fast
+  end-to-end pipeline test. → `CLAUDE.md` "Two model versions".
+- **Speed: patch ANNarchy, keep the statistics exact.** The generator cannot
+  move inside ANNarchy (random distributions need global arguments; no
+  inverse-CDF functions), and regenerating on the fly measured 181 s per
+  simulated second — 4.5x worse than the precompute. Oliver's original
+  precompute design was right; the fix was the transfer, not the algorithm.
+  → history (here); the ANNarchy limitation is a `CLAUDE.md` gotcha.
+- **Cache layout: pre-summed per postsynaptic type, `uint16`,
+  `(time, receivers)`, on `/scratch/olmai`.** → §3.
+- **Loss: per-region BOLD time-course correlation** (not functional
+  connectivity — the cortical drive comes from the same recording, so the
+  model is asked to reproduce what this subject's basal ganglia actually did,
+  TR by TR) plus the firing-rate plausibility term, with the cheap rate probe
+  gating the expensive BOLD run; CMA-ES is rank-based, so the skip-and-charge
+  ordering stays consistent. → `CLAUDE.md` "Running things"; the gate
+  calibration is §10.
+- **Parameters: 19 for v07** — 3 striatal cortical input weights, 4
+  `CorticalInputs` weights, 2 baseline currents (snr, gpe_proto have no
+  cortical input), 10 projection-cluster scalings. Clusters scale the
+  literature weights rather than freeing them, preserving their relative
+  balance and conditioning the search. → `CLAUDE.md` "Running things".
+- **DBS-on staging: only the putamen loop's weights move**, plus the 3 DBS
+  parameters. → §2 (with the free-control rationale) and §32.
+- **DBS: retrofit the mechanisms before compile, in both conditions**, never
+  `DBSstimulator(auto_implement=True)`; off and on then differ only in
+  parameter values, which is the claim the inference rests on. The price:
+  off-condition numerics changed (one global RNG stream), taken deliberately
+  before any real fit had run. → `DBS.md`; the before/after values are in the
+  step-6 record below.
+- **Seeds: fixed at 42 during fitting**, winner re-run across ~10 seeds. → §32.
+- **Robustness: penalize and continue** — per-individual logs with exit codes,
+  worst-case loss 10.0 for a dead individual, hard abort past half a
+  generation, CMA-ES checkpoint every generation with `--resume`.
+  → `CLAUDE.md` "Running things".
+- **Deferred: the DBS inference design.** → §2.
+
+**Progress: steps 1-6, all done and verified (2026-08-03 to 2026-08-04).**
+Step 1 patched ANNarchy's `TimedArray` and proved the output bit-identical;
+step 2 removed the `cyInstance` workarounds; step 3 rebuilt `get_loss.py`
+(bug fixes + `--model-version`, v08 reproducing its pre-refactor loss exactly);
+step 4 built a short v07 cache and executed the v07 path for the first time;
+step 5 added the gate, logging, checkpointing and failure policy and rewrote
+`deap_cma_opt.py`; step 6 made the DBS-on path real. Measured on the laptop,
+v07 went from **41.87 to ~3.25 s per simulated second** — a full 716 s
+evaluation from ~500 min to **~39 min**, against a C++ floor of ~21 min.
+
+Running the v07 path (step 4) required fixing three things that had never been
+reachable: `CorticalInputs` had to learn the coarse per-TR drive
+(`Microcircuit` already had it); `update_time` moved 100 → 110 ms so every
+simulated stretch divides into whole chunks (the ramp-up TR is 21 chunks; the
+probe moved 10,000 → 9900 ms, changing the v08 rate loss by 1e-4, so v08 is no
+longer bit-identical to its pre-refactor reference by exactly that much); and
+the 3 DBS parameters moved from fixed indices 21-23 to the last three slots.
+The first end-to-end v07 evaluation (5 TRs, DBS off, drive weights 0.001, base
+currents 100, scalings 1) gave `loss 1.5430 = firing_rate 0.8678 + bold
+0.6752`; the drive-weight sweep proving the parameters reach `mc` and `ci` is
+§9's table (resolved, merged into §1).
+
+**Step 6: the DBS-on path was never real.** The staging was written but no
+DBS-on evaluation had ever run — no loss file, result, checkpoint, log or
+cache existed. Two defects were waiting: (1) v07 + `--dbs on` could not build
+the model at all — `DBSstimulator(auto_implement=True)` clears the network and
+recreates projections through `_connector_methods_dict`, which has no
+`"Specific"` key, so v07's `CurrentInjection` inputs die with a `KeyError`;
+(2) even on v08, DBS was silently inert — `on()` ran after `compile()`, wrote
+to the C++ instance and not `pop.init`, and the first `reset()` restored
+`dbs_on = 0` while the loss JSON still said `"dbs": "on"`. Both fixed by the
+retrofit decision plus calling `on()` **before** `compile()`.
+
+The off-condition regression from the retrofit (v07, 5 TRs, reference vector):
+total 1.5430 → **1.5442** (rate 0.8678 → 0.8705, BOLD 0.6752 → 0.6737) — the
+RNG stream moved, but little, because v07's DBS footprint excludes the
+1000-neuron microcircuit that dominates RNG consumption.
+
+The DBS effect is real and confined to putamen (v07, 5 TRs,
+`dbs_depolarization` 3.0, `passing_fibres_strength` 0.5,
+`axon_spikes_per_pulse` 0.5), Hz:
+
+| population | off | on | Δ | | caudate twin | Δ |
+|---|---|---|---|---|---|---|
+| snr:putamen | 139.11 | 112.63 | **−26.48** | | snr:caudate | +0.71 |
+| gpe_proto:putamen | 111.90 | 88.97 | **−22.93** | | gpe_proto:caudate | +0.79 |
+| stn:putamen | 18.53 | 10.69 | **−7.84** | | stn:caudate | −0.79 |
+| thal:putamen | 4.56 | 3.12 | −1.44 | | thal:caudate | −1.18 |
+
+The sub-1 Hz caudate changes are the cortical drive differing by condition,
+not a DBS leak; on v08, comparing the two on-runs on the *same* drive with
+only the DBS parameters differing, every caudate population is identical to
+2 dp while nine putamen populations move — the free control holds exactly
+(§2's update of 2026-08-11). The whole fitting loop ran in both conditions on
+both versions (off mini-run → on mini-run seeding via `load_best_off_fit` →
+`--resume`), and `test_dbs_on.py`'s 24 checks pass. Both mini-runs needed
+`--gate-threshold 1.0` (§10). A laptop limit surfaced on the way: `--lambda 4`
+lost two of four `cc1plus` processes to the OOM killer during the
+per-individual compiles; `--lambda 2` was fine (§6's update of 2026-08-04).
+
+**Commits, by plan step:**
+
+| step | repo | commit |
+|------|------|--------|
+| 1 patch ANNarchy | `ANNarchy_compneuro` | `2a11e858` fast buffer + backported `update()` semantics |
+| 1 patch ANNarchy | `ANNarchy_compneuro` | `f215694e` round instead of truncate when converting schedule/period |
+| 2 drop workarounds | CompNeuroPy | `c0ad10f` (also carries the coarser-cortical-drive change) |
+| 2 drop workarounds | BGM_22 | `9716591` |
+| 3 rebuild `get_loss.py` | BGM_22 | `3b65e8f` bug fixes + `--model-version` |
+| 4 run v07 | CompNeuroPy | `CorticalInputs`: accept a coarser cortical drive |
+| 4 run v07 | BGM_22 | `update_time` 110 ms, `build_input_caches.py`, `--cache-dir` |
+| 5 optimizer | BGM_22 | firing-rate gate, robust `deap_cma_opt.py`, DBS-on staging |
+| — documentation | BGM_22 | `2db3872` `CLAUDE.md`, `PLAN.md`, `TODO.md` |
+
+Unrelated January work committed at the same time: BGM_22 `a0cd700`
+(`test_microcircuit.py`) and CompNeuroPy `5fcc6b9` (`spike_input_cortex.py`
+demo), both produced for the SPP-2041 meeting.
+
+**Resolved 2026-08-11 10:04:**
+
+Resolved on arrival — this entry is the historical record of `PLAN.md`, not
+work owed. Its forward-looking remainder went into §1 and §6 (as Updates of
+today), the new §31/§32, and the Roadmap; `PLAN.md`'s "Immediate next
+actions" were checked against §1/§3/§6 and found already recorded there
+(the ~7 h / ~120 GiB cache budget verbatim in §3), except the push status,
+which was re-verified and is §6's update of today. `CLAUDE.md` now states the
+loss design and parameter rationale as current state, and every living-document
+reference to `PLAN.md` was repointed in the same sweep.

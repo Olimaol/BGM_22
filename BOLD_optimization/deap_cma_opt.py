@@ -178,7 +178,7 @@ def search_space(model_version: str, dbs_condition: str):
         # default to 0.001. p0 is that default, i.e. the model as its author
         # configured it, and the bound is an order of magnitude above it.
         # PROVISIONAL: nobody has measured the useful range for v07 either.
-        # TODO.md section 1 / PLAN.md step 6 must settle this before a real fit.
+        # TODO.md section 1 must settle this before a real fit.
         base_lower = np.zeros(n_base)
         base_upper = np.array([0.01] * 7 + [500, 500] + [5] * n_clusters)
         base_p0 = np.array([0.001] * 7 + [0, 0] + [1] * n_clusters)

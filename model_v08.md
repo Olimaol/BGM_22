@@ -10,7 +10,7 @@ This document is a delta against `model_v07.md`, which is the reference: the
 creation sequence, the `BGM` / `parameters.csv` machinery, the shared neuron and
 projection tables, and the prerequisites are described there and are not
 repeated. What follows is what v08 does differently. Read alongside `CLAUDE.md`,
-`PLAN.md`, `TODO.md` and `DBS.md`.
+`TODO.md` and `DBS.md`.
 
 ---
 
