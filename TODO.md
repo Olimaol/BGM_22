@@ -40,7 +40,7 @@ lag the session that produced the finding by a few hours.
 
 ### 1. Validate the optimization bounds — for both v07 and v08
 
-*Opened 2026-08-04 06:24*
+*Opened 2026-08-04 06:24 · 1 update, 2026-08-11 06:54*
 
 **Opened 2026-08-04 06:24:**
 
@@ -83,6 +83,34 @@ the saturated regime where the loss carries no gradient information.
 **Options discussed:** optimize in log space (e.g. `log10(weight)` over [-5, 0]);
 measure the useful range per population and set tight linear bounds; do both; or
 keep the bounds and hand-pick `p0`/`sig0`. Not decided.
+
+**Update 2026-08-11 06:54:**
+
+**§9 merged in.** §9 ("The bounds question, now with v07 measured") was opened
+the same day as evidence toward this entry — its own opening line said "§1
+stays open; this is the evidence to settle it with" — and is now resolved into
+it; the measurement tables live with the full §9 entry in the Resolved
+section. What it established:
+
+- The `sig0` caveat above is settled: `DeapCma._prepare` rescales the bounds
+  to [0, 1] first and *then* sets `sigma = 0.25` when `sig0` is `None`, so the
+  default really is 25% of the parameter range.
+- v07 is **not** saturated at its default. Sweeping all seven drive weights
+  together (5 TRs, DBS off, seed 42), `caudate_dSPN` went 7.06 → 22.62 →
+  69.88 Hz for weights 0.0005 / 0.001 / 0.002 — a steep response, the opposite
+  of v08's flat sweep above. This also confirmed the optimized parameters
+  really reach `mc.mean_weights_by_type` and `ci.mean_weights_by_type`.
+- Provisional v07 bounds `[0, 0.01]` with `p0 = 0.001` (the class default) are
+  in `deap_cma_opt.search_space` — ~5x above the useful top rather than v08's
+  ~250,000x, but still a guess.
+- The striatal target bands moved to the medication-off values on 2026-08-06
+  (dSPN 12.67–37.33 Hz), which shifts the useful weight range *down* and if
+  anything better centres those provisional bounds; §9's rate-loss numbers
+  were computed against the old bands and are stale.
+- Still open, for both versions: per-population bounds measured one parameter
+  at a time. The §9 sweep confounded the seven weights, and `gpe_arky`,
+  `gpe_cp` and `snr` were far outside their bands throughout — driven by the
+  base currents and cluster scalings, not by the drive weights.
 
 ### 2. Design the DBS-on inference properly
 
@@ -246,59 +274,7 @@ stagger the compile phase.
 
 ## From the session on 2026-08-04 (first execution of the v07 path, plan steps 4-5)
 
-### 9. The bounds question, now with v07 measured
-
-*Opened 2026-08-04 09:39 · 1 update, 2026-08-06 11:38*
-
-**Opened 2026-08-04 09:39:**
-
-Resolves two caveats from §1 and adds numbers for v07. §1 stays open; this is the
-evidence to settle it with.
-
-**`sig0` is confirmed.** `DeapCma._prepare` scales the bounds to [0, 1] first and
-*then* sets `sigma = 0.25 if sig0 is None`, so the default really is 25% of the
-parameter range, as §1 assumed.
-
-**v07 is not saturated at its default.** With everything else held at base currents
-100 and cluster scalings 1, sweeping all seven drive weights together (5 TRs,
-DBS off, seed 42):
-
-| weight | caudate_dSPN | caudate_FS | thal:caudate | stn:caudate | rate loss |
-|--------|--------------|------------|--------------|-------------|-----------|
-| 0.0005 |  7.06 Hz     | 14.91 Hz   |  3.94 Hz     | 18.10 Hz    | —         |
-| 0.001  | 22.62        | 25.44      |  6.59        | 19.16       | 0.868     |
-| 0.002  | 69.88        | 51.44      | 14.54        | 21.75       | 0.837     |
-
-So the dSPN plausible band (20.45-53.69 Hz) is crossed between 0.001 and 0.002, and
-the response is steep rather than flat — the opposite of v08's behaviour in §1. This
-also confirms the optimized parameters really reach `mc.mean_weights_by_type` and
-`ci.mean_weights_by_type`.
-
-**Provisional bounds are now in `deap_cma_opt.search_space`:** `[0, 0.01]` for the
-seven v07 drive weights with `p0 = 0.001` (the class default, i.e. the model as its
-author configured it). That is ~5x above the useful top rather than v08's ~250,000x,
-but it is still a guess.
-
-**Caveats.** The sweep moved all seven weights together, so the striatal and the
-CorticalInputs weights are confounded; the rates it produces are the joint effect.
-`gpe_arky` (1.9-4.3 Hz against a 15-20 band), `gpe_cp` (10-15 against 75-85) and
-`snr` (132-139 against 21-93) are far outside their bands at every weight, which is
-what keeps the rate loss near 0.85 — those are driven by the base currents and the
-cluster scalings, not by this parameter. **Per-population bounds still have to be
-measured one parameter at a time.**
-
-**Update 2026-08-06 11:38:**
-
-**Superseded in part.** The measured rates in the table stand, but
-the bands they were read against do not: the striatal targets moved to the
-medication-off values (dSPN band now 12.67-37.33, iSPN 21.22-44.78) — see
-`experimental_data/activity_striatum/README.md`. Under the new dSPN band, 22.62 Hz
-at weight 0.001 sits comfortably inside rather than near the lower edge, and 69.88
-at 0.002 is well outside rather than just outside. The useful weight range
-therefore shifts *down*, which if anything better centres the provisional
-`[0, 0.01]` bounds with `p0 = 0.001`. **The rate-loss column (0.868, 0.837) was
-computed against the old bands and is stale** — it would have to be re-measured,
-and doing so needs a rebuilt cache.
+### 9. The bounds question, now with v07 measured — resolved 2026-08-11, merged into §1, moved to Resolved
 
 ### 10. The firing-rate gate threshold is not calibrated
 
@@ -884,6 +860,69 @@ failure policy, and the `deap_cma_opt.py` rewrite with the version switch,
 per-version parameter counts and the DBS-on staging. The findings from that
 execution are §9–§13. The "Done and verified" half was a state snapshot and has
 since been superseded by `PLAN.md`.
+
+### 9. The bounds question, now with v07 measured
+
+*Opened 2026-08-04 09:39 · resolved 2026-08-11 06:54 (merged into §1) · 1 update, 2026-08-06 11:38*
+
+**Opened 2026-08-04 09:39:**
+
+Resolves two caveats from §1 and adds numbers for v07. §1 stays open; this is the
+evidence to settle it with.
+
+**`sig0` is confirmed.** `DeapCma._prepare` scales the bounds to [0, 1] first and
+*then* sets `sigma = 0.25 if sig0 is None`, so the default really is 25% of the
+parameter range, as §1 assumed.
+
+**v07 is not saturated at its default.** With everything else held at base currents
+100 and cluster scalings 1, sweeping all seven drive weights together (5 TRs,
+DBS off, seed 42):
+
+| weight | caudate_dSPN | caudate_FS | thal:caudate | stn:caudate | rate loss |
+|--------|--------------|------------|--------------|-------------|-----------|
+| 0.0005 |  7.06 Hz     | 14.91 Hz   |  3.94 Hz     | 18.10 Hz    | —         |
+| 0.001  | 22.62        | 25.44      |  6.59        | 19.16       | 0.868     |
+| 0.002  | 69.88        | 51.44      | 14.54        | 21.75       | 0.837     |
+
+So the dSPN plausible band (20.45-53.69 Hz) is crossed between 0.001 and 0.002, and
+the response is steep rather than flat — the opposite of v08's behaviour in §1. This
+also confirms the optimized parameters really reach `mc.mean_weights_by_type` and
+`ci.mean_weights_by_type`.
+
+**Provisional bounds are now in `deap_cma_opt.search_space`:** `[0, 0.01]` for the
+seven v07 drive weights with `p0 = 0.001` (the class default, i.e. the model as its
+author configured it). That is ~5x above the useful top rather than v08's ~250,000x,
+but it is still a guess.
+
+**Caveats.** The sweep moved all seven weights together, so the striatal and the
+CorticalInputs weights are confounded; the rates it produces are the joint effect.
+`gpe_arky` (1.9-4.3 Hz against a 15-20 band), `gpe_cp` (10-15 against 75-85) and
+`snr` (132-139 against 21-93) are far outside their bands at every weight, which is
+what keeps the rate loss near 0.85 — those are driven by the base currents and the
+cluster scalings, not by this parameter. **Per-population bounds still have to be
+measured one parameter at a time.**
+
+**Update 2026-08-06 11:38:**
+
+**Superseded in part.** The measured rates in the table stand, but
+the bands they were read against do not: the striatal targets moved to the
+medication-off values (dSPN band now 12.67-37.33, iSPN 21.22-44.78) — see
+`experimental_data/activity_striatum/README.md`. Under the new dSPN band, 22.62 Hz
+at weight 0.001 sits comfortably inside rather than near the lower edge, and 69.88
+at 0.002 is well outside rather than just outside. The useful weight range
+therefore shifts *down*, which if anything better centres the provisional
+`[0, 0.01]` bounds with `p0 = 0.001`. **The rate-loss column (0.868, 0.837) was
+computed against the old bands and is stale** — it would have to be re-measured,
+and doing so needs a rebuilt cache.
+
+**Resolved 2026-08-11 06:54:**
+
+**Merged into §1.** This entry was never a task of its own — its opening line
+already framed it as the evidence for §1, and keeping both open split the
+chronology of one decision across two entries (the 2026-08-06 band update
+landed here but bears directly on §1). §1's Update of 2026-08-11 summarizes
+what this entry established; the measurement tables remain here. Living-
+document references were repointed to §1.
 
 ### 20. The FS rate is not on a stated dopamine condition
 

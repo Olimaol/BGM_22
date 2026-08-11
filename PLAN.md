@@ -145,7 +145,8 @@ proves it reaches both `mc` and `ci`:
 | 0.002  | 69.88        | 51.44      | 14.54        | 21.75       |
 
 Unlike v08, v07's drive parameter is **not** saturated at its default: the plausible
-dSPN band was crossed between 0.001 and 0.002. See `TODO.md` §9 — the band has since
+dSPN band was crossed between 0.001 and 0.002. See `TODO.md` §1 (the v07
+measurements live in resolved §9, merged into §1) — the band has since
 moved to the medication-off values (12.67-37.33 Hz), which shifts the useful weight
 range down without changing the conclusion.
 
@@ -178,7 +179,7 @@ Step 5 is written and exercised on v08:
 
 - **Firing-rate gate.** Above `firing_rate_gate` (0.5, in `parameters.py`) the BOLD
   run is skipped and charged 1.0. `--gate-threshold` overrides it per run; 1.0
-  disables it. The threshold is **not calibrated** — see `TODO.md` §9.
+  disables it. The threshold is **not calibrated** — see `TODO.md` §10.
 - **`deap_cma_opt.py` rewritten.** Version switch and per-version bounds, its own
   parallel runner instead of `run_script_parallel` (per-individual log files,
   exit codes kept, `sys.executable` rather than whatever `python` resolves to),

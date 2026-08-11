@@ -218,7 +218,7 @@ half a generation, and a CMA-ES checkpoint per generation for `--resume`.
   whose spacing is not an integer multiple, is rejected.
 - The striatal `exp_input_weight` bounds are orders of magnitude too wide in **v08**
   (see `TODO.md` §1) — do not start a real fit before resolving that. v07's drive
-  weight is better behaved but its bounds are still provisional (`TODO.md` §9).
+  weight is better behaved but its bounds are still provisional (also `TODO.md` §1).
 - **A parameter set after `compile()` does not survive `reset()`.**
   `Population.__setattr__` writes to `pop.init` while the population is
   uninitialized and to the C++ instance afterwards, and `Population.reset()` is
