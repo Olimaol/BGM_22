@@ -259,6 +259,17 @@ is exact without knowing which axons are whose. All coupling between receivers c
 from the shared k(t): a bin where the pool fires a lot is a high bin for
 <em>everyone</em>. Figure 3 shows this over six TRs of the real drive.
 </p>
+<div class="key">
+<p><strong>The c_i(t) are the stream.</strong> Stack the count rows c_i(t) of all R
+receivers of one type and you have exactly the (R, n_steps) matrix of Fig. 1 —
+that matrix is the stream for one (cortical region, striatal type) pair, written
+to the cache as <code>receiver_counts_&lt;region&gt;_&lt;type&gt;.dat</code>. There is one
+such stream per pair: for the caudate, 6 contributing regions × 3 types = 18
+cortical streams. A region's three streams are <em>drawn</em> together — they
+share the same k(t), which is where the cross-type correlation lives — but
+<em>stored</em> as three separate matrices. k(t) itself is scaffolding: it is
+never written anywhere.</p>
+</div>
 <figure id="fig3">
   <img src="figures/fig_1a_timecourse.png" alt="Four aligned time panels: the p(t) staircase from real dlPFC rates, the shared k(t) trace, per-receiver counts for one dSPN, one iSPN and one FS, and per-TR averaged counts of two dSPNs tracking each other." width="920">
   <figcaption><b>Figure 3.</b> One draw of the toy pool (Table 2, explicit
@@ -396,6 +407,11 @@ pools — falling with distance automatically (Fig. 7).
 <pre><code>n_events(t) ~ Binomial(S·k_mult, p)         # all real neurons the cloud stands for
 source of each event ~ Uniform{0 … S−1}     # which virtual source spiked
 c_i(t) = # events whose source feeds i      # one bincount over (receiver, bin)</code></pre>
+<p>
+As in case 1a, the stacked c_i(t) rows are the stream — here one per
+(pre type → post type) pair, e.g. <code>receiver_counts_iSPN_dSPN.dat</code>,
+7 streams per loop.
+</p>
 <figure id="fig8">
   <img src="figures/fig_1b_timecourse.png" alt="Three aligned panels: a constant p(t), the total event count fluctuating around its mean, and two receivers' counts with markers where a shared source fired." width="920">
   <figcaption><b>Figure 8.</b> One draw of the toy cloud of Fig. 6 over 240 bins
@@ -442,6 +458,10 @@ n_private = N − n_shared                    # per receiver
 S(t)   ~ Binomial(n_shared,  p(t))          # drawn once, added to every receiver
 P_i(t) ~ Binomial(n_private, p(t))          # per receiver
 c_i(t) = S(t) + P_i(t)                      # exactly Binomial(N, p);  corr = f</code></pre>
+<p>
+Again the stacked c_i(t) rows are the stream, one per (cortical region, BG
+population) pair — 6 regions × 4 populations = 24 streams for the caudate loop.
+</p>
 <figure id="fig9">
   <img src="figures/fig_1c_structure.png" alt="Diagram of one shared sub-pool feeding all four receivers plus a private sub-pool per receiver." width="920">
   <figcaption><b>Figure 9.</b> Step 1c on a toy with N = 10 afferents per
