@@ -361,10 +361,11 @@ def fig_1a_equivalence(eq):
     w = 0.34
     ax1.bar(
         x - w / 2, eq["fano"]["explicit"], w, color=C_DSPN,
-        label="explicit toy pool",
+        label="explicit pool (fixed membership)",
     )
     ax1.bar(
-        x + w / 2, eq["fano"]["real"], w, color=C_OTHER, label="real generator"
+        x + w / 2, eq["fano"]["real"], w, color=C_OTHER,
+        label="real generator (hypergeometric)",
     )
     ax1.plot(
         [x[0] - w, x[-1] + w], [eq["fano"]["analytic"][0]] * 2,
@@ -384,18 +385,24 @@ def fig_1a_equivalence(eq):
     real_v = [eq["corr"][k]["real"] for k in keys]
     ens = [eq["corr"][k]["analytic_ensemble"] for k in keys]
     this = [eq["corr"][k]["analytic_this_membership"] for k in keys]
-    ax2.bar(x - w / 2, exp_v, w, color=C_DSPN, label="explicit toy pool")
-    ax2.bar(x + w / 2, real_v, w, color=C_OTHER, label="real generator")
+    ax2.bar(
+        x - w / 2, exp_v, w, color=C_DSPN,
+        label="explicit pool (fixed membership)",
+    )
+    ax2.bar(
+        x + w / 2, real_v, w, color=C_OTHER,
+        label="real generator (hypergeometric)",
+    )
     for xi, (e, t_) in enumerate(zip(ens, this)):
         ax2.plot(
             [xi - w, xi + w], [e, e], color=INK, lw=1.4,
             linestyle=(0, (4, 3)),
-            label="√(NᵢNⱼ)/M" if xi == 0 else None,
+            label="ensemble target √(NᵢNⱼ)/M" if xi == 0 else None,
         )
         ax2.plot(
             [xi - w * 1.15, xi + w * 0.15], [t_, t_], color=C_SHARED,
             lw=2.4, zorder=6,
-            label="this membership" if xi == 0 else None,
+            label="this membership: n/√(NᵢNⱼ)" if xi == 0 else None,
         )
     ax2.set_xticks(x, keys, fontsize=8)
     ax2.set_ylabel("pairwise correlation")
