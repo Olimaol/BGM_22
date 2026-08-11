@@ -14,6 +14,12 @@ doubles as the project's historical record.
   a stable reference everywhere, including for resolved entries. A gap in the
   active numbering means the entry was resolved; a one-line stub marks its old
   place.
+- **Adding an entry:** take the next unused number and open it under a
+  `## From the session on <date> (<topic>)` heading at the bottom of the open
+  section (reuse the heading if the session already has one), first block
+  `**Opened <YYYY-MM-DD HH:MM>:**`. Then place it in the Roadmap — at an
+  ordered position with the reason, or in the no-assigned-order list. An open
+  entry that appears nowhere in the Roadmap is a rule violation.
 - **Entry bodies are append-only chronological logs.** The first block is
   `**Opened <YYYY-MM-DD HH:MM>:**`; every later change is a new
   `**Update <YYYY-MM-DD HH:MM>:**` block appended at the end. Never rewrite
@@ -25,7 +31,8 @@ doubles as the project's historical record.
   date of the last one.
 - **Resolving an entry:** append a `**Resolved <YYYY-MM-DD HH:MM>:**` block,
   move the whole entry to the Resolved section (ordered by number), and leave
-  a one-line stub heading in its session position. Then check the
+  a one-line stub heading in its session position. Rewrite the Roadmap:
+  remove the entry and adjust whatever its removal unblocks. Then check the
   cross-references: `§N` mentions in the living documents — `CLAUDE.md`,
   `DBS.md`, `model_v07.md`, `model_v08.md`, the
   `experimental_data/` READMEs, code comments — get annotated
@@ -74,7 +81,8 @@ use.
    before anything is written up).
 
 No assigned order — each entry states its own trigger: §5, §8, §13, §14, §15,
-§17, §23, §24, §25, §26, §28.
+§17, §23, §24, §25, §26, §28. (By definition this is every open entry not
+ordered above; keep the enumeration complete when entries open or resolve.)
 
 ---
 

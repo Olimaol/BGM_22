@@ -274,11 +274,13 @@ on the laptop first and then move on to the working machines.
 - Before changing behaviour that has a reference output, capture a baseline first
   and prove the change bit-identical. That is how the truncating-schedule bug in
   ANNarchy was found rather than shipped.
-- Deferred findings go in `TODO.md`, with the caveats that make them provisional.
-  Its entries are append-only chronological logs with numbers that are never
-  reused; resolved entries move to its Resolved section and leave a stub. The
-  maintenance rules are at the top of that file — follow them when adding,
-  updating or resolving an entry.
+- All future work goes in `TODO.md` — deferred findings and upcoming tasks
+  alike, with the caveats that make them provisional. Its entries are
+  append-only chronological logs with numbers that are never reused; its
+  Roadmap section (freely rewritten, ordering only, never itself referenced)
+  must always account for every open entry; resolved entries move to its
+  Resolved section and leave a stub. The maintenance rules are at the top of
+  that file — follow them when adding, updating or resolving an entry.
 - **Documentation maintenance** (from `TODO.md` §18, resolved 2026-08-11). The
   living documents are `CLAUDE.md`, `DBS.md`, `model_v07.md`,
   `model_v08.md`, the `experimental_data/` READMEs, and code comments.
