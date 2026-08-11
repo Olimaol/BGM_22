@@ -139,7 +139,7 @@ cross-loop projections. Only putamen weights + the 3 DBS parameters move.
 
 ### 3. Regenerate the input caches with a transposed layout
 
-*Opened 2026-08-04 06:24*
+*Opened 2026-08-04 06:24 · 1 update, 2026-08-11 08:31*
 
 **Opened 2026-08-04 06:24:**
 
@@ -158,7 +158,17 @@ Note: pre-summing forecloses giving different cortical regions different weights
 without regenerating. Currently `set_opt_params` assigns one weight per
 postsynaptic type, so it is exactly lossless today.
 
-### 4. Check the missing-GABA self-consistency after the first fit
+**Update 2026-08-11 08:31:**
+
+The serial time budget above predates the §22 generator rebuild (2026-08-07)
+and is stale: measured after the rebuild, 5 TRs takes 2.9 min (caudate) /
+3.2 min (putamen) per loop, so the serial budget is **~7 h per DBS condition**
+at full length rather than ~70 h, with the parallel figure shrinking
+accordingly (PLAN.md step 8, commit `f661e88`). Everything this entry actually
+argues is unchanged — the 8.2x transpose measurement, the ~138 GiB target, the
+pre-summing losslessness. As PLAN.md notes, cheaper generation makes the
+smaller layout *more* worth doing, not less: storage, not generation time, is
+now the bottleneck.
 
 *Opened 2026-08-04 06:24 · 2 updates, last 2026-08-06 13:52*
 
@@ -320,27 +330,7 @@ into an expensive fit.
 
 ### 11. `run_script_parallel` is no longer used by the optimization — resolved 2026-08-11, not a BGM_22 task, moved to Resolved
 
-### 12. Cost of building the input caches, measured
-
-*Opened 2026-08-04 09:39*
-
-**Opened 2026-08-04 09:39:**
-
-Laptop, 5 TRs (115,500 steps at dt = 0.1 ms), DBS off, current `float64`
-`(receivers, time)` layout:
-
-- **24.2 min for the caudate loop, 23.8 min for putamen**, 21 GB on disk for both.
-- Extrapolated to the full 310 TRs: **~25 h per loop, ~50 h per condition** serially.
-  Consistent with the ~70 h in §3, which was an estimate.
-
-The short cache lives in `mc_ci_cache_5tr/` (gitignored) and is only loadable at
-`--n-trs 5`, because `Microcircuit` and `CorticalInputs` require the stored `n_steps`
-to equal `int(t.duration/dt)` exactly.
-
-Note the constraint that only bites on short runs: the cache must also cover the
-**firing-rate probe**, which is a fixed 9900 ms. At full length the BOLD run dwarfs
-it; below 5 TRs the probe is the longer of the two and would run off the end of the
-cache. `build_input_caches.py` refuses that case up front.
+### 12. Cost of building the input caches, measured — resolved 2026-08-11, superseded by the §22 rebuild, moved to Resolved
 
 ### 13. Cache state files store the cortical rate path as a bare string
 
@@ -947,6 +937,44 @@ hand, and since there is no `python` on PATH they only work from a shell with
 the `compneuro` env activated — a trip hazard if either is ever rerun (the
 cortical drive regeneration in §21 is exactly such a case), but not a defect to
 fix here.
+
+### 12. Cost of building the input caches, measured
+
+*Opened 2026-08-04 09:39 · resolved 2026-08-11 08:31*
+
+**Opened 2026-08-04 09:39:**
+
+Laptop, 5 TRs (115,500 steps at dt = 0.1 ms), DBS off, current `float64`
+`(receivers, time)` layout:
+
+- **24.2 min for the caudate loop, 23.8 min for putamen**, 21 GB on disk for both.
+- Extrapolated to the full 310 TRs: **~25 h per loop, ~50 h per condition** serially.
+  Consistent with the ~70 h in §3, which was an estimate.
+
+The short cache lives in `mc_ci_cache_5tr/` (gitignored) and is only loadable at
+`--n-trs 5`, because `Microcircuit` and `CorticalInputs` require the stored `n_steps`
+to equal `int(t.duration/dt)` exactly.
+
+Note the constraint that only bites on short runs: the cache must also cover the
+**firing-rate probe**, which is a fixed 9900 ms. At full length the BOLD run dwarfs
+it; below 5 TRs the probe is the longer of the two and would run off the end of the
+cache. `build_input_caches.py` refuses that case up front.
+
+**Resolved 2026-08-11 08:31:**
+
+Everything this entry measured is gone. The 24-min-per-loop timings were taken
+on the copula generator that the §22 rebuild (2026-08-07) replaced — measured
+after the rebuild: 2.9 min (caudate) / 3.2 min (putamen) at 5 TRs, ~7 h per
+DBS condition at full length extrapolated (PLAN.md step 8, commit `f661e88`).
+And `mc_ci_cache_5tr/` itself was deleted on 2026-08-06 when the striatal
+rates moved to the medication-off values (§20); **no cache exists anywhere
+right now**. The two constraints this entry recorded — a cache is loadable
+only at the exact `n_steps` it was built for, and must cover the fixed 9900 ms
+probe — remain true and live in CLAUDE.md.
+
+The next cost measurement belongs to the §3 layout rebuild on the workstations
+(PLAN step 8), which waits on the §1 bounds (step 7); a fresh cost record
+should be taken there, not extrapolated from the laptop.
 
 ### 20. The FS rate is not on a stated dopamine condition
 
