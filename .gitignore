@@ -32,3 +32,8 @@ striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_d
 # deliberately repo-wide rather than per-folder, because it has now been needed
 # twice (activity_striatum, then cortical_correlations).
 **/*.pdf
+# docs/stream_demo is a committed snapshot: its figures and measured numbers
+# are part of the document, so they are exempt from the *.png / *.json rules
+!docs/stream_demo/figures/*.png
+!docs/stream_demo/results.json
+!docs/stream_demo/bench.json

@@ -868,6 +868,10 @@ file written before any of those were recorded is refused rather than trusted.
 Everything cached in §7.3 and §7.5 is the same kind of object, produced by
 `striatal_microcircuit/spike_input_cortex.py`. Understanding it once covers the
 missing-GABA streams, the striatal cortical streams and all of `CorticalInputs`.
+A visual walkthrough of this section on drawable toy examples — with real-code
+statistics checks and real-scale benchmarks — lives in `docs/stream_demo/`
+(dated snapshot 2026-08-11, not a living document; regenerate with its
+`make_figures.py` if it drifts).
 
 **What a stream is.** One `(R, n_steps)` matrix for one `(pre, post)` pair. Row
 `i` is receiver `i`; column `t` is one `dt = 0.1 ms` step. The entry is a

@@ -1,0 +1,69 @@
+{
+ "machine": "tuxedo-oliver",
+ "cpu": "x86_64",
+ "bins_per_tr": 23100,
+ "dt_ms": 0.1,
+ "phases": {
+  "1a_pool_streams_1tr": {
+   "wall_s": 3.9564904830185696,
+   "peak_rss_mb": 486.0546875,
+   "baseline_rss_mb": 44.3515625,
+   "detail": {
+    "pool_size": 275000,
+    "streams": {
+     "dSPN": {
+      "R": 486,
+      "N": 3850
+     },
+     "iSPN": {
+      "R": 485,
+      "N": 3850
+     },
+     "FS": {
+      "R": 29,
+      "N": 1540
+     }
+    },
+    "bytes_written": 184800000
+   }
+  },
+  "1a_primitives": {
+   "wall_s": 0.4199394009774551,
+   "peak_rss_mb": 73.609375,
+   "baseline_rss_mb": 44.36328125,
+   "detail": {
+    "binomial_k_ms_per_chunk": 0.47237600665539503,
+    "hypergeometric_ms_per_chunk_dSPN": 348.5909419832751,
+    "memmap_write_ms_per_chunk": 63.959990977309644,
+    "chunk_bins": 5592
+   }
+  },
+  "1b_pool_build": {
+   "wall_s": 2.178005469031632,
+   "peak_rss_mb": 217.421875,
+   "baseline_rss_mb": 44.36328125,
+   "detail": {
+    "n_sources": 72971,
+    "mean_n_eff": 501.13168724279836,
+    "n_receivers": 486
+   }
+  },
+  "1b_stream_1tr": {
+   "wall_s": 2.3115750839933753,
+   "peak_rss_mb": 586.0625,
+   "baseline_rss_mb": 44.3671875,
+   "detail": {
+    "bytes_written": 89812800
+   }
+  },
+  "1c_stream_1tr": {
+   "wall_s": 1.0785502020735294,
+   "peak_rss_mb": 304.484375,
+   "baseline_rss_mb": 44.37109375,
+   "detail": {
+    "N_eff": 550,
+    "bytes_written": 18480000
+   }
+  }
+ }
+}

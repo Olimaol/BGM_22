@@ -1,0 +1,450 @@
+<title>BGM_22 — how the input streams are drawn</title>
+<style>
+  :root {
+    --ground: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --dspn: #2a78d6;
+    --ispn: #eb6834;
+    --fs: #147a55;      /* darker text-step of the FS aqua */
+    --fs-mark: #1baf7a;
+    --shared: #4a3aa7;
+    --shared-wash: #eceafd;
+    --warn-wash: #fdf3e4;
+  }
+  html { color-scheme: light; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 2.2rem 1rem 4rem;
+  }
+  main { max-width: 60rem; margin: 0 auto; }
+  h1 {
+    font-size: 1.7rem; line-height: 1.2; text-wrap: balance;
+    margin: 0 0 0.4rem;
+  }
+  h2 {
+    font-size: 1.22rem; margin: 2.8rem 0 0.4rem; text-wrap: balance;
+    padding-top: 1.2rem; border-top: 1px solid var(--grid);
+  }
+  h3 { font-size: 1.02rem; margin: 1.6rem 0 0.3rem; }
+  p, li { max-width: 78ch; }
+  .lede { color: var(--ink2); max-width: 78ch; margin: 0.2rem 0 0; }
+  .stamp {
+    color: var(--muted); font-size: 0.82rem; letter-spacing: 0.02em;
+    text-transform: uppercase; margin-bottom: 0.6rem;
+  }
+  .toc {
+    background: var(--surface); border: 1px solid var(--grid);
+    border-radius: 8px; padding: 0.9rem 1.2rem; margin: 1.4rem 0 0;
+    font-size: 0.92rem;
+  }
+  .toc b { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .toc ol { margin: 0.4rem 0 0; padding-left: 1.3rem; }
+  .toc a { color: var(--ink2); text-decoration: none; }
+  .toc a:hover, .toc a:focus { color: var(--shared); text-decoration: underline; }
+  a { color: var(--shared); }
+  figure {
+    margin: 1.2rem 0; background: var(--surface);
+    border: 1px solid var(--grid); border-radius: 8px;
+    padding: 0.8rem; overflow-x: auto;
+  }
+  figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  figcaption {
+    color: var(--ink2); font-size: 0.86rem; max-width: 82ch;
+    margin: 0.6rem auto 0; padding: 0 0.2rem;
+  }
+  code, pre {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.88em;
+  }
+  code { background: var(--surface); border: 1px solid var(--grid); border-radius: 4px; padding: 0.05em 0.3em; }
+  pre {
+    background: var(--surface); border: 1px solid var(--grid);
+    border-radius: 8px; padding: 0.8rem 1rem; overflow-x: auto;
+    line-height: 1.5; max-width: 78ch;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  .key {
+    border-left: 3px solid var(--shared); background: var(--shared-wash);
+    border-radius: 0 8px 8px 0; padding: 0.7rem 1rem; margin: 1.2rem 0;
+    max-width: 74ch;
+  }
+  .key p { margin: 0.3rem 0; }
+  .off-banner {
+    border-left: 3px solid var(--ispn); background: var(--warn-wash);
+    border-radius: 0 8px 8px 0; padding: 0.7rem 1rem; margin: 1.2rem 0;
+    max-width: 74ch;
+  }
+  table {
+    border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem;
+    background: var(--surface); border: 1px solid var(--grid);
+    border-radius: 8px;
+  }
+  .table-scroll { overflow-x: auto; }
+  th, td {
+    padding: 0.4rem 0.8rem; text-align: left;
+    border-bottom: 1px solid var(--grid);
+  }
+  th {
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--muted); font-weight: 600;
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  .swatch {
+    display: inline-block; width: 0.72em; height: 0.72em; border-radius: 2px;
+    margin-right: 0.35em; vertical-align: baseline;
+  }
+  .t-dspn { color: var(--dspn); font-weight: 600; }
+  .t-ispn { color: var(--ispn); font-weight: 600; }
+  .t-fs { color: var(--fs); font-weight: 600; }
+  .t-shared { color: var(--shared); font-weight: 600; }
+  .foot { color: var(--muted); font-size: 0.84rem; margin-top: 3rem; border-top: 1px solid var(--grid); padding-top: 1rem; }
+  :focus-visible { outline: 2px solid var(--shared); outline-offset: 2px; }
+</style>
+
+<main>
+<p class="stamp">BGM_22 · snapshot 2026-08-11 · not a living document — rerun <code>make_figures.py</code> if it drifts</p>
+<h1>How the input streams are drawn — a visual walkthrough of model_v07.md §7.4</h1>
+<p class="lede">
+Every unsimulated input in the v07 model — cortex onto the striatal microcircuit,
+the missing GABA from striatum outside the cube, cortex onto thal/GPe/STN — is a
+<em>stream</em>: a precomputed matrix of spike counts. This page walks through how one is
+drawn, on toy examples small enough to draw every neuron, and then proves on each
+case that the real generator (<code>spike_input_cortex.py</code>) produces exactly the
+statistics the toy explains. Toy numbers are deliberately exaggerated
+(shared fraction 0.2 instead of 0.014) so overlap is visible; every section carries
+the real numbers alongside.
+</p>
+<nav class="toc">
+<b>Contents</b>
+<ol>
+  <li><a href="#what">What a stream is, and what it must reproduce</a></li>
+  <li><a href="#steps">The four steps, and what is fixed vs redrawn</a></li>
+  <li><a href="#case1a">Case 1a — cortex → striatum: one axon pool per region</a></li>
+  <li><a href="#case1b">Case 1b — missing GABA: a geometric source cloud</a></li>
+  <li><a href="#case1c">Case 1c — CorticalInputs: shared + private split</a></li>
+  <li><a href="#mod">Step 2b — the shared rate modulation (currently off)</a></li>
+  <li><a href="#perf">Time and memory at real scale</a></li>
+</ol>
+</nav>
+
+<h2 id="what">1 · What a stream is, and what it must reproduce</h2>
+<p>
+One stream serves one <code>(pre, post)</code> pair. Row <em>i</em> is receiver <em>i</em>,
+column <em>t</em> is one <code>dt = 0.1 ms</code> bin, and the entry is a <strong>count</strong>:
+how many of the pair's presynaptic neurons spiked into receiver <em>i</em> in that bin.
+No spike trains, no individual synapses — a single mean weight turns counts into
+current later.
+</p>
+<figure>
+  <img src="figures/stream_matrix.png" alt="Heatmap of a toy count matrix: 7 receivers by 120 time bins, darker cells meaning more spikes." width="920">
+  <figcaption>A toy stream: 7 receivers × 120 bins. The real caudate dlPFC→dSPN
+  stream is 486 × 7 161 000 (486 receivers, 310 TRs × 23 100 bins each).</figcaption>
+</figure>
+<p>
+The stream stands in for <code>N</code> neurons firing at probability
+<code>p(t) = rate(t)·dt/1000</code> per bin, whose afferent pools overlap between two
+receivers by a fraction <code>f</code>, and which may themselves be pairwise correlated
+at <code>ρ</code>. Three statistics then follow with no freedom, and the generator is
+checked against them at build time (<code>stream_target_statistics</code>,
+<code>check_stream_statistics</code>):
+</p>
+<pre><code>mean = N · p(t)
+Fano = (1 − p) · ((1 − ρ) + N·ρ)          → 1 − p       when ρ = 0
+corr = (f·(1 − ρ) + N·ρ) / ((1 − ρ) + N·ρ) → f           when ρ = 0</code></pre>
+<div class="key">
+<p><strong>The one principle behind all three constructions:</strong> realise the presynaptic
+pool explicitly and let <em>overlap</em> produce the correlations — never compute a
+correlation and impose it. (The pre-2026-08-07 code imposed it through a Gaussian
+copula and delivered corr 0.00009 where 0.014 was intended, Fano 1922 where 1 was.)</p>
+</div>
+
+<h2 id="steps">2 · The four steps, and what is fixed vs redrawn</h2>
+<div class="table-scroll"><table>
+<tr><th>step</th><th>what happens</th><th>how often</th><th>constant or varying</th></tr>
+<tr><td>1 — fix the pool</td><td>decide what the presynaptic pool <em>is</em> (a size M, a source cloud, a shared/private split)</td><td>once per stream — except 1a: once per cortical region, all receiver types together</td><td>constant for the whole run</td></tr>
+<tr><td>2 — probability</td><td>p(t) = rate·dt/1000, optionally × a shared modulation (2b)</td><td>every bin</td><td>staircase (cortical) or flat (GABA); one trace per stream, shared by all receivers</td></tr>
+<tr><td>3 — draw counts</td><td>the actual random counts, receivers coupled through what they share</td><td>every bin</td><td>varying — this is the data</td></tr>
+<tr><td>4 — check</td><td>measured mean/Fano/corr vs the closed-form targets; raises on mismatch</td><td>once, on the first 20 000 bins</td><td>—</td></tr>
+</table></div>
+<p>
+Only step 1 differs between the three cases. Steps 2–4 are literally shared code.
+</p>
+
+<h2 id="case1a">3 · Case 1a — cortex → striatum: one axon pool per region</h2>
+<p>
+Think of one cortical region, say dlPFC. Its axons crossing the striatal tissue form
+one pool of <strong>M</strong> axons, and every receiver —
+<span class="t-dspn">dSPN</span>, <span class="t-ispn">iSPN</span> or
+<span class="t-fs">FS</span> alike — owns a random subset of it:
+<code>N_i = round(proportion(region) · N_cortical_inputs[type])</code> axons.
+The <span class="t-shared">shared input</span> between two receivers is simply the
+axons in <em>both</em> subsets.
+</p>
+<figure>
+  <img src="figures/fig_1a_structure.png" alt="Bipartite diagram of 40 axons connected to 7 receivers, with the two axons shared by receivers A and B highlighted in violet; below, the same connectivity as a membership matrix." width="920">
+  <figcaption>Toy pool: M = 40, three dSPNs (N = 8), two iSPNs (N = 8), two FSs
+  (N = 4). A and B happen to share 2 axons; the expected overlap is
+  N²/M = 1.6. Bottom: the same thing as a membership matrix — which the real
+  code <em>never builds</em> (see the equivalence below for why it doesn't have to).</figcaption>
+</figure>
+<div class="key">
+<p><strong>Why M = N/f realises the shared fraction.</strong> Two SPNs each picking
+N axons uniformly from M share N²/M axons on average — a fraction N/M of their
+pools. Kincaid's measurement says that fraction is 0.014, so the pool size is
+<em>defined</em> by it: <code>M = round(N_eff(dSPN)/0.014)</code>. For dlPFC:
+3850/0.014 = 275 000 axons. f is never imposed anywhere — M is chosen so overlap
+produces it.</p>
+<p><strong>Why once per region, not per stream.</strong> All three receiver types sample
+the <em>same physical axons</em>, so the three streams are drawn together against one
+pool. Drawn separately, a dSPN and an iSPN in the same tissue would share nothing.
+The cross-type shared fractions then follow from M instead of being free parameters
+(table below).</p>
+</div>
+<p>
+Per bin, the draw needs no membership matrix
+(<code>simulate_cortical_axon_pool_streams_to_memmap</code>):
+</p>
+<pre><code>k(t)   ~ Binomial(M, p(t))                        # how many pool axons fire — ONCE, shared
+c_i(t) ~ Hypergeometric(N_i, M − N_i, k(t))       # how many of them receiver i owns</code></pre>
+<p>
+The hypergeometric is the marbles question — <em>of the k firing axons, how many
+land in my N_i?</em> — and because the subsets are uniform random, that distribution
+is exact without knowing which axons are whose. All coupling between receivers comes
+from the shared k(t): a bin where the pool fires a lot is a high bin for
+<em>everyone</em>.
+</p>
+<figure>
+  <img src="figures/fig_1a_timecourse.png" alt="Four aligned time panels: the p(t) staircase from real dlPFC rates, the shared k(t) trace, per-receiver counts for one dSPN, one iSPN and one FS, and per-TR averaged counts of two dSPNs tracking each other." width="920">
+  <figcaption>The toy draw over six TRs, driven by the real dlPFC rate snippet
+  (rescaled ×500 so counts are visible). p(t) is a staircase — one value per TR,
+  repeated for every bin inside it (real: 23 100 repeats). k(t) follows M·p(t);
+  every receiver's counts ride the same k(t).</figcaption>
+</figure>
+<h3>The real generator does the same thing — measured</h3>
+<p>
+400 000 bins at constant p = 0.25, toy scale. The explicit pool (every axon
+simulated, fixed membership) against the real hypergeometric generator:
+</p>
+<figure>
+  <img src="figures/fig_1a_equivalence.png" alt="Bar charts comparing Fano factors and pairwise correlations of the explicit toy pool and the real generator against analytic targets." width="920">
+  <figcaption>Marginals agree exactly (Fano = 1 − p = 0.75). The correlations
+  expose the one subtle difference: a <em>fixed</em> membership gives each specific
+  pair its own realised overlap (A and B share 2 axons → corr 2/8 = 0.25; A and F
+  share 0 → corr 0), while the real generator's per-bin re-draw gives every pair the
+  <em>ensemble</em> value √(N<sub>i</sub>N<sub>j</sub>)/M. Same statistics on average
+  over memberships; at M = 275 000 and f = 0.014 the per-pair spread is negligible —
+  at M = 40 it is visible, which is exactly why this panel is instructive.</figcaption>
+</figure>
+<div class="table-scroll"><table>
+<tr><th>quantity</th><th class="num">toy</th><th class="num">real (caudate dlPFC)</th></tr>
+<tr><td>pool size M</td><td class="num">40</td><td class="num">275 000</td></tr>
+<tr><td>N (dSPN / iSPN / FS)</td><td class="num">8 / 8 / 4</td><td class="num">3850 / 3850 / 1540</td></tr>
+<tr><td>receivers R (dSPN / iSPN / FS)</td><td class="num">3 / 2 / 2</td><td class="num">486 / 485 / 29</td></tr>
+<tr><td>f — SPN↔SPN (= N<sub>SPN</sub>/M)</td><td class="num">0.20</td><td class="num">0.014</td></tr>
+<tr><td>f — FS↔SPN (= √(N<sub>FS</sub>N<sub>SPN</sub>)/M)</td><td class="num">0.141</td><td class="num">0.00885</td></tr>
+<tr><td>f — FS↔FS (= N<sub>FS</sub>/M)</td><td class="num">0.10</td><td class="num">0.0056</td></tr>
+<tr><td>bins per TR</td><td class="num">40</td><td class="num">23 100</td></tr>
+<tr><td>mean p per bin</td><td class="num">0.25</td><td class="num">5·10⁻⁴ (5 Hz)</td></tr>
+</table></div>
+<p>
+Regions stay separate: each has its own pool, so streams of different regions are
+independent within a bin and co-fluctuate only through their BOLD-derived rate
+series. Note the FS caveat: this derivation gives FS <em>less</em> overlap than SPNs,
+while Ramanathan 2002 / Choi 2018 report higher cortical convergence onto FS —
+recorded as <code>TODO.md</code> §26.
+</p>
+
+<h2 id="case1b">4 · Case 1b — missing GABA: a geometric source cloud</h2>
+<p>
+The simulated cube is far smaller than the connection kernels reach, so most of a
+neuron's striatal GABA afferents sit <em>outside</em> the lattice. Each of the 7
+connected pairs (dSPN→dSPN, dSPN→iSPN, FS→dSPN, FS→FS, FS→iSPN, iSPN→dSPN,
+iSPN→iSPN) gets a compensation stream. Here the shared fraction cannot be one
+number — it must <em>fall with distance</em> between two receivers.
+</p>
+<figure>
+  <img src="figures/fig_1b_kernels.png" alt="The real fitted connection-probability kernels versus distance for three pairs, with the simulated inner region shaded." width="920">
+  <figcaption>The real fitted kernels (<code>fitted_params.json</code>,
+  p(d) = P₀·exp(−d²/σ²)). Inside Rin ≈ 114 µm connections are simulated; from Rin
+  to Rout = 3σ they are replaced by the stream.</figcaption>
+</figure>
+<p>
+Step 1b (<code>build_geometric_source_pools</code>) makes the unsimulated neurons
+<em>actual points</em>: virtual sources scattered at the real density (divided by
+<code>multiplicity</code> — one virtual source stands for 10 real neurons) in a box
+that extends Rout beyond the receivers, connected to every receiver with the
+<em>model's own kernel</em>. A receiver's pool is whatever sources it connected to.
+</p>
+<figure>
+  <img src="figures/fig_1b_structure.png" alt="Two 2D maps of a source cloud around a receiver grid; a near receiver pair with shared sources highlighted, and a far pair sharing almost none." width="920">
+  <figcaption>2D toy (the real construction is 3D and is checked below). Dashed
+  circles: Rin/Rout annulus. Two nearby receivers connect to overlapping
+  neighbourhoods and share sources; distant receivers do not. Nothing ever computes
+  f(d) — it <em>is</em> the overlap.</figcaption>
+</figure>
+<figure>
+  <img src="figures/fig_1b_fd.png" alt="Scatter of realised shared fraction versus receiver pair distance, falling from about 0.10 to zero, with the near and far example pairs marked." width="920">
+  <figcaption>Every receiver pair of the toy: realised f against pair distance.
+  The decay is inherited entirely from the kernel geometry.</figcaption>
+</figure>
+<p>Per bin, spikes are thrown at the whole cloud and scattered
+(<code>simulate_receiver_counts_geometric_to_memmap</code>):</p>
+<pre><code>n_events(t) ~ Binomial(S·k_mult, p)         # all real neurons the cloud stands for
+source of each event ~ Uniform{0 … S−1}     # which virtual source spiked
+c_i(t) = # events whose source feeds i      # one bincount over (receiver, bin)</code></pre>
+<figure>
+  <img src="figures/fig_1b_timecourse.png" alt="Three aligned panels: a constant p(t), the total event count fluctuating around its mean, and two receivers' counts with markers where a shared source fired." width="920">
+  <figcaption>Unlike the cortical streams, the missing-GABA drive is a
+  <em>constant</em> rate (<code>firing_rate_dict</code>: dSPN 25, iSPN 33, FS 10.5 Hz)
+  — p(t) is flat, all time structure is the draw itself. A spike of a shared source
+  lands in both receivers in the same bin; that is the correlation.</figcaption>
+</figure>
+<h3>Real-code check (3D, real parameters, reduced lattice)</h3>
+<div class="table-scroll"><table>
+<tr><th>iSPN→dSPN, 125 receivers on the real lattice spacing</th><th class="num">target</th><th class="num">measured</th></tr>
+<tr><td>mean count per bin (N̄·p, N̄ = 480.8 afferents)</td><td class="num">1.587</td><td class="num">1.590</td></tr>
+<tr><td>Fano factor (1 − p)</td><td class="num">0.997</td><td class="num">1.038</td></tr>
+<tr><td>pairwise corr (mean realised f)</td><td class="num">0.0387</td><td class="num">0.0382</td></tr>
+</table></div>
+<p>
+Run with the real kernel (P₀ = 0.141, σ = 255 µm), real density (41 204 iSPN/mm³),
+real Rin/Rout (0.114/1.201 mm), multiplicity 10 → 63 828 sources; 50 000 bins at
+dt = 0.1 ms. The full-size run differs only in scale (486 receivers, 72 971
+sources). The realised mean degree is additionally required to match the kernel
+integral E_outer within 20 % — a genuine prediction, since nothing imposes it.
+</p>
+
+<h2 id="case1c">5 · Case 1c — CorticalInputs: shared + private split</h2>
+<p>
+The BG populations (thal, gpe_arky, gpe_cp, stn; 100 neurons each) have no
+geometry and one population per stream, so the pool is the simplest possible:
+split each receiver's N afferents into a part all receivers share and a part
+each owns alone (<code>simulate_receiver_counts_homogeneous_to_memmap</code>).
+</p>
+<pre><code>n_shared  = round(f · N)                    # ONE pool for everybody
+n_private = N − n_shared                    # per receiver
+S(t)   ~ Binomial(n_shared,  p(t))          # drawn once, added to every receiver
+P_i(t) ~ Binomial(n_private, p(t))          # per receiver
+c_i(t) = S(t) + P_i(t)                      # exactly Binomial(N, p);  corr = f</code></pre>
+<figure>
+  <img src="figures/fig_1c_structure.png" alt="Diagram of one shared sub-pool feeding all four receivers plus a private sub-pool per receiver." width="920">
+  <figcaption>Toy: N = 10, f = 0.3 → 3 shared + 7 private. The correlation is f
+  because a fraction f of each receiver's count is <em>literally the same random
+  number</em>.</figcaption>
+</figure>
+<figure>
+  <img src="figures/fig_1c_timecourse.png" alt="Three aligned panels: the shared draw S(t), two independent private draws, and the two receiver sums tracking the drive." width="920">
+  <figcaption>Same real-dlPFC staircase drive as case 1a. Wherever S(t) is high,
+  <em>both</em> receiver counts are lifted together.</figcaption>
+</figure>
+<div class="table-scroll"><table>
+<tr><th>toy check (N = 10, f = 0.3, 400 000 bins)</th><th class="num">target</th><th class="num">measured</th></tr>
+<tr><td>mean count per bin</td><td class="num">2.5</td><td class="num">2.495</td></tr>
+<tr><td>Fano factor</td><td class="num">0.75</td><td class="num">0.753</td></tr>
+<tr><td>pairwise corr</td><td class="num">0.30</td><td class="num">0.303</td></tr>
+</table></div>
+<p>
+In the shipped model every entry of <code>ci.shared_fraction_dict</code> is
+<strong>0</strong> — certainly wrong physically, but unmeasured; kept as a visible
+parameter (<code>input_streams/README.md</code> §4.6). At f = 0 the shared pool is
+empty and receivers are independent given the drive. N per stream is
+<code>round(proportion · N_total)</code> with N_total = 1000 (thal) / 500 (others),
+driven by the same seven per-region rate series as case 1a.
+</p>
+
+<h2 id="mod">6 · Step 2b — the shared rate modulation</h2>
+<div class="off-banner">
+<strong>Currently switched off.</strong> Every <code>r_sc</code> in the shipped
+configuration is 0 (<code>mc.correlation_dict</code>,
+<code>mc.cortical_correlation</code>), so p(t) = p_drive(t) and everything below is
+skipped — pending the scan of <code>TODO.md</code> §25, because these values set the
+simulated BOLD amplitude directly. This section exists so the machinery is
+understood before it is turned on.
+</div>
+<p>
+The presynaptic neurons themselves can be pairwise correlated at <code>r_sc</code>.
+That is realised as one multiplicative rate modulation all of them share: mean 1,
+variance σ², autocorrelation timescale τ_c. Its amplitude is <em>solved</em> from
+the target correlation and — crucially — the window T_meas the target was measured
+at (<code>solve_modulation_amplitude</code>):
+</p>
+<pre><code>a    = exp(−dt/τ_c)                          # AR(1) coefficient
+W(m) = Var[sum of m AR(1) samples]           # closed form, ou_sum_variance
+σ²   = r_sc · m / ((1 − r_sc) · p̄ · W(m))    # m = T_meas/dt</code></pre>
+<figure>
+  <img src="figures/fig_2b_pipeline.png" alt="Five aligned panels: white noise, the AR(1) trace, its normal-CDF uniforms, the Gamma-warped modulation, and the modulated p(t) around the flat p_drive." width="920">
+  <figcaption>The pipeline at r_sc = 0.05, τ_c = 50 ms, T_meas = 200 ms, 100 Hz
+  drive: noise → AR(1) memory → uniform via Φ → Gamma marginal (strictly positive,
+  mean 1) → p(t). One trace per stream, cost O(n_steps).</figcaption>
+</figure>
+<figure>
+  <img src="figures/fig_2b_window.png" alt="Spike-count correlation versus counting window on a log axis: the analytic curve rises and saturates past the correlation timescale; simulated points follow it; the calibration point is marked." width="920">
+  <figcaption>Why the window matters: the same modulation yields r_sc ≈ 0.004 at a
+  5 ms window and ≈ 0.06 at 1 s. A literature value is meaningless without its
+  window — which is why <code>correlation_window_ms</code> is required as soon as any
+  r_sc is non-zero. Points: two simulated neurons, 2·10⁶ bins (the largest window
+  has only 2 000 samples, hence its scatter).</figcaption>
+</figure>
+
+<h2 id="perf">7 · Time and memory at real scale</h2>
+<p>
+Measured on this laptop (8 logical cores, 15 GB RAM), one phase per fresh process,
+real per-stream parameters, one TR of bins (23 100 at dt = 0.1 ms), float64 memmaps
+as in the real cache. Peak RSS is the process high-water mark
+(<code>VmHWM</code>; baseline after imports ≈ 44 MB).
+</p>
+<div class="table-scroll"><table>
+<tr><th>phase (real parameters)</th><th class="num">wall</th><th class="num">peak RSS</th><th class="num">disk written</th></tr>
+<tr><td>1a — dlPFC pool, all 3 caudate streams, 1 TR (M = 275 000, R = 486+485+29)</td><td class="num">3.96 s</td><td class="num">486 MB</td><td class="num">185 MB</td></tr>
+<tr><td>1b — build iSPN→dSPN source cloud (72 971 sources, 486 receivers)</td><td class="num">2.18 s</td><td class="num">217 MB</td><td class="num">—</td></tr>
+<tr><td>1b — iSPN→dSPN stream, 1 TR</td><td class="num">2.31 s</td><td class="num">586 MB</td><td class="num">90 MB</td></tr>
+<tr><td>1c — thal ← dlPFC stream, 1 TR (R = 100, N = 550)</td><td class="num">1.08 s</td><td class="num">304 MB</td><td class="num">18 MB</td></tr>
+</table></div>
+<p>
+Inside case 1a the cost is almost entirely the hypergeometric draw: per 5 592-bin
+chunk, <code>k ~ Binomial(M, p)</code> takes 0.5 ms, the dSPN hypergeometric
+349 ms, the memmap write 64 ms. So ~85 % of cache-build time for the cortical
+streams is <code>rng.hypergeometric</code>, which also means build time scales with
+R × n_steps and barely with M.
+</p>
+<h3>What that extrapolates to (linear in n_steps)</h3>
+<div class="table-scroll"><table>
+<tr><th>quantity</th><th class="num">this laptop, extrapolated</th><th class="num">known aggregate (CLAUDE.md)</th></tr>
+<tr><td>caudate loop, one DBS condition, 5 TRs (6 regions·1a + 7·1b + 24·1c)</td><td class="num">≈ 6 min</td><td class="num">≈ 4 min per loop</td></tr>
+<tr><td>one DBS condition, both loops, full 310 TRs</td><td class="num">≈ 11 h</td><td class="num">≈ 7 h</td></tr>
+<tr><td>disk, one condition (both loops), 5 TRs</td><td class="num">≈ 22 GB</td><td class="num">≈ 22 GB ✓</td></tr>
+<tr><td>disk, one condition, full length</td><td class="num">≈ 1.3 TB</td><td class="num">≈ 1.25 TiB ✓</td></tr>
+</table></div>
+<p>
+The disk figures reproduce the known ones exactly because they are pure arithmetic:
+R × n_steps × 8 bytes per stream in the current float64/per-region layout
+(<code>TODO.md</code> §3 holds the agreed smaller layout, ~120 GiB per condition).
+The time extrapolation lands in the right range; the measured aggregates come from a
+different machine state, and 1b pool-degree and per-region R differences make
+per-stream costs uneven. The practical readings: cache building is
+<strong>disk-bound, not RAM-bound</strong> (no phase peaked above 0.6 GB — a
+full-length build streams chunk by chunk at the same peak), and a full-length cache
+belongs on the workstations' <code>/scratch</code>, not this laptop's disk.
+</p>
+
+<p class="foot">
+Sources of truth: <code>model_v07.md</code> §7.4–7.5, <code>DBS.md</code>,
+<code>experimental_data/input_streams/README.md</code> (the stream contract),
+<code>CompNeuroPy/striatal_microcircuit/spike_input_cortex.py</code> (all three
+generators). Figures, numbers and benchmarks regenerate with
+<code>make_figures.py</code> and <code>bench_real_scale.py</code> in this folder
+(compneuro interpreter); measured values live in <code>results.json</code> and
+<code>bench.json</code>. Toy randomness is seeded — the page is reproducible
+bit-for-bit.
+</p>
+</main>

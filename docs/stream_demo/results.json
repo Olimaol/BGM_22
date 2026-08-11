@@ -1,0 +1,156 @@
+{
+ "toy_1a": {
+  "M": 40,
+  "receivers": [
+   {
+    "type": "dSPN",
+    "label": "A",
+    "N": 8
+   },
+   {
+    "type": "dSPN",
+    "label": "B",
+    "N": 8
+   },
+   {
+    "type": "dSPN",
+    "label": "C",
+    "N": 8
+   },
+   {
+    "type": "iSPN",
+    "label": "D",
+    "N": 8
+   },
+   {
+    "type": "iSPN",
+    "label": "E",
+    "N": 8
+   },
+   {
+    "type": "FS",
+    "label": "F",
+    "N": 4
+   },
+   {
+    "type": "FS",
+    "label": "G",
+    "N": 4
+   }
+  ],
+  "shared_AB": 2,
+  "equivalence": {
+   "T": 400000,
+   "p": 0.25,
+   "mean": {
+    "explicit": [
+     2.00064,
+     2.002355,
+     0.9992675
+    ],
+    "real": [
+     1.9990025,
+     2.00129,
+     0.9990625
+    ],
+    "analytic": [
+     2.0,
+     2.0,
+     1.0
+    ]
+   },
+   "fano": {
+    "explicit": [
+     0.7523615395073574,
+     0.7486057437242646,
+     0.7493808849419701
+    ],
+    "real": [
+     0.7488542435508461,
+     0.7492583962843965,
+     0.7510357170785111
+    ],
+    "analytic": [
+     0.75,
+     0.75,
+     0.75
+    ]
+   },
+   "corr": {
+    "dSPN\u2194dSPN": {
+     "explicit": 0.25397744724436333,
+     "real": 0.19850839410413165,
+     "analytic_ensemble": 0.2,
+     "analytic_this_membership": 0.25,
+     "shared_axons": 2
+    },
+    "dSPN\u2194iSPN": {
+     "explicit": 0.12874326449336038,
+     "real": 0.20200865360841672,
+     "analytic_ensemble": 0.2,
+     "analytic_this_membership": 0.125,
+     "shared_axons": 1
+    },
+    "dSPN\u2194FS": {
+     "explicit": 0.0017594610786579206,
+     "real": 0.14037442499542477,
+     "analytic_ensemble": 0.1414213562373095,
+     "analytic_this_membership": 0.0,
+     "shared_axons": 0
+    },
+    "FS\u2194FS": {
+     "explicit": 0.0027386710958251137,
+     "real": 0.1005569346995444,
+     "analytic_ensemble": 0.1,
+     "analytic_this_membership": 0.0,
+     "shared_axons": 0
+    }
+   }
+  }
+ },
+ "real_check_1b": {
+  "pair": "iSPN->dSPN",
+  "n_receivers": 125,
+  "n_sources": 63828,
+  "multiplicity": 10,
+  "mean_n_eff": 480.79999999999995,
+  "r_in_mm": 0.114,
+  "r_out_mm": 1.2008999999999999,
+  "density_pre": 41204.28893905192,
+  "target": {
+   "mean": 1.58664,
+   "fano": 0.9967000000000001,
+   "corr": 0.03871219624143916
+  },
+  "measured": {
+   "mean": 1.5898798283261804,
+   "fano": 1.03832107761861,
+   "corr": 0.03823858624282182
+  },
+  "mean_shared_fraction": 0.03871219624143916
+ },
+ "real_check_1c": {
+  "N": 10,
+  "f": 0.3,
+  "R": 4,
+  "target": {
+   "mean": 2.5,
+   "fano": 0.75,
+   "corr": 0.3
+  },
+  "measured": {
+   "mean": 2.495275,
+   "fano": 0.7525233388604463,
+   "corr": 0.30253064068615193
+  }
+ },
+ "mod_2b": {
+  "rate_hz": 100.0,
+  "dt": 1.0,
+  "r_sc": 0.05,
+  "tau_c": 50.0,
+  "t_meas": 200.0,
+  "sigma": 0.08351393016192331,
+  "sigma2": 0.0069745765310906035
+ }
+}
