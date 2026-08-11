@@ -170,6 +170,8 @@ pre-summing losslessness. As PLAN.md notes, cheaper generation makes the
 smaller layout *more* worth doing, not less: storage, not generation time, is
 now the bottleneck.
 
+### 4. Check the missing-GABA self-consistency after the first fit
+
 *Opened 2026-08-04 06:24 · 2 updates, last 2026-08-06 13:52*
 
 **Opened 2026-08-04 06:24:**
