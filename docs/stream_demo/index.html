@@ -324,14 +324,20 @@ to within sampling error; they differ from <em>each other</em> because at M = 40
 single membership scatters widely around the ensemble.
 </p>
 <p>
-Why this is harmless at real scale: for a real dSPN pair, the shared-axon count n
-is hypergeometric with mean N²/M = 3850²/275 000 ≈ 54 axons and SD ≈ 7, so a
-specific pair's f is 0.014 ± 0.002 — and each stream's statistics average over
-hundreds of receivers, i.e. tens of thousands of pairs, pulling the measured
-correlation onto the ensemble value either way. At M = 40 the same relative
-scatter is enormous (0 to 3 shared axons among pairs of this one membership),
-which is why the toy makes the distinction visible at all. The real code therefore
-draws from the ensemble directly and never stores who owns which axon.
+Why this is harmless at real scale: for a real pair, the shared-axon count n is
+hypergeometric and tightly concentrated, for every pair class. Between two SPNs
+(dSPN↔dSPN or dSPN↔iSPN — their N are equal): n = 54 ± 7 axons, so a specific
+pair's f is 0.0140 ± 0.0019 (±13 %). FS↔SPN: n = 21.6 ± 4.6, f = 0.0089 ± 0.0019
+(±21 %). FS↔FS: n = 8.6 ± 2.9, f = 0.0056 ± 0.0019 (±34 %). The relative spread
+grows as the pools get smaller, but the absolute scatter is ±0.002 for every pair
+class — and each stream's statistics average over many pairs (≈118 000 dSPN↔dSPN
+pairs, ≈236 000 dSPN↔iSPN, 406 even for FS↔FS), pulling the measured correlation
+onto the ensemble value either way. In the toy the same scatter is as large as
+the value itself: a toy SPN pair has n = 1.6 ± 1.0 (f = 0.20 ± 0.13) and a toy
+dSPN↔FS pair n = 0.8 ± 0.8 (f = 0.14 ± 0.14) — the memberships of Fig. 2 simply
+landed at 2, 1, 0 and 0 shared axons — which is why Fig. 4 makes the distinction
+visible at all. The real code therefore draws from the ensemble directly and
+never stores who owns which axon.
 </p>
 <p>
 Regions stay separate: each has its own pool, so streams of different regions are
