@@ -887,7 +887,7 @@ def fig_2b_pipeline():
         (u, INK2, 1.4, "u = Φ(z)",
          "the normal CDF maps it onto (0, 1) — a correlated uniform"),
         (mod, C_SHARED, 1.4, "Mod(t)",
-         f"Gamma.ppf(u): mean 1, variance σ² = {sigma**2:.2f}, "
+         f"Gamma.ppf(u): mean 1, variance σ² = {sigma**2:.3f}, "
          "strictly positive"),
         (p_t, C_SHARED, 1.4, "p(t)",
          "p(t) = p_drive · Mod(t) — every presynaptic neuron now "
