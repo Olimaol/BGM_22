@@ -475,15 +475,29 @@ As in case 1a, the stacked c_i(t) rows are the stream — here one per
 </figure>
 <p>
 Table 3 is the real-code check for this case: the actual 3D generator run at real
-parameters on a reduced lattice, measured against the closed-form targets.
+parameters, measured against the closed-form targets. "Reduced lattice" means
+only this: the receivers are all 125 sites of a 5 × 5 × 5 grid at the real
+lattice spacing (d ≈ 22.8 µm), every site treated as a dSPN receiver. It is
+<em>not</em> a shrunken microcircuit in which 125 iSPNs happen to fit — no type
+assignment is made at all. The presynaptic iSPNs are not lattice neurons in this
+construction anyway: they are the virtual source cloud, drawn at the real iSPN
+volume density (0.485 · 84 900 ≈ 41 204 per mm³) in the box around the
+receivers. That is why using every site as a receiver is harmless: receivers are
+passive observers of the cloud and never interact, so each receiver's degree
+depends only on kernel, density and annulus (all real here), and each pair's
+overlap only on the pair's distance. Cutting 486 → 125 receivers reduces compute
+and restricts which pair distances occur — nothing else; the targets in Table 3
+are computed from this run's own realised degrees and overlaps, so the
+comparison is self-consistent.
 </p>
 <div class="table-scroll"><table id="tab3">
 <caption><b>Table 3.</b> Real-code check for case 1b:
 <code>build_geometric_source_pools</code> +
 <code>simulate_receiver_counts_geometric_to_memmap</code> for iSPN→dSPN with real
 parameters (kernel P₀ = 0.141, σ = 255 µm; density 41 204 iSPN/mm³;
-Rin/Rout = 0.114/1.201 mm; multiplicity 10 → 63 828 sources), 125 receivers on
-the real lattice spacing, 50 000 bins at dt = 0.1 ms, rate 33 Hz. Targets from
+Rin/Rout = 0.114/1.201 mm; multiplicity 10 → 63 828 sources), receivers = all
+125 sites of a 5 × 5 × 5 grid at the real lattice spacing (see text),
+50 000 bins at dt = 0.1 ms, rate 33 Hz. Targets from
 <code>stream_target_statistics</code> at the realised mean degree
 N̄ = 480.8 afferents and the realised mean shared fraction. The full-size run
 differs only in scale (486 receivers, 72 971 sources; section 7). The realised
