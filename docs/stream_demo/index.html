@@ -617,7 +617,8 @@ this section: m = 200 bins of dt = 1 ms, so 200 ms per window). Within a
 single bin a neuron either spikes or it doesn't — one coin flip with
 probability p(t) per bin. For window number w, let K₁(w) be the <em>total</em>
 spike count of neuron 1 in that window — the sum of its m coin flips,
-typically ~20 spikes at p̄ = 0.1 — and K₂(w) the same for neuron 2. Over many
+typically ~20 spikes at the running example's p = 0.1 — and K₂(w) the same
+for neuron 2. Over many
 windows this gives two series of window totals, and the spike-count
 correlation is the correlation between them:
 </p>
@@ -806,7 +807,8 @@ construction: g(0) ≈ 1 (z = 0 is the median of the Gaussian, so it maps to
 the middle of a Gamma whose mean is 1) and slope g′(0) ≈ σ (a near-linear
 map that turns a spread-1 input into a spread-σ output must stretch by σ).
 Hence Mod(t) ≈ 1 + σ·z(t). How good that is at the running example's
-σ = 0.0835, exact g(z) against the tangent 1 + σ·z:
+σ = 0.0835 (√0.00697, the σ² Fig. 11 is drawn with), exact g(z) against the
+tangent 1 + σ·z:
 </p>
 <pre><code>z        −3       −2       −1        0       +1       +2       +3
 g(z)     0.768    0.840    0.917    0.998    1.083    1.174    1.269
