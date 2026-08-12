@@ -1078,9 +1078,14 @@ c_i(t) = number of events whose source connects to receiver i
 ```
 
 The last line is a `bincount` over a flattened `(receiver, bin)` index, which is
-what makes this affordable. Marginals are `Binomial(deg_i · k_mult, p)` and the
-correlation between two receivers is their pool overlap — i.e. `f(d)`, never
-computed.
+what makes this affordable. Unlike 3a, this draw is not exact: the uniform
+assignment is with replacement and uncapped, so the marginal is
+`Binomial(S · k_mult, deg_i · p / S)` rather than the `Binomial(deg_i · k_mult, p)`
+of a real pool — same mean, Fano `1 − deg_i·p/S` instead of `1 − p`, and
+strictly a source can be assigned more spikes in a bin than the `k_mult`
+neurons it stands for. All of these differences are O(p) at the rates in force
+(see `experimental_data/input_streams/README.md` §4.3). The correlation between
+two receivers is their pool overlap — i.e. `f(d)`, never computed.
 
 **(3c) Flat split.**
 

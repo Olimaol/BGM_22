@@ -465,8 +465,15 @@ emitting source of any given spike is equally likely to be any of the S sources:
 the code draws one uniform random source index per event
 (<code>rng.integers(0, S, size=n_events)</code>, with replacement — the same
 source can emit several spikes in one bin, as it should, since it stands for
-k_mult neurons). No per-source rate is ever drawn; the uniform assignment
-<em>is</em> the distribution of the total over the sources.
+k_mult neurons). Nothing caps the repeats at k_mult, though: strictly, a source
+can be assigned more spikes in a bin than the neurons it stands for. At these
+per-bin probabilities that tail is vanishingly rare, and where the per-pair
+clamp on k_mult (model_v07.md §7.4, step 1b) reaches 1 it is one neuron spiking
+twice within a single 0.1 ms bin — the within-bin cousin of the double-spiking
+that independently drawn bins already permit <em>across</em> bins, since the
+streams have no refractoriness anywhere (input-streams README §4.3). No
+per-source rate is ever drawn; the uniform assignment <em>is</em> the
+distribution of the total over the sources.
 </p>
 <p>
 <strong>Line 3 — from sources to receivers.</strong> Now every event is a

@@ -215,7 +215,15 @@ heterogeneity is lost in the compensation.
 ### 4.3 No single-neuron temporal structure
 
 Bins are drawn independently. There is no refractoriness, no bursting, no spike
-adaptation in the presynaptic pool. **Population rhythms are representable** —
+adaptation in the presynaptic pool. The same independence holds *within* a bin
+for the missing-GABA streams: spikes are assigned to virtual sources uniformly
+with replacement and without a cap
+(`simulate_receiver_counts_geometric_to_memmap`), so a source can be assigned
+more spikes in one bin than the `k_mult` real neurons it stands for. That tail
+is vanishingly rare at the rates in force, shifts every checked §2 statistic by
+at most O(p), and where the per-pair clamp drives `k_mult` to 1 (FS→FS) it is
+one neuron spiking twice in a 0.1 ms bin — a rarer cousin of the adjacent-bin
+double spike the independent bins already permit. **Population rhythms are representable** —
 a shared modulation at 20 Hz gives beta-band correlated input — but individual
 neurons bursting is not. This matters for the parkinsonian state: Raz et al. 2001
 (*J Neurosci* 21:RC128) report the MPTP basal ganglia synchronises strongly, though
