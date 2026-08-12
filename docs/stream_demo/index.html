@@ -458,14 +458,18 @@ As in case 1a, the stacked c_i(t) rows are the stream — here one per
 </p>
 <figure id="fig8">
   <img src="figures/fig_1b_timecourse.png" alt="Three aligned panels: a constant p(t), the total event count fluctuating around its mean, and two receivers' counts with markers where a shared source fired." width="920">
-  <figcaption><b>Figure 8.</b> One draw of the toy cloud of Fig. 6 over 240 bins
-  at constant p = 0.02. <em>Panel 1:</em> unlike the cortical streams, the
-  missing-GABA drive is a <em>constant</em> rate (<code>firing_rate_dict</code>:
-  dSPN 25, iSPN 33, FS 10.5 Hz) — p(t) is flat, all time structure is the draw
-  itself. <em>Panel 2:</em> total events on the cloud around its mean (dashed).
-  <em>Panel 3:</em> counts of the near pair A, B of Fig. 6; violet markers flag
-  bins in which one of their shared sources fired — such a spike lands in
-  <em>both</em> receivers in the same bin, and that is the correlation.</figcaption>
+  <figcaption><b>Figure 8.</b> One draw of the toy cloud of Fig. 6 — S = 1764
+  sources at k_mult = 1 (in the toy each virtual source stands for a single
+  neuron; the real construction uses k_mult = 10), receiver degrees ≈ 29 —
+  over 240 bins at constant p = 0.02. <em>Panel 1:</em> unlike the cortical
+  streams, the missing-GABA drive is a <em>constant</em> rate
+  (<code>firing_rate_dict</code>: dSPN 25, iSPN 33, FS 10.5 Hz) — p(t) is flat,
+  all time structure is the draw itself. <em>Panel 2:</em> total events on the
+  cloud, n_events(t) ~ Binomial(S·k_mult, p), around its mean
+  S·k_mult·p = 1764 · 0.02 ≈ 35.3 (dashed). <em>Panel 3:</em> counts of the near
+  pair A, B of Fig. 6 (mean deg·p ≈ 0.6 per bin); violet markers flag bins in
+  which one of their shared sources fired — such a spike lands in <em>both</em>
+  receivers in the same bin, and that is the correlation.</figcaption>
 </figure>
 <p>
 Table 3 is the real-code check for this case: the actual 3D generator run at real
