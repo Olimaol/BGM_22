@@ -791,6 +791,29 @@ reinforce each other and W(m) grows toward m² for windows shorter than τ_c —
 15 092 instead of 200 in the worked example.)
 </p>
 <p>
+<em>How W(m) is actually computed.</em> Purely analytically — no z is ever
+simulated for it, no averaging over repeated sequences. The variance of a sum
+is the sum of all pairwise covariances, and for a unit-variance AR(1) every
+covariance is known in advance: Cov(z(s), z(t)) = a<sup>|s−t|</sup>, decaying
+one factor of a per bin of lag. Organising the m² terms of the double sum by
+lag:
+</p>
+<pre><code>W(m) = Σ_s Σ_t Cov(z(s), z(t))               # m² terms
+     = m  +  2·Σ_{k=1…m−1} (m − k)·a^k       # m diagonal 1s; lag k occurs 2·(m−k) times
+     = m + 2·(m·g − w)                       # geometric series, evaluated in closed form:
+                                             #   g = a·(1 − a^(m−1)) / (1 − a)
+                                             #   w = a·(1 − m·a^(m−1) + (m−1)·a^m) / (1 − a)²</code></pre>
+<p>
+<code>ou_sum_variance(m, a)</code> is exactly that last line — one formula
+evaluation, exact and O(1), used because m is routinely 10 000 or more
+(T_meas in the literature at dt = 0.1 ms). All three routes agree: for the
+worked example (m = 200, a = 0.9802) the naive lag sum gives 15 092.4, the
+closed form 15 092.4, and a brute-force simulation — generate a long z(t),
+chop it into 200-bin windows, take the empirical variance of the window sums —
+gives ≈ 15 060, matching up to sampling error. So simulation is a way to
+<em>check</em> W(m), but never how it is obtained.
+</p>
+<p>
 <em>The variance of one count.</em> One piece is still missing for the
 correlation: Var(K). It comes from the same decomposition (R2): a count's
 deviation from its overall mean m·p̄ is D + noise, and the average of its
