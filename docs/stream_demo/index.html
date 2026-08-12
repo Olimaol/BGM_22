@@ -759,7 +759,7 @@ each neuron's variance but not to their covariance.
 <em>The shared part.</em> The expected count, given the modulation path, is
 E[K | Mod] = Σ_t p̄·Mod(t). Split each term around the modulation's mean of 1,
 Mod(t) = 1 + (Mod(t) − 1): the sum becomes m·p̄ + D, where
-D = p̄·Σ_t (Mod(t) − 1) — that is where "Mod(t) − 1" comes from — is the
+<strong>D = p̄·Σ_t (Mod(t) − 1)</strong> — that is where "Mod(t) − 1" comes from — is the
 surplus or deficit of expected spikes in <em>this particular window</em>,
 caused by the modulation having wandered above or below 1 during it.
 </p>
@@ -778,7 +778,8 @@ Rearranging is then an identity, not an assumption — "actual = expected given
 the path + leftover" — result <strong>(R2)</strong>:
 </p>
 <pre><code>K₁ = m·p̄ + D + noise₁          # same D for both neurons: they ride the same Mod path
-K₂ = m·p̄ + D + noise₂          # independent noises: their coin flips are their own</code></pre>
+K₂ = m·p̄ + D + noise₂          # independent noises: their coin flips are their own
+ D = p̄·Σ_t (Mod(t) − 1)        # the shared surplus, defined above</code></pre>
 <p>
 These noise terms are exactly the private coin-flip randomness of the first
 paragraph: mean 0 given the path, variance ≈ m·p̄ (that is R1), and noise₁
