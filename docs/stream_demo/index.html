@@ -785,8 +785,10 @@ paragraph: mean 0 given the path, variance ≈ m·p̄ (that is R1), and noise₁
 independent of noise₂ because the two neurons flip separate coins.
 </p>
 <p>
-Both deviations from the overall mean m·p̄ are "D plus own noise", so the
-average product of the deviations is
+Now the covariance. Its definition from above:
+Cov(K₁, K₂) = E[(K₁ − E[K₁]) · (K₂ − E[K₂])], the average product of the two
+counts' deviations from their means. By (R2) both deviations from the overall
+mean m·p̄ are "D plus own noise", so the average product of the deviations is
 </p>
 <pre><code>Cov(K₁, K₂) = E[(D + noise₁)·(D + noise₂)] = E[D²] = Var(D)      # (R3)</code></pre>
 <p>
