@@ -421,6 +421,37 @@ pools, normalised by their degrees — falling with distance automatically
 source of each event ~ Uniform{0 … S−1}     # which virtual source spiked
 c_i(t) = # events whose source feeds i      # one bincount over (receiver, bin)</code></pre>
 <p>
+Line by line. <strong>Line 1 — how many spikes, in total.</strong> The cloud
+stands for S·k_mult real neurons (each virtual source represents k_mult = 10 of
+them), and each fires with probability p in this bin. Instead of simulating them
+one by one, a single Binomial draw yields n_events(t), the total number of
+spikes the <em>whole cloud</em> emits in this bin — the 1b analogue of the
+shared k(t) of case 1a.
+</p>
+<p>
+<strong>Line 2 — which source emitted each spike.</strong> Each of those
+n_events spikes must have come from some neuron. All neurons in the cloud are
+statistically identical — same constant rate, no structure among them — so the
+emitting source of any given spike is equally likely to be any of the S sources:
+the code draws one uniform random source index per event
+(<code>rng.integers(0, S, size=n_events)</code>, with replacement — the same
+source can emit several spikes in one bin, as it should, since it stands for
+k_mult neurons). No per-source rate is ever drawn; the uniform assignment
+<em>is</em> the distribution of the total over the sources.
+</p>
+<p>
+<strong>Line 3 — from sources to receivers.</strong> Now every event is a
+(source, bin) pair, and a spike of source s must be delivered to <em>every</em>
+receiver whose pool contains s — this is why the connectivity is stored
+source-major (source → list of its receivers). Each event is expanded into its
+(receiver, bin) pairs and one single <code>bincount</code> over the flattened
+index accumulates them all into the (R, n) count block; that one array operation,
+instead of a loop over receivers, is what makes the construction affordable. A
+spike whose source sits in two pools increments both receivers in the same bin —
+the shared-source markers of Fig. 8, and the correlation of Figs. 6–7, are
+exactly this happening.
+</p>
+<p>
 As in case 1a, the stacked c_i(t) rows are the stream — here one per
 (pre type → post type) pair, e.g. <code>receiver_counts_iSPN_dSPN.dat</code>,
 7 streams per loop.
