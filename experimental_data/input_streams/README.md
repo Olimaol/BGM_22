@@ -250,6 +250,18 @@ certainly wrong physically; there is simply no measurement of corticosubthalamic
 or corticothalamic afferent overlap to put there. It is a parameter rather than a
 hardcoded zero so the assumption stays visible.
 
+These streams use the shared+private construction
+(`spike_input_cortex.simulate_receiver_counts_homogeneous_to_memmap`), not the
+axon pool the striatal cortical streams draw from: each receiver's `N` afferents
+split into `round(f·N)` it shares with every other receiver of the same
+population and `N − round(f·N)` of its own, which gives exactly `Binomial(N, p)`
+marginals and a pairwise correlation of exactly `f` at any `f`. At the `f = 0`
+in force the draw is simply an independent Binomial per receiver — something a
+finite axon pool cannot express, since a pool of `M` axons always leaves
+`f = N/M > 0`. The fraction is flat within a population, and receivers of
+*different* populations share nothing at any `f`; the trade-offs between this
+construction and the pool are laid out in `TODO.md` §26.
+
 ### 4.7 Cortical sharing has no distance dependence
 
 Kincaid gives one flat 1.4 % with no geometry attached, so two SPNs 20 µm apart

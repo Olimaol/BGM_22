@@ -659,7 +659,7 @@ came from — it was never untraceable, just uncited;
 
 ### 26. Two shared fractions have no measurement behind them
 
-*Opened 2026-08-07 10:55*
+*Opened 2026-08-07 10:55 · 1 update, 2026-08-12 10:27*
 
 **Opened 2026-08-07 10:55:**
 
@@ -684,6 +684,39 @@ interneurons is *higher* than onto SPNs, which the current derivation does not
 capture — it assumes FS and SPN sample the same pool with the same per-axon
 contact probability. If FS sample more broadly, `N_FS` is right but `M` should be
 smaller for FS, raising both FS correlations.
+
+**Update 2026-08-12 10:27:**
+
+**Why the CI streams use a different construction than the striatal cortical
+streams, and what a future nonzero `f` would and would not change.**
+Shared+private with fraction `f`
+(`spike_input_cortex.simulate_receiver_counts_homogeneous_to_memmap`) is
+pairwise-identical to an axon pool of `M = N/f` — the pool construction subsumes
+it — except at `f = 0`, which corresponds to `M = ∞` and is exactly what is in
+force here. That, plus the absence of any cross-population requirement, is why
+`CorticalInputs` uses the split and `Microcircuit` the explicit pool.
+
+**Putting a nonzero value into `ci.shared_fraction_dict` is by itself no reason
+to switch constructions**: shared+private handles any `f` with the same
+exactness (Binomial marginal, correlation exactly `f`) and cheaper draws
+(Binomial instead of hypergeometric). Switching to one pool per cortical region
+would buy exactly two things, both currently unwanted or unmeasured:
+
+1. **Derived cross-structure coupling.** Receivers of different populations
+   (thal/GPe/STN) sampling one pool would correlate at `sqrt(N_i N_j)/M` —
+   physically plausible via corticofugal collaterals (hyperdirect STN afferents
+   are collaterals of corticofugal axons that also reach thalamus), but with no
+   measurement behind it. The same move forces `f_i = N_i/M`, so the per-type
+   fractions of this dict would stop being independently settable.
+2. **A natural parameterization for anatomy-shaped data.** If an overlap
+   measurement ever arrives as an axon count `M` (as Kincaid's effectively did)
+   rather than as a fraction, the pool takes it directly — though `f = N/M` can
+   just as well be computed by hand and fed to the present construction, so this
+   is convenience, not capability.
+
+The present-tense description of the construction is in
+`input_streams/README.md` §4.6 and the `spike_input_cortex` module docstring;
+this block holds the forward-looking part.
 
 ## From the session on 2026-08-07 (verifying model_v07.md against the code)
 
