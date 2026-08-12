@@ -685,14 +685,38 @@ neurons flip their coins <em>independently</em>, so this part contributes to
 each neuron's variance but not to their covariance.
 </p>
 <p>
+<em>What covariance is, and what we are after.</em> The covariance of the two
+window counts,
+Cov(K₁, K₂) = E[(K₁ − E[K₁]) · (K₂ − E[K₂])], is the average <em>product of
+their deviations</em> from their respective means: positive when the two counts
+tend to be high together and low together, zero when their fluctuations are
+unrelated. The correlation being calibrated is just its normalised form,
+r_sc = Cov(K₁, K₂) / (SD(K₁)·SD(K₂)) — and since the two neurons are
+statistically identical, that is Cov divided by the common variance. So the
+goal of the next two steps is to compute Cov(K₁, K₂) and Var(K).
+</p>
+<p>
 <em>The shared part.</em> The expected count, given the modulation path, is
 E[K | Mod] = Σ_t p̄·Mod(t). Split each term around the modulation's mean of 1,
-Mod(t) = 1 + (Mod(t) − 1): the sum becomes m·p̄ + p̄·Σ_t (Mod(t) − 1). The
-first piece is the fixed mean; the second — that is where "Mod(t) − 1" comes
-from — is the surplus or deficit of expected spikes in <em>this particular
-window</em>, caused by the modulation having wandered above or below 1 during
-it. Both neurons see the same Mod path, so this term is <em>identical</em> for
-both: it is their covariance.
+Mod(t) = 1 + (Mod(t) − 1): the sum becomes m·p̄ + D, where
+D = p̄·Σ_t (Mod(t) − 1) — that is where "Mod(t) − 1" comes from — is the
+surplus or deficit of expected spikes in <em>this particular window</em>,
+caused by the modulation having wandered above or below 1 during it. Each
+neuron's count is therefore its conditional expectation plus its own coin-flip
+noise:
+</p>
+<pre><code>K₁ = m·p̄ + D + noise₁          # same D for both neurons: they ride the same Mod path
+K₂ = m·p̄ + D + noise₂          # independent noises: their coin flips are their own</code></pre>
+<p>
+Both deviations from the overall mean m·p̄ are "D plus own noise", so the
+average product of the deviations is
+</p>
+<pre><code>Cov(K₁, K₂) = E[(D + noise₁)·(D + noise₂)] = E[D²] = Var(D)</code></pre>
+<p>
+— every product involving a noise term averages to zero, because the coin
+flips have mean zero given the path and are independent of everything else.
+The covariance of the two counts is therefore exactly the variance of the
+shared surplus D. What remains is to evaluate Var(D).
 </p>
 <p>
 <em>Where z comes in ("to leading order").</em> The pipeline below builds
@@ -701,13 +725,17 @@ to have mean 1 and standard deviation σ. For small σ that chain is well
 approximated by its linearisation — a first-order Taylor expansion —
 Mod(t) ≈ 1 + σ·z(t); the neglected terms carry higher powers of σ and are
 negligible at σ ≈ 0.08 (the Fig. 11 example). With that,
-Σ_t (Mod(t) − 1) ≈ σ·(z(1) + … + z(m)), whose variance is σ²·W(m) — this is
-the only place W(m) is needed. Its value depends on the memory a: with no
-memory (τ_c = 0) the m samples of z are independent and W(m) = m; with memory,
-consecutive z values reinforce each other and W(m) grows toward m² for windows
-shorter than τ_c. Putting private and shared together:
+D = p̄·Σ_t (Mod(t) − 1) ≈ p̄·σ·(z(1) + … + z(m)), so
+Var(D) = p̄²·σ²·W(m) with W(m) the variance of that sum of m consecutive z
+values — this is the only place W(m) is needed. Its value depends on the
+memory a: with no memory (τ_c = 0) the m samples of z are independent and
+W(m) = m; with memory, consecutive z values reinforce each other and W(m)
+grows toward m² for windows shorter than τ_c. Putting the pieces together —
+covariance Var(D), variance = coin-flip part plus shared part:
 </p>
-<pre><code>r_sc(T) = shared / (private + shared) = p̄·σ²·W(m) / (m + p̄·σ²·W(m))</code></pre>
+<pre><code>r_sc(T) = Cov(K₁, K₂) / Var(K)
+        = p̄²·σ²·W(m) / (m·p̄ + p̄²·σ²·W(m))       # divide through by p̄:
+        = p̄·σ²·W(m) / (m + p̄·σ²·W(m))</code></pre>
 <p>
 — the curve of Fig. 12. The calibration is this formula read backwards: demand
 r_sc(T_meas) = target, solve for σ². Note the two roles the window plays: the
