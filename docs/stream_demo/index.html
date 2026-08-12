@@ -767,8 +767,9 @@ Inside ±2 (95 % of the time) the curve and its tangent differ by less than
 order" / "for small σ" refers to: the neglected curvature terms carry higher
 powers of σ. With that,
 </p>
-<pre><code>D = p̄·Σ_t (Mod(t) − 1) ≈ p̄·σ · (z(1) + … + z(m))
-    └ constant factor ┘   └── the random part ──┘</code></pre>
+<pre><code>D = p̄·Σ_t (Mod(t) − 1) ≈ (p̄·σ) · (z(1) + … + z(m))
+                         └─┬─┘   └───────┬───────┘
+                  constant factor the random part</code></pre>
 <p>
 Now the variance of D, in two standard steps. <em>First</em>, pulling a
 constant out of a variance squares it: Var(c·X) = c²·Var(X). That is because
