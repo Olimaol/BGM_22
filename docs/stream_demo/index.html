@@ -259,6 +259,35 @@ is exact without knowing which axons are whose. All coupling between receivers c
 from the shared k(t): a bin where the pool fires a lot is a high bin for
 <em>everyone</em>. Figure 3 shows this over six TRs of the real drive.
 </p>
+<p>
+<strong>What the hypergeometric distribution is.</strong> It answers the urn
+question <em>without replacement</em>: an urn holds M marbles, N_i of them yours
+and M − N_i not; someone draws k marbles; the number c of <em>your</em> marbles
+among the k is hypergeometric, with
+</p>
+<pre><code>P(c) = C(N_i, c) · C(M − N_i, k − c) / C(M, k)      # C(n, k): binomial coefficient
+mean = k · N_i / M
+var  = k · (N_i/M) · (1 − N_i/M) · (M − k)/(M − 1)</code></pre>
+<p>
+It is the without-replacement sibling of the Binomial: a Binomial would ask the
+same question with each drawn marble put back, and has the larger variance
+k·(N_i/M)·(1 − N_i/M) — the factor (M − k)/(M − 1) &lt; 1 is the correction for
+drawing without replacement (an axon either fired this bin or it didn't; it
+cannot be "drawn twice"). In our setting the urn is the region's axon pool, your
+marbles are the N_i axons receiver i owns, and the k drawn marbles are the axons
+that fired in this bin.
+</p>
+<p>
+<strong>The NumPy function.</strong>
+<code>rng.hypergeometric(ngood, nbad, nsample)</code> samples exactly this:
+it returns the number of "good" items in a sample of <code>nsample</code> drawn
+without replacement from a population of <code>ngood + nbad</code>. The
+generator calls
+<code>rng.hypergeometric(N_i, M − N_i, k)</code> with the bin-wise k(t)
+broadcast to shape (R, n) — one independent draw per receiver and bin, all
+conditioned on the same shared k(t) of that bin, which is precisely where the
+receiver correlation comes from.
+</p>
 <div class="key">
 <p><strong>The c_i(t) are the stream.</strong> Stack the count rows c_i(t) of all R
 receivers of one type and you have exactly the (R, n_steps) matrix of Fig. 1 —
