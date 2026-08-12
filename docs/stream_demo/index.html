@@ -605,74 +605,142 @@ p(t) = p_drive(t) — pending the scan of <code>TODO.md</code> §25, because the
 values set the simulated BOLD amplitude directly. This section exists so the
 machinery is understood before it is turned on.
 </div>
-<h3>What the step is for, and its inputs</h3>
+<h3>What we want: correlated spike counts</h3>
 <p>
 In cases 1a–1c the presynaptic neurons fire independently of each other, given
 the drive. In reality two cortical (or striatal) neurons are themselves weakly
-correlated. The target for that is <strong>r_sc</strong>, the pairwise
-<em>spike-count correlation</em> between two presynaptic neurons: count each
-neuron's spikes in windows of length <strong>T_meas</strong>, and correlate the
-two count series. r_sc only means something together with its window — that is
-Fig. 13's point — so the step takes three inputs: the target r_sc, the window
-T_meas it was measured at, and a correlation timescale <strong>τ_c</strong>
-(how slowly the shared fluctuation drifts; both times in ms).
+correlated, and the standard measure of that is the pairwise
+<em>spike-count correlation</em>. Spelled out precisely: there are two neurons.
+Chop time into consecutive counting windows of length <strong>T_meas</strong>,
+i.e. <strong>m = T_meas / dt</strong> bins each (in the example running through
+this section: m = 200 bins of dt = 1 ms, so 200 ms per window). Within a
+single bin a neuron either spikes or it doesn't — one coin flip with
+probability p(t) per bin. For window number w, let K₁(w) be the <em>total</em>
+spike count of neuron 1 in that window — the sum of its m coin flips,
+typically ~20 spikes at p̄ = 0.1 — and K₂(w) the same for neuron 2. Over many
+windows this gives two series of window totals, and the spike-count
+correlation is the correlation between them:
+</p>
+<pre><code>r_sc = corr(K₁(w), K₂(w))        across windows w</code></pre>
+<p>
+So "count" always means the total over a whole window, never a single bin; in
+the derivation below, K stands for one such window total of one neuron. What
+this step must achieve is a chosen value of r_sc: the two count series should
+rise and fall together, to a controlled degree.
 </p>
 <p>
-The mechanism that realises it: all presynaptic neurons of the stream share one
-multiplicative modulation <strong>Mod(t)</strong> of their firing probability,
+Three numbers therefore have to be fixed up front. The target
+<strong>r_sc</strong> itself; the window <strong>T_meas</strong> it was
+measured at — required because the same mechanism produces a
+<em>different</em> measured correlation at every counting window, so a target
+without its window is meaningless (the derivation ends at exactly this point,
+Fig. 13); and a correlation timescale <strong>τ_c</strong> — how slowly the
+shared fluctuation drifts (both times in ms).
+</p>
+<h3>From correlation to covariance and variance</h3>
+<p>
+The definition of r_sc dictates what has to be computed. The covariance of the
+two window counts,
+Cov(K₁, K₂) = E[(K₁ − E[K₁]) · (K₂ − E[K₂])], is the average <em>product of
+their deviations</em> from their respective means: positive when the two counts
+tend to be high together and low together, zero when their fluctuations are
+unrelated. The correlation is just its normalised form,
+r_sc = Cov(K₁, K₂) / (SD(K₁)·SD(K₂)) — and since the two neurons are
+statistically identical, that is Cov divided by the common variance:
+</p>
+<pre><code>r_sc = Cov(K₁, K₂) / Var(K)</code></pre>
+<p>
+So the whole task reduces to two quantities — the covariance between the two
+count series and the variance of one of them — both computed under whatever
+mechanism couples the neurons. The next two subsections fix that mechanism;
+the derivation then computes Cov(K₁, K₂) and Var(K) for it.
+</p>
+<h3>The mechanism: a shared multiplicative modulation</h3>
+<p>
+The coupling is deliberately simple: all presynaptic neurons of the stream
+share one multiplicative modulation <strong>Mod(t)</strong> of their firing
+probability,
 </p>
 <pre><code>p(t) = p_drive(t) · Mod(t)          # p_drive(t) = rate(t)·dt/1000, exactly as in step 2a</code></pre>
 <p>
 with Mod(t) fluctuating around 1: mean exactly 1 (the mean drive is untouched),
-variance <strong>σ²</strong> (the knob that is solved for below), and
-autocorrelation timescale τ_c. Every neuron waxing and wanes together is what
-correlates their spike counts.
+variance <strong>σ²</strong> — the single unknown of this whole section, solved
+for at the end of the derivation — and autocorrelation timescale τ_c. Every
+neuron waxing and waning together is what correlates their spike counts.
 </p>
-<h3>Calibration: solving σ² from r_sc</h3>
-<p>
-The calibration has exactly one unknown and one output: the number
-<strong>σ²</strong>, the variance of Mod(t). It is computed once, before any
-bins are drawn (nothing is simulated here — z(t) does not exist yet; the
-formulas below only <em>anticipate</em> the statistics the pipeline will
-produce). That σ² is then handed to the generation pipeline of Fig. 12, which
-builds the one Mod(t) shared by all presynaptic neurons of the stream. Every
-other symbol in the block is computed from known inputs:
-</p>
-<pre><code>m    = T_meas / dt                           # the measurement window in bins
-a    = exp(−dt/τ_c)                          # per-bin memory: autocorrelation decays by a each bin
-p̄    = mean of p_drive(t)                    # mean per-bin firing probability of the drive
-W(m) = Var[z(1) + … + z(m)]                  # how much shared wobble accumulates over one window;
-                                             #   closed form in ou_sum_variance; W(m) = m if τ_c = 0
-σ²   = r_sc · m / ((1 − r_sc) · p̄ · W(m))    # the modulation variance that yields r_sc at window T_meas</code></pre>
 <p>
 <strong>What p_drive and p̄ are.</strong> p_drive(t) = rate(t)·dt/1000 is the
 <em>unmodulated</em> per-bin firing probability, straight from the drive — the
 same quantity every case used in step 2a (the staircase of Fig. 3 for cortical
 streams, the flat line of Fig. 8 for missing GABA). Step 2b multiplies Mod(t)
-onto it. p̄ is simply its average over the stretch being generated — a single
-number (in the Fig. 12 example the drive is constant at 100 Hz, so
-p̄ = p_drive = 0.1).
+onto it. <strong>p̄</strong> is simply its average over the stretch being
+generated — a single number (in the running example the drive is constant at
+100 Hz, so p̄ = p_drive = 0.1).
 </p>
 <p>
-<strong>What W(m) is, and why a sum of z(t) appears.</strong> First the
-definition of r_sc, spelled out precisely. There are two neurons. Chop time
-into consecutive windows of m bins each (in the example: m = 200 bins of
-dt = 1 ms, so 200 ms per window). Within a single bin a neuron either spikes
-or it doesn't — one coin flip with probability p(t) per bin. For window
-number w, let K₁(w) be the <em>total</em> spike count of neuron 1 in that
-window — the sum of its m coin flips, typically ~20 spikes at p̄ = 0.1 — and
-K₂(w) the same for neuron 2. Over many windows this gives two series of
-window totals, and r_sc is the correlation between them:
-r_sc = corr(K₁(w), K₂(w)) across w. So "count" always means the total over a
-whole window, never a single bin. In the derivation below, K stands for one
-such window total of one neuron.
-One simplification before we start: the definition of the modulated
-probability is always p(t) = p_drive(t)·Mod(t), but for the calibration the
-drive is taken at its mean, p_drive(t) → p̄, so p(t) = p̄·Mod(t) throughout
-this derivation. That is exact for a constant drive (the Fig. 12 example) and
-is precisely the simplification the code itself makes —
+One simplification, used from here on: for the calibration the drive is taken
+at its mean, p_drive(t) → p̄, so p(t) = p̄·Mod(t) throughout the derivation.
+That is exact for a constant drive (the running example) and is precisely the
+simplification the code itself makes —
 <code>solve_modulation_amplitude</code> receives only p̄, never the full
-p_drive(t). With that, K varies for two reasons:
+p_drive(t).
+</p>
+<h3>Generation: the pipeline of Figure 11</h3>
+<p>
+Before deriving anything, here is how such a Mod(t) is actually built — the
+derivation leans on the pieces, so they should be concrete first. Given a
+variance σ², the modulation is generated in five lines — one per panel of
+Fig. 11:
+</p>
+<pre><code>ξ(t) ~ N(0, 1)                               # white noise, one value per bin      (Fig. 11, panel 1)
+z(t) = a·z(t−1) + √(1 − a²)·ξ(t)             # AR(1) filter: adds the memory τ_c   (panel 2)
+u(t) = Φ(z(t))                               # Φ = standard normal CDF → uniform   (panel 3)
+Mod(t) = GammaInv(u(t); mean 1, var σ²)      # Gamma inverse CDF → the modulation  (panel 4)
+p(t) = p_drive(t) · Mod(t)                   # the modulated probability           (panel 5)</code></pre>
+<p>
+Line by line. <strong>ξ(t)</strong> is fresh Gaussian white noise — no memory,
+no structure. <strong>z(t)</strong> is an <em>AR(1) process</em>
+("autoregressive of order 1"): each value is the previous one times the memory
+coefficient <strong>a = exp(−dt/τ_c)</strong>, plus scaled fresh noise. That
+single recursion gives z(t) unit variance and an autocorrelation that decays as
+a<sup>k</sup> = e<sup>−k·dt/τ_c</sup> — a trace that wanders slowly on the
+timescale τ_c instead of jumping independently every bin.
+<strong>u(t) = Φ(z(t))</strong> pushes z through the standard normal cumulative
+distribution function, turning a Gaussian value into one uniform on (0, 1)
+while keeping the time correlation. <strong>Mod(t)</strong> pushes u through
+the <em>inverse</em> CDF of a Gamma distribution chosen to have mean 1 and
+variance σ² — the standard trick for "keep the correlation, change the
+distribution": the result inherits z's slow time structure but is Gamma
+distributed, hence strictly positive at any σ² (a Gaussian modulation could
+make p(t) negative). The last line multiplies it onto the drive. Cost is one
+trace per stream, O(n_steps) — not one per receiver.
+</p>
+<figure id="fig11">
+  <img src="figures/fig_2b_pipeline.png" alt="Five aligned panels: white noise, the AR(1) trace, its normal-CDF uniforms, the Gamma-warped modulation, and the modulated p(t) around the flat p_drive." width="920">
+  <figcaption><b>Figure 11.</b> The five pipeline lines above, one panel each,
+  over 1.2 s. Parameters: target r_sc = 0.05 at T_meas = 200 ms, τ_c = 50 ms,
+  constant 100 Hz drive at dt = 1 ms (so p_drive = 0.1 and p̄ = 0.1). Panel 1:
+  the white noise ξ(t). Panel 2: the AR(1) trace z(t) — same randomness, now
+  wandering on the τ_c = 50 ms timescale. Panel 3: u(t) = Φ(z(t)) ∈ (0, 1).
+  Panel 4: Mod(t), Gamma distributed around its mean 1 (dashed) — drawn with
+  σ² = 0.007, the value the calibration below solves for exactly these
+  parameters. Panel 5: p(t) = p_drive·Mod(t) fluctuating around p_drive = 0.1
+  (dashed) — the value every receiver's draw then uses in step 3.</figcaption>
+</figure>
+<p>
+The one thing the pipeline does not fix is <strong>σ²</strong>: how hard the
+modulation may wobble so that the target r_sc comes out at the window T_meas.
+That is the calibration. It is a single analytic computation, done once before
+any bins are drawn — nothing is simulated for it; the derivation only
+<em>anticipates</em> the statistics the pipeline above will produce — and its
+result σ² is then handed to the pipeline, which builds the one Mod(t) shared
+by all presynaptic neurons of the stream. Deriving it is the rest of this
+section.
+</p>
+<h3>Deriving r_sc(T), then solving for σ²</h3>
+<p>
+The plan from above: compute Cov(K₁, K₂) and Var(K) under the shared
+modulation, with p(t) = p̄·Mod(t). A window count K varies for two reasons:
 </p>
 <p>
 <em>The private part.</em> Even with the modulation path held fixed, the coin
@@ -685,17 +753,6 @@ counting longer means summing more independent coin flips, and the absolute
 spread of a sum grows linearly in the number of terms. Crucially, the two
 neurons flip their coins <em>independently</em>, so this part contributes to
 each neuron's variance but not to their covariance.
-</p>
-<p>
-<em>What covariance is, and what we are after.</em> The covariance of the two
-window counts,
-Cov(K₁, K₂) = E[(K₁ − E[K₁]) · (K₂ − E[K₂])], is the average <em>product of
-their deviations</em> from their respective means: positive when the two counts
-tend to be high together and low together, zero when their fluctuations are
-unrelated. The correlation being calibrated is just its normalised form,
-r_sc = Cov(K₁, K₂) / (SD(K₁)·SD(K₂)) — and since the two neurons are
-statistically identical, that is Cov divided by the common variance. So the
-goal of the next two steps is to compute Cov(K₁, K₂) and Var(K).
 </p>
 <p>
 <em>The shared part.</em> The expected count, given the modulation path, is
@@ -738,7 +795,7 @@ The covariance of the two counts is therefore exactly the variance of the
 shared surplus D. What remains is to evaluate Var(D).
 </p>
 <p>
-<em>Where z comes in ("to leading order").</em> The pipeline below builds
+<em>Where z comes in ("to leading order").</em> The pipeline above builds
 Mod(t) from z(t) by applying one fixed function to it,
 Mod(t) = g(z(t)) with g(z) = GammaInv(Φ(z)) — a smooth, increasing curve
 mapping each Gaussian value to a Gamma value. "First-order Taylor expansion"
@@ -748,16 +805,16 @@ at z = 0 is the relevant one — and its two coefficients are forced by
 construction: g(0) ≈ 1 (z = 0 is the median of the Gaussian, so it maps to
 the middle of a Gamma whose mean is 1) and slope g′(0) ≈ σ (a near-linear
 map that turns a spread-1 input into a spread-σ output must stretch by σ).
-Hence Mod(t) ≈ 1 + σ·z(t). How good that is at the worked example's
+Hence Mod(t) ≈ 1 + σ·z(t). How good that is at the running example's
 σ = 0.0835, exact g(z) against the tangent 1 + σ·z:
 </p>
 <pre><code>z        −3       −2       −1        0       +1       +2       +3
 g(z)     0.768    0.840    0.917    0.998    1.083    1.174    1.269
 1+σ·z    0.750    0.833    0.917    1.000    1.084    1.167    1.251</code></pre>
-<figure id="fig11">
+<figure id="fig12">
   <img src="figures/fig_2b_tangent.png" alt="The curve g(z) = GammaInv(Phi(z)) and its tangent line 1 + sigma z, nearly indistinguishable inside plus-minus two, with the region z visits 95 percent of the time shaded." width="720">
-  <figcaption><b>Figure 11.</b> The map g(z) = GammaInv(Φ(z)) (black) and its
-  tangent at z = 0, the line 1 + σ·z (violet dashed), for the worked example's
+  <figcaption><b>Figure 12.</b> The map g(z) = GammaInv(Φ(z)) (black) and its
+  tangent at z = 0, the line 1 + σ·z (violet dashed), for the running example's
   σ = 0.0835. Shaded: |z| ≤ 2, where the unit-variance z(t) sits 95 % of the
   time; there the curve and the line differ by less than 0.007 (the table
   above). The linearisation Mod(t) ≈ 1 + σ·z(t) is this substitution of the
@@ -765,7 +822,7 @@ g(z)     0.768    0.840    0.917    0.998    1.083    1.174    1.269
 </figure>
 <p>
 Inside ±2 (95 % of the time) the curve and its tangent differ by less than
-0.007 (Fig. 11) — and the mismatch shrinks with σ, which is what "to leading
+0.007 (Fig. 12) — and the mismatch shrinks with σ, which is what "to leading
 order" / "for small σ" refers to: the neglected curvature terms carry higher
 powers of σ. With that,
 </p>
@@ -778,17 +835,19 @@ constant out of a variance squares it: Var(c·X) = c²·Var(X). That is because
 variance is the average <em>squared</em> deviation — multiplying a random
 quantity by c makes every deviation c times larger, and squaring the
 deviations turns that into c². Here the constant is c = p̄·σ, giving the
-factor p̄²·σ². <em>Second</em>, what remains is Var(z(1) + … + z(m)), and that
-is precisely the quantity we <em>named</em> W(m) in the code block — nothing
-is computed here, the name is substituted. Together, result
-<strong>(R4): Var(D) = p̄²·σ²·W(m)</strong>.
+factor p̄²·σ². <em>Second</em>, what remains is Var(z(1) + … + z(m)) — how
+much shared wobble accumulates over one window. Give that quantity a name,
+</p>
+<pre><code>W(m) = Var[z(1) + … + z(m)]</code></pre>
+<p>
+Together, result <strong>(R4): Var(D) = p̄²·σ²·W(m)</strong>.
 (Why is W(m) not simply m times the variance of one z?
 Because "variance of a sum = sum of variances" holds only for
 <em>independent</em> terms. The z values are AR(1)-correlated, so all the
 pairwise covariances between different bins add on top: with no memory
 (τ_c = 0) they vanish and W(m) = m; with memory, consecutive z values
 reinforce each other and W(m) grows toward m² for windows shorter than τ_c —
-15 092 instead of 200 in the worked example.)
+15 092 instead of 200 in the running example.)
 </p>
 <p>
 <em>How W(m) is actually computed.</em> Purely analytically — no z is ever
@@ -807,7 +866,7 @@ lag:
 <code>ou_sum_variance(m, a)</code> is exactly that last line — one formula
 evaluation, exact and O(1), used because m is routinely 10 000 or more
 (T_meas in the literature at dt = 0.1 ms). All three routes agree: for the
-worked example (m = 200, a = 0.9802) the naive lag sum gives 15 092.4, the
+running example (m = 200, a = 0.9802) the naive lag sum gives 15 092.4, the
 closed form 15 092.4, and a brute-force simulation — generate a long z(t),
 chop it into 200-bin windows, take the empirical variance of the window sums —
 gives ≈ 15 060, matching up to sampling error. So simulation is a way to
@@ -829,15 +888,42 @@ Putting the pieces together — (R3) over (R5):
 </p>
 <pre><code>r_sc(T) = Cov(K₁, K₂) / Var(K)                    # (R3) / (R5)
         = p̄²·σ²·W(m) / (m·p̄ + p̄²·σ²·W(m))       # divide through by p̄:
-        = p̄·σ²·W(m) / (m + p̄·σ²·W(m))</code></pre>
+        = p̄·σ²·W(m) / (m + p̄·σ²·W(m))            # with m = T/dt</code></pre>
 <p>
-— the curve of Fig. 13. The calibration is this formula read backwards: demand
-r_sc(T_meas) = target, solve for σ². Note the two roles the window plays: the
-same σ² produces a different r_sc at every T, so the target is only
-well-defined once T_meas is named.
+Note what came out: not a single number but a <em>function of the counting
+window</em>, m = T/dt. The same modulation produces a different measured
+correlation at every window: summing counts over a longer window averages away
+the independent (private) spiking noise but keeps the shared slow modulation,
+so the correlation grows with T and saturates once T exceeds τ_c — the curve
+of Fig. 13.
 </p>
+<figure id="fig13">
+  <img src="figures/fig_2b_window.png" alt="Spike-count correlation versus counting window on a log axis: the analytic curve rises and saturates past the correlation timescale; simulated points follow it; the calibration point is marked." width="920">
+  <figcaption><b>Figure 13.</b> r_sc(T) for the modulation of Fig. 11: the
+  closed form above (black) and two simulated presynaptic neurons sharing that
+  Mod(t) (violet points; 2·10⁶ bins, counts correlated at windows
+  T = 5 … 1000 ms). The calibration point (diamond) is where the curve was
+  pinned: r_sc(T_meas = 200 ms) = 0.05. The same modulation yields r_sc ≈ 0.004
+  at a 5 ms window and ≈ 0.06 at 1 s — a literature value is meaningless without
+  its window, which is why <code>correlation_window_ms</code> is required as
+  soon as any correlation target is non-zero. The largest window has only 2 000
+  samples, hence its scatter.</figcaption>
+</figure>
 <p>
-<strong>Worked example</strong> — the exact numbers behind Fig. 12. Given: the
+This is why T_meas had to be named as an input back at the start: the same σ²
+yields the whole curve, and a target r_sc pins it at one point only. The
+calibration is the formula read backwards — demand that the curve pass through
+the target at the measured window, r_sc(T_meas) = target, and solve for σ²
+(multiply out, collect the σ² terms):
+</p>
+<pre><code>σ² = r_sc · m / ((1 − r_sc) · p̄ · W(m))          # m = T_meas/dt: pins the diamond of Fig. 13</code></pre>
+<p>
+That single number is what the calibration hands to the generation pipeline of
+Fig. 11.
+</p>
+<h3>Worked example</h3>
+<p>
+The exact numbers behind Fig. 11. Given: the
 target r_sc = 0.05 measured at T_meas = 200 ms, timescale τ_c = 50 ms, a
 constant 100 Hz drive, dt = 1 ms. Step by step
 (<code>solve_modulation_amplitude</code> reproduces these to all digits):
@@ -860,68 +946,8 @@ So the modulation needs a standard deviation of only σ = √0.00697 ≈ 0.08 �
 correlation at a 200 ms window. Sanity check forwards: with these numbers the
 shared part of the r_sc formula is p̄·σ²·W(m) = 0.1 · 0.00697 · 15 092 ≈ 10.5
 against the private part m = 200, and 10.5 / (200 + 10.5) = 0.05 — the target,
-recovered. This σ² = 0.007 is the value Fig. 12's panel 4 is drawn with.
+recovered. This σ² = 0.007 is the value Fig. 11's panel 4 is drawn with.
 </p>
-<h3>Generation: the pipeline of Figure 12</h3>
-<p>
-With σ² fixed, the modulation is generated in five lines — one per panel of
-Fig. 12:
-</p>
-<pre><code>ξ(t) ~ N(0, 1)                               # white noise, one value per bin      (Fig. 12, panel 1)
-z(t) = a·z(t−1) + √(1 − a²)·ξ(t)             # AR(1) filter: adds the memory τ_c   (panel 2)
-u(t) = Φ(z(t))                               # Φ = standard normal CDF → uniform   (panel 3)
-Mod(t) = GammaInv(u(t); mean 1, var σ²)      # Gamma inverse CDF → the modulation  (panel 4)
-p(t) = p_drive(t) · Mod(t)                   # the modulated probability           (panel 5)</code></pre>
-<p>
-Line by line. <strong>ξ(t)</strong> is fresh Gaussian white noise — no memory,
-no structure. <strong>z(t)</strong> is an <em>AR(1) process</em>
-("autoregressive of order 1"): each value is the previous one times the memory
-coefficient a, plus scaled fresh noise. That single recursion gives z(t) unit
-variance and an autocorrelation that decays as a<sup>k</sup> = e<sup>−k·dt/τ_c</sup>
-— a trace that wanders slowly on the timescale τ_c instead of jumping
-independently every bin. <strong>u(t) = Φ(z(t))</strong> pushes z through the
-standard normal cumulative distribution function, turning a Gaussian value into
-one uniform on (0, 1) while keeping the time correlation. <strong>Mod(t)</strong>
-pushes u through the <em>inverse</em> CDF of a Gamma distribution chosen to have
-mean 1 and variance σ² — the standard trick for "keep the correlation, change
-the distribution": the result inherits z's slow time structure but is Gamma
-distributed, hence strictly positive at any σ² (a Gaussian modulation could make
-p(t) negative). The last line multiplies it onto the drive. Cost is one trace
-per stream, O(n_steps) — not one per receiver.
-</p>
-<figure id="fig12">
-  <img src="figures/fig_2b_pipeline.png" alt="Five aligned panels: white noise, the AR(1) trace, its normal-CDF uniforms, the Gamma-warped modulation, and the modulated p(t) around the flat p_drive." width="920">
-  <figcaption><b>Figure 12.</b> The five pipeline lines above, one panel each,
-  over 1.2 s. Parameters: target r_sc = 0.05 at T_meas = 200 ms, τ_c = 50 ms,
-  constant 100 Hz drive at dt = 1 ms (so p_drive = 0.1 and p̄ = 0.1); the
-  calibration solves σ² = 0.007. Panel 1: the white noise ξ(t). Panel 2: the
-  AR(1) trace z(t) — same randomness, now wandering on the τ_c = 50 ms
-  timescale. Panel 3: u(t) = Φ(z(t)) ∈ (0, 1). Panel 4: Mod(t), Gamma
-  distributed around its mean 1 (dashed). Panel 5: p(t) = p_drive·Mod(t)
-  fluctuating around p_drive = 0.1 (dashed) — the value every receiver's draw
-  then uses in step 3.</figcaption>
-</figure>
-<h3>Why the window must be part of the target</h3>
-<p>
-The same modulation produces a <em>different</em> measured correlation at every
-counting window: summing counts over a longer window averages away the
-independent (private) spiking noise but keeps the shared slow modulation, so the
-correlation grows with T and saturates once T exceeds τ_c. Closed form, with
-m = T/dt:
-</p>
-<pre><code>r_sc(T) = p̄·σ²·W(m) / (m + p̄·σ²·W(m))</code></pre>
-<figure id="fig13">
-  <img src="figures/fig_2b_window.png" alt="Spike-count correlation versus counting window on a log axis: the analytic curve rises and saturates past the correlation timescale; simulated points follow it; the calibration point is marked." width="920">
-  <figcaption><b>Figure 13.</b> r_sc(T) for the modulation of Fig. 12: the
-  closed form above (black) and two simulated presynaptic neurons sharing that
-  Mod(t) (violet points; 2·10⁶ bins, counts correlated at windows
-  T = 5 … 1000 ms). The calibration point (diamond) is where the curve was
-  pinned: r_sc(T_meas = 200 ms) = 0.05. The same modulation yields r_sc ≈ 0.004
-  at a 5 ms window and ≈ 0.06 at 1 s — a literature value is meaningless without
-  its window, which is why <code>correlation_window_ms</code> is required as
-  soon as any correlation target is non-zero. The largest window has only 2 000
-  samples, hence its scatter.</figcaption>
-</figure>
 <p>
 Loose end tied back to section 1: the single-bin presynaptic correlation ρ that
 appears in the target formulas there is this same modulation evaluated at the
