@@ -912,6 +912,43 @@ def fig_2b_pipeline():
     return sigma
 
 
+def fig_2b_tangent(sigma):
+    """g(z) = GammaInv(Phi(z)) against its tangent 1 + sigma*z."""
+    from scipy.stats import gamma as gamma_dist, norm
+
+    z = np.linspace(-3.5, 3.5, 400)
+    g = gamma_dist.ppf(
+        np.clip(norm.cdf(z), 1e-12, 1 - 1e-12),
+        a=1.0 / sigma**2, scale=sigma**2,
+    )
+    fig, ax = new_fig(5.8, 3.0)
+    ax.axvspan(-2, 2, color=GRID, alpha=0.45, zorder=0)
+    ax.plot(z, g, color=INK, lw=2.0, label="g(z) = GammaInv(Φ(z))")
+    ax.plot(
+        z, 1 + sigma * z, color=C_SHARED, lw=1.8, linestyle=(0, (4, 3)),
+        label=f"tangent 1 + σ·z  (σ = {sigma:.3f})",
+    )
+    ax.scatter(
+        [0], [1], s=48, color=C_SHARED, zorder=5, edgecolors=SURFACE,
+        linewidths=1.5,
+    )
+    ax.text(
+        0.1, 1.012, "z = 0:  g(0) ≈ 1", fontsize=8, color=C_SHARED,
+    )
+    ax.text(
+        0, 0.79, "z stays here 95 % of the time", fontsize=8, color=INK2,
+        ha="center",
+    )
+    ax.set_xlabel("z")
+    ax.set_ylabel("Mod")
+    ax.set_title(
+        "the map from z(t) to Mod(t) is almost exactly its tangent"
+    )
+    ax.legend(loc="upper left", fontsize=8)
+    style_axes(ax)
+    save_fig(fig, "fig_2b_tangent.png")
+
+
 def fig_2b_window(sigma):
     p_drive = MOD["rate_hz"] * MOD["dt"] / 1000.0
     a = np.exp(-MOD["dt"] / MOD["tau_c"])
@@ -997,6 +1034,7 @@ def main():
 
     print("step 2b")
     sigma = fig_2b_pipeline()
+    fig_2b_tangent(sigma)
     fig_2b_window(sigma)
 
     dump_results(
