@@ -381,8 +381,14 @@ Step 1b (<code>build_geometric_source_pools</code>) makes the unsimulated neuron
 <code>multiplicity</code> — one virtual source stands for 10 real neurons) in a box
 that extends Rout beyond the receivers, connected to every receiver with the
 <em>model's own kernel</em>. A receiver's pool is whatever sources it connected to
-(Fig. 6), and the shared fraction between two receivers is the overlap of their
-pools — falling with distance automatically (Fig. 7).
+(Fig. 6); the size of that pool is the receiver's <strong>degree</strong>
+deg<sub>i</sub>, its realised afferent count. The degree is not a parameter — it
+falls out of the construction (density × kernel), scattering around the kernel
+integral: in the toy, mean 29.4 ± 5.3 sources per receiver against an expected
+30.1; in the real 3D run of Table 3, deg × multiplicity ≈ 481 afferents against
+E_outer ≈ 500. The shared fraction between two receivers is the overlap of their
+pools, normalised by their degrees — falling with distance automatically
+(Fig. 7).
 </p>
 <figure id="fig6">
   <img src="figures/fig_1b_structure.png" alt="Two 2D maps of a source cloud around a receiver grid; a near receiver pair with shared sources highlighted, and a far pair sharing almost none." width="920">
@@ -399,8 +405,15 @@ pools — falling with distance automatically (Fig. 7).
   <figcaption><b>Figure 7.</b> Realised shared fraction
   f = n<sub>shared</sub>/√(deg<sub>i</sub>·deg<sub>j</sub>) against pair distance
   for all 4 950 receiver pairs of the toy cloud of Fig. 6 (blue dots; black line:
-  mean per 1-unit distance bin). The two example pairs of Fig. 6 are marked. The
-  decay is inherited entirely from the kernel geometry.</figcaption>
+  mean per 1-unit distance bin). Here n<sub>shared</sub> is the number of sources
+  in both pools and deg<sub>i</sub> is receiver i's degree — the size of its
+  pool, i.e. how many blue (or magenta) dots Fig. 6 shows for it; toy mean
+  29.4 ± 5.3. The geometric mean √(deg<sub>i</sub>·deg<sub>j</sub>) is the right
+  normaliser because the correlation of two Binomial counts sharing n of their
+  N<sub>i</sub> and N<sub>j</sub> afferents is n/√(N<sub>i</sub>N<sub>j</sub>)
+  (cf. case 1a). Example: the near pair of Fig. 6 shares 3 sources with degrees
+  28 and 42, so f = 3/√(28·42) = 0.087. The two example pairs of Fig. 6 are
+  marked. The decay is inherited entirely from the kernel geometry.</figcaption>
 </figure>
 <p>Per bin, spikes are thrown at the whole cloud and scattered
 (<code>simulate_receiver_counts_geometric_to_memmap</code>):</p>
