@@ -630,18 +630,49 @@ correlates their spike counts.
 </p>
 <h3>Calibration: solving σ² from r_sc</h3>
 <p>
-Four derived symbols, then the solution
-(<code>solve_modulation_amplitude</code>):
+The calibration has exactly one unknown and one output: the number
+<strong>σ²</strong>, the variance of Mod(t). It is computed once, before any
+bins are drawn (nothing is simulated here — z(t) does not exist yet; the
+formulas below only <em>anticipate</em> the statistics the pipeline will
+produce). That σ² is then handed to the generation pipeline of Fig. 11, which
+builds the one Mod(t) shared by all presynaptic neurons of the stream. Every
+other symbol in the block is computed from known inputs:
 </p>
 <pre><code>m    = T_meas / dt                           # the measurement window in bins
 a    = exp(−dt/τ_c)                          # per-bin memory: autocorrelation decays by a each bin
-p̄    = mean of p_drive(t)                    # mean firing probability per bin
-W(m) = Var[z(1) + … + z(m)]                  # variance of a summed stretch of z(t), see below;
+p̄    = mean of p_drive(t)                    # mean per-bin firing probability of the drive
+W(m) = Var[z(1) + … + z(m)]                  # how much shared wobble accumulates over one window;
                                              #   closed form in ou_sum_variance; W(m) = m if τ_c = 0
 σ²   = r_sc · m / ((1 − r_sc) · p̄ · W(m))    # the modulation variance that yields r_sc at window T_meas</code></pre>
 <p>
-This is just the r_sc(T) formula of Fig. 12 read backwards: demand that the
-correlation measured at window T_meas equals the target, solve for σ².
+<strong>What p_drive and p̄ are.</strong> p_drive(t) = rate(t)·dt/1000 is the
+<em>unmodulated</em> per-bin firing probability, straight from the drive — the
+same quantity every case used in step 2a (the staircase of Fig. 3 for cortical
+streams, the flat line of Fig. 8 for missing GABA). Step 2b multiplies Mod(t)
+onto it. p̄ is simply its average over the stretch being generated — a single
+number (in the Fig. 11 example the drive is constant at 100 Hz, so
+p̄ = p_drive = 0.1).
+</p>
+<p>
+<strong>What W(m) is, and why a sum of z(t) appears.</strong> Recall the
+definition of r_sc: count each neuron's spikes over a window of m bins and
+correlate the counts. A neuron's window count K = Σ_t (spikes in bin t) has two
+sources of variability: its private spiking noise, which grows like m·p̄, and
+the shared modulation — over the window the modulation contributes
+p̄·Σ_t (Mod(t) − 1), which to leading order is p̄·σ·(z(1) + … + z(m)). So the
+strength of the <em>shared</em> part is set by the variance of that summed
+stretch of the AR(1) trace, which is exactly W(m). Its value depends on the
+memory a: with no memory (τ_c = 0) the m samples are independent and
+W(m) = m; with memory, consecutive z values reinforce each other and W(m)
+grows toward m² for windows shorter than τ_c. Only the shared part is common
+to the two neurons, so
+</p>
+<pre><code>r_sc(T) = shared / (private + shared) = p̄·σ²·W(m) / (m + p̄·σ²·W(m))</code></pre>
+<p>
+— the curve of Fig. 12. The calibration is this formula read backwards: demand
+r_sc(T_meas) = target, solve for σ². Note the two roles the window plays: the
+same σ² produces a different r_sc at every T, so the target is only
+well-defined once T_meas is named.
 </p>
 <h3>Generation: the pipeline of Figure 11</h3>
 <p>
