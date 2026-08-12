@@ -737,11 +737,26 @@ shared surplus D. What remains is to evaluate Var(D).
 </p>
 <p>
 <em>Where z comes in ("to leading order").</em> The pipeline below builds
-Mod(t) from z(t) through two monotone maps, Mod(t) = GammaInv(Φ(z(t))), tuned
-to have mean 1 and standard deviation σ. For small σ that chain is well
-approximated by its linearisation — a first-order Taylor expansion —
-Mod(t) ≈ 1 + σ·z(t); the neglected terms carry higher powers of σ and are
-negligible at σ ≈ 0.08 (the Fig. 11 example). With that,
+Mod(t) from z(t) by applying one fixed function to it,
+Mod(t) = g(z(t)) with g(z) = GammaInv(Φ(z)) — a smooth, increasing curve
+mapping each Gaussian value to a Gamma value. "First-order Taylor expansion"
+means: near a point, replace a smooth curve by its tangent line,
+g(z) ≈ g(0) + g′(0)·z. Since z has mean 0 and rarely leaves ±3, the tangent
+at z = 0 is the relevant one — and its two coefficients are forced by
+construction: g(0) ≈ 1 (z = 0 is the median of the Gaussian, so it maps to
+the middle of a Gamma whose mean is 1) and slope g′(0) ≈ σ (a near-linear
+map that turns a spread-1 input into a spread-σ output must stretch by σ).
+Hence Mod(t) ≈ 1 + σ·z(t). How good that is at the worked example's
+σ = 0.0835, exact g(z) against the tangent 1 + σ·z:
+</p>
+<pre><code>z        −3       −2       −1        0       +1       +2       +3
+g(z)     0.768    0.840    0.917    0.998    1.083    1.174    1.269
+1+σ·z    0.750    0.833    0.917    1.000    1.084    1.167    1.251</code></pre>
+<p>
+Inside ±2 (95 % of the time) the curve and its tangent differ by less than
+0.007 — and the mismatch shrinks with σ, which is what "to leading order" /
+"for small σ" refers to: the neglected curvature terms carry higher powers of
+σ. With that,
 D = p̄·Σ_t (Mod(t) − 1) ≈ p̄·σ·(z(1) + … + z(m)), so
 Var(D) = p̄²·σ²·W(m) with W(m) the variance of that sum of m consecutive z
 values — this is the only place W(m) is needed. Its value depends on the
