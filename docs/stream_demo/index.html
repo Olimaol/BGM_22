@@ -700,6 +700,32 @@ r_sc(T_meas) = target, solve for σ². Note the two roles the window plays: the
 same σ² produces a different r_sc at every T, so the target is only
 well-defined once T_meas is named.
 </p>
+<p>
+<strong>Worked example</strong> — the exact numbers behind Fig. 11. Given: the
+target r_sc = 0.05 measured at T_meas = 200 ms, timescale τ_c = 50 ms, a
+constant 100 Hz drive, dt = 1 ms. Step by step
+(<code>solve_modulation_amplitude</code> reproduces these to all digits):
+</p>
+<pre><code># given:  r_sc = 0.05,  T_meas = 200 ms,  τ_c = 50 ms,  rate = 100 Hz,  dt = 1 ms
+
+m    = T_meas / dt        = 200 / 1                       = 200 bins
+a    = exp(−dt/τ_c)       = exp(−1/50)                    = 0.9802
+p̄    = rate · dt / 1000   = 100 · 1 / 1000                = 0.1
+W(m) = ou_sum_variance(200, 0.9802)                       = 15 092
+       # 75× larger than the memoryless W = m = 200: within a 200 ms window the
+       # 50 ms memory makes consecutive z values reinforce instead of cancel
+
+σ²   = r_sc · m / ((1 − r_sc) · p̄ · W(m))
+     = 0.05 · 200 / (0.95 · 0.1 · 15 092)
+     = 10 / 1433.8                                        = 0.00697</code></pre>
+<p>
+So the modulation needs a standard deviation of only σ = √0.00697 ≈ 0.08 — an
+8 % waxing and waning of the firing probability — to produce a 0.05 spike-count
+correlation at a 200 ms window. Sanity check forwards: with these numbers the
+shared part of the r_sc formula is p̄·σ²·W(m) = 0.1 · 0.00697 · 15 092 ≈ 10.5
+against the private part m = 200, and 10.5 / (200 + 10.5) = 0.05 — the target,
+recovered. This σ² = 0.007 is the value Fig. 11's panel 4 is drawn with.
+</p>
 <h3>Generation: the pipeline of Figure 11</h3>
 <p>
 With σ² fixed, the modulation is generated in five lines — one per panel of
