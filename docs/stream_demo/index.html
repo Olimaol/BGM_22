@@ -678,7 +678,9 @@ p_drive(t). With that, K varies for two reasons:
 <em>The private part.</em> Even with the modulation path held fixed, the coin
 flips themselves are random. Variances of independent contributions add, and
 one bin's flip has variance p(t)·(1 − p(t)) ≈ p̄ (p is small), so m bins
-contribute variance ≈ m·p̄. That is why this part "grows with the window":
+contribute variance ≈ m·p̄ — the first intermediate result,
+<strong>(R1): Var(coin-flip part) = m·p̄</strong>. That is why this part
+"grows with the window":
 counting longer means summing more independent coin flips, and the absolute
 spread of a sum grows linearly in the number of terms. Crucially, the two
 neurons flip their coins <em>independently</em>, so this part contributes to
@@ -715,20 +717,20 @@ leftover a name — <em>define</em>
 noise₂ = K₂ − E[K₂ | Mod]       # same for neuron 2</code></pre>
 <p>
 Rearranging is then an identity, not an assumption — "actual = expected given
-the path + leftover":
+the path + leftover" — result <strong>(R2)</strong>:
 </p>
 <pre><code>K₁ = m·p̄ + D + noise₁          # same D for both neurons: they ride the same Mod path
 K₂ = m·p̄ + D + noise₂          # independent noises: their coin flips are their own</code></pre>
 <p>
 These noise terms are exactly the private coin-flip randomness of the first
-paragraph: mean 0 given the path, variance ≈ m·p̄, and noise₁ independent of
-noise₂ because the two neurons flip separate coins.
+paragraph: mean 0 given the path, variance ≈ m·p̄ (that is R1), and noise₁
+independent of noise₂ because the two neurons flip separate coins.
 </p>
 <p>
 Both deviations from the overall mean m·p̄ are "D plus own noise", so the
 average product of the deviations is
 </p>
-<pre><code>Cov(K₁, K₂) = E[(D + noise₁)·(D + noise₂)] = E[D²] = Var(D)</code></pre>
+<pre><code>Cov(K₁, K₂) = E[(D + noise₁)·(D + noise₂)] = E[D²] = Var(D)      # (R3)</code></pre>
 <p>
 — every product involving a noise term averages to zero, because the coin
 flips have mean zero given the path and are independent of everything else.
@@ -778,17 +780,31 @@ quantity by c makes every deviation c times larger, and squaring the
 deviations turns that into c². Here the constant is c = p̄·σ, giving the
 factor p̄²·σ². <em>Second</em>, what remains is Var(z(1) + … + z(m)), and that
 is precisely the quantity we <em>named</em> W(m) in the code block — nothing
-is computed here, the name is substituted. Together:
-Var(D) = p̄²·σ²·W(m). (Why is W(m) not simply m times the variance of one z?
+is computed here, the name is substituted. Together, result
+<strong>(R4): Var(D) = p̄²·σ²·W(m)</strong>.
+(Why is W(m) not simply m times the variance of one z?
 Because "variance of a sum = sum of variances" holds only for
 <em>independent</em> terms. The z values are AR(1)-correlated, so all the
 pairwise covariances between different bins add on top: with no memory
 (τ_c = 0) they vanish and W(m) = m; with memory, consecutive z values
 reinforce each other and W(m) grows toward m² for windows shorter than τ_c —
-15 092 instead of 200 in the worked example.) Putting the pieces together —
-covariance Var(D), variance = coin-flip part plus shared part:
+15 092 instead of 200 in the worked example.)
 </p>
-<pre><code>r_sc(T) = Cov(K₁, K₂) / Var(K)
+<p>
+<em>The variance of one count.</em> One piece is still missing for the
+correlation: Var(K). It comes from the same decomposition (R2): a count's
+deviation from its overall mean m·p̄ is D + noise, and the average of its
+<em>square</em> splits exactly like the covariance did — the cross term
+2·E[D·noise] vanishes for the same reason as before (noise has mean 0 given
+the path, independent of it). What remains are the two variances already
+computed, (R4) and (R1):
+</p>
+<pre><code>Var(K) = E[(D + noise)²] = Var(D) + Var(noise)
+       = p̄²·σ²·W(m) + m·p̄                        # (R5) = (R4) + (R1)</code></pre>
+<p>
+Putting the pieces together — (R3) over (R5):
+</p>
+<pre><code>r_sc(T) = Cov(K₁, K₂) / Var(K)                    # (R3) / (R5)
         = p̄²·σ²·W(m) / (m·p̄ + p̄²·σ²·W(m))       # divide through by p̄:
         = p̄·σ²·W(m) / (m + p̄·σ²·W(m))</code></pre>
 <p>
