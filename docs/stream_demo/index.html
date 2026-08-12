@@ -766,12 +766,25 @@ Inside ±2 (95 % of the time) the curve and its tangent differ by less than
 0.007 (Fig. 11) — and the mismatch shrinks with σ, which is what "to leading
 order" / "for small σ" refers to: the neglected curvature terms carry higher
 powers of σ. With that,
-D = p̄·Σ_t (Mod(t) − 1) ≈ p̄·σ·(z(1) + … + z(m)), so
-Var(D) = p̄²·σ²·W(m) with W(m) the variance of that sum of m consecutive z
-values — this is the only place W(m) is needed. Its value depends on the
-memory a: with no memory (τ_c = 0) the m samples of z are independent and
-W(m) = m; with memory, consecutive z values reinforce each other and W(m)
-grows toward m² for windows shorter than τ_c. Putting the pieces together —
+</p>
+<pre><code>D = p̄·Σ_t (Mod(t) − 1) ≈ p̄·σ · (z(1) + … + z(m))
+    └ constant factor ┘   └── the random part ──┘</code></pre>
+<p>
+Now the variance of D, in two standard steps. <em>First</em>, pulling a
+constant out of a variance squares it: Var(c·X) = c²·Var(X). That is because
+variance is the average <em>squared</em> deviation — multiplying a random
+quantity by c makes every deviation c times larger, and squaring the
+deviations turns that into c². Here the constant is c = p̄·σ, giving the
+factor p̄²·σ². <em>Second</em>, what remains is Var(z(1) + … + z(m)), and that
+is precisely the quantity we <em>named</em> W(m) in the code block — nothing
+is computed here, the name is substituted. Together:
+Var(D) = p̄²·σ²·W(m). (Why is W(m) not simply m times the variance of one z?
+Because "variance of a sum = sum of variances" holds only for
+<em>independent</em> terms. The z values are AR(1)-correlated, so all the
+pairwise covariances between different bins add on top: with no memory
+(τ_c = 0) they vanish and W(m) = m; with memory, consecutive z values
+reinforce each other and W(m) grows toward m² for windows shorter than τ_c —
+15 092 instead of 200 in the worked example.) Putting the pieces together —
 covariance Var(D), variance = coin-flip part plus shared part:
 </p>
 <pre><code>r_sc(T) = Cov(K₁, K₂) / Var(K)
