@@ -59,24 +59,40 @@ use.
 
 Reordered 2026-08-13 into three phases: finalize the model, then make it
 fast, then clarify and run the fits. The reason for the order: nearly any
-model change invalidates the input caches, and a structural finding from §34
-would invalidate the fits — so nothing expensive (full-length caches,
-workstation runs, fits) is built until the model is final. This also
-repositions §1 by its own logic ("before anything expensive"): the expensive
-part now starts in phase 3.
+model change invalidates the input caches, and a structural finding from the
+community review would invalidate the fits — so nothing expensive
+(full-length caches, workstation runs, fits) is built until the model is
+final. This also repositions §1 by its own logic ("before anything
+expensive"): the expensive part now starts in phase 3.
 
 **Phase 1 — finalize the model.** (Its first item — §29 + §27 + §13, the
 cache-validation hardening — was completed 2026-08-13, before any cache was
-built through the weaker path.)
+built through the weaker path. Its second — §34, the community-conventions
+review — was completed the same day; its 24 findings now feed the triage
+below.)
 
-1. **§34 — the community-conventions review, then its triage.** Runs before
-   any model verdicts because its findings bear on exactly what the verdicts
-   rule on (§23, §24, §25, §26, §28, §30). Hard blocker on everything
-   downstream, deliberately without a timebox. Accepted proposals spawn their
-   own entries, which join the verdict pass below on triage.
+1. **The community-review triage.** §34 is resolved and its output is
+   `community_review/synthesis.md`: 24 findings F1–F24, ranked by how many of
+   the seven seats raised each, one change proposal apiece. This step decides
+   which are accepted. Every accepted finding **spawns its own numbered
+   entry**, which then joins the verdict pass below; a rejected one is
+   recorded as rejected with its reason in the spawning entry or, where no
+   entry is warranted, nowhere — the synthesis is not itself referenceable, so
+   anything meant to survive must become an entry. Runs before any model
+   verdicts because the findings bear on exactly what the verdicts rule on
+   (§23, §24, §25, §26, §28, §30). Hard blocker on everything downstream,
+   deliberately without a timebox.
+
+   Three orderings the synthesis's own reading guide implies, kept here
+   because they are ordering and nothing else: the input-correlation finding
+   is the one hard blocker on §32 and is already carried by **§25**; four
+   findings would invalidate the input caches if accepted, so they must be
+   settled inside this phase rather than after phase 2 builds them; and the
+   subject's medication state must be established before any full-length
+   cache is built, because a wrong answer invalidates every one of them.
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
-   plus anything §34 spawned. Each entry gets an explicit verdict: **fix
-   now** (implemented within this phase) or **accepted limitation**
+   plus everything the triage spawned. Each entry gets an explicit verdict:
+   **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
    a model gap, not a write-up-time sensitivity check.
@@ -884,163 +900,7 @@ surround assumption), §2 (inference design over the fitted result) and §16
 
 ## From the session on 2026-08-13 (community conventions review)
 
-### 34. Survey the BG-modeling community's conventions via reviewer personas
-
-*Opened 2026-08-13 10:38*
-
-**Opened 2026-08-13 10:38:** We do not know whether the model violates
-conventions of the active basal ganglia neurocomputational community — things
-every comparable model does that ours silently doesn't. The task is a
-structured survey, in three steps, producing review documents; implementing
-any accepted change is explicitly *not* part of this entry — each accepted
-proposal spawns its own numbered entry, and §34 resolves when the review
-documents exist.
-
-**Step 1 — the panel.** Select 5-8 research groups/lineages (the unit is a
-group sharing one modeling approach — e.g. Rubin-Terman counts once — not an
-individual). Primary ranking: similarity of the modeling approach to ours
-(mesoscopic, populations of point neurons, possibly spiking, multiple
-functionally connected BG regions) weighted with citation impact. Detailed
-single-cell/morphology modeling is dissimilar regardless of citations.
-Secondary criterion: the panel must include at least 1-2 groups that model
-DBS at the network level, so the mechanisms of §14-§17 get a reviewer with
-standing (Jonathan Rubin qualifies on both counts and is the seed
-suggestion). The Hamker/Chemnitz lineage is included as one persona, judged
-against its own published standards. **Strict recency:** both the groups and
-the papers must be from roughly the last 10 years (2016+). Accepted
-consequence: foundational papers (Terman & Rubin 2002/2004, Humphries 2006)
-are excluded, so each persona is reconstructed from recent work only —
-conventions stated long ago and silently assumed since may be missed. No
-seat for BOLD/whole-brain (mean-field) groups: they fail the
-approach-similarity criterion; instead the synthesis must explicitly record
-that the BOLD pipeline had no peer reviewer, as a known limitation.
-Checkpoint: the group list is confirmed by Oliver before step 2.
-
-**Step 2 — the reading list.** 2-4 papers per group (~15-25 total): the
-flagship network-model paper of the recent era plus the most recent relevant
-one, more only if the group's approach shifted. Delivered as a DOI list;
-Oliver downloads the PDFs, and step 3 reads the saved full texts, not
-abstracts. Checkpoint: the list goes to Oliver for download before any
-review is written.
-
-**Step 3 — the reviews.** One review per group, written in character as that
-group reviewing our model, applying the group's *full* standards unfiltered
-— structure (regions, neuron types), connectivity, dynamics, validation
-data, DBS representation. Every raised point is tagged with whether it
-plausibly matters for our stated goal (single-subject resting-state BOLD
-fitting and DBS inference), so nothing is pre-filtered but triage is
-pre-structured. Then one synthesis document: merge overlapping points, rank
-by how many personas raise them (convergence across groups = community
-convention; a single voice = one lab's taste), and attach one concrete
-change proposal per point — exactly what we would modify.
-
-**Location:** new top-level `community_review/` — committed README (group
-list with selection rationale, DOI reading list) and committed review
-documents; PDFs saved beside them but untracked (the remote is public; cite
-DOIs, never commit publisher PDFs — the `experimental_data/` pattern).
-
-**Ordering:** the survey is laptop reading work and runs in parallel with
-the workstation/cache track (§6, §3), but the fits (§32) must not launch
-until the synthesis is triaged — a structural finding discovered after the
-fits would mean paying for them twice. See the Roadmap.
-
-**Update 2026-08-13 (step 1 done):** panel selected, written up with
-selection rationale in `community_review/README.md`, and confirmed by
-Oliver — all six seats: Kumar–Hellgren Kotaleski (KTH), Rubin/Verstynen
-(Pittsburgh/CMU, DBS standing, the seed), Girard–Doya (ISIR/OIST), Grill
-(Duke, DBS standing), Hamker (Chemnitz, own lineage), Chakravarthy (IIT
-Madras, optional-seat-made-firm). Considered and excluded, with rationale
-recorded in the README: Bogacz (mean-field/oscillator approach), Rubchinsky
-(thin post-2016 full-network output), Humphries (recency rule), McIntyre
-(biophysical/axonal), whole-brain/TVB groups (by design — the README also
-records the resulting BOLD-has-no-reviewer limitation, and that Meier et
-al. 2022's TVB co-simulation of the Hamker-lineage BG model is the nearest
-published precedent for our BOLD pipeline, for the synthesis to note).
-Candidates were verified against web searches (lineage activity and
-in-window output), not memory; no full texts read yet. Next: step 2, the
-DOI reading list.
-
-**Update 2026-08-13 (step 1 amended: seat 7, the experimentalist):** the
-panel as confirmed was all modeling lineages, so the review would only
-catch what the *modeling* community already models — experimental findings
-the modeling literature has not yet absorbed (most prominently the GPe
-reorganization of roughly 2015–2024: arkypallidal/prototypic cell types,
-pallido-striatal projections, bridging collaterals — directly relevant
-since v07 already contains `gpe_arky`/`gpe_cp`) would be invisible. A
-seventh seat is added: **the experimentalist**, a *review-defined
-composite* persona — a deliberate, recorded exception to the
-one-seat-one-lineage rule, since no single experimental lab covers
-whole-BG structure, connectivity and organization; its voice is what the
-selected reviews collectively assert, and it has no single lab's published
-standard to be judged against. Mandate: structure, connectivity and
-organization, **plus** auditing the model's empirical validation anchors
-(the Liang et al. 2008 medication-off firing-rate bands, the
-Borra-tracer-based cortical proportions) — experimental claims no modeling
-seat audits; the DBS representation stays with the Grill/Rubin seats.
-Reading list (extends step 2): 4–6 reviews — above the 2–4 per-seat norm
-because the seat covers a literature, not one lab's output — same 2016+
-window, preferring the most recent authoritative synthesis per topic, with
-two mandatory slots: at least one dedicated GPe review and at least one
-whole-BG circuit-organization review; the remaining slots are chosen at
-step 2 against what the model actually contains. Reviews-first with a
-narrow escape hatch: a primary paper may take a slot only where step 2
-finds no in-window review covering a mandated topic, the substitution and
-the failed search recorded in the README. Two step-3 consequences: (a) the
-synthesis convergence rule is amended for this seat — a point raised only
-by the experimentalist is weighted by convergence *within* its reading
-list (asserted by multiple independent reviews → literature consensus,
-comparable to multi-persona convergence; a single review → one voice), and
-the synthesis states which case applies; (b) every structural claim in the
-experimentalist's review carries a species-provenance tag (mouse / rat /
-macaque / human) beside the goal-relevance tag, because the recent GPe
-literature is overwhelmingly mouse while the model is a human-subject fit
-anchored on macaque tracer data. Seat definition written into
-`community_review/README.md` and confirmed by Oliver on 2026-08-13.
-
-**Update 2026-08-13 (step 2 done):** the DOI reading list is compiled,
-verified and written into `community_review/README.md` — 25 papers: 19
-across the six lineage seats (Kumar–Hellgren Kotaleski 3, Rubin/Verstynen
-4, Girard–Doya 3, Grill 3, Hamker 4, Chakravarthy 2; the four-paper seats
-are justified in the README by a documented shift in the lineage's
-approach) plus 6 reviews for the experimentalist seat. Both mandatory
-seat-7 slots were filled by in-window reviews (GPe: Courtney/Pamukcu/Chan
-2023 Nat Neurosci; whole-BG organization: McGregor & Nelson 2019 Neuron),
-so the primary-paper escape hatch was not needed. Every DOI was verified
-against Crossref and/or the publisher page on 2026-08-13; per-seat
-selections were drawn from PubMed author listings, not memory — which
-caught one wrong provisional pointer from step 1 (seat 6's 2016 Frontiers
-DBS paper is Mandali & Chakravarthy, not Muralidharan et al.; corrected in
-the README, the historical step-1 text above left as written). Notable
-selection decisions, with rationale in the README: Meier et al. 2022
-(virtual DBS, Exp Neurol) sits in seat 5's list as a Hamker-lineage paper,
-partially mitigating the BOLD-has-no-reviewer limitation from inside the
-panel; Giossi et al. 2024 (EJN GPe review) was rejected for seat 7 because
-it is authored by the seat-2 modeling lineage, whose unfiltered
-experimental counterpart seat 7 exists to provide. The list is handed to
-Oliver for download (checkpoint); step 3 starts only once the PDFs are
-saved under `community_review/` and reads only those full texts.
-
-**Update 2026-08-13 (download checkpoint passed; list amended by Oliver):**
-the PDFs are saved under `community_review/` (untracked) and the set was
-verified complete and valid against the list — 27 PDFs: 26 papers plus the
-Bahuguna 2025 correction. At the checkpoint Oliver amended the reading
-list in three places, all recorded with rationale in the README: (a)
-**Hjorth et al. 2020** (PNAS, `10.1073/pnas.2000671117`, verified against
-Crossref) added to seat 1 — the lineage's own striatal-microcircuit
-standard, relevant to v07's `Microcircuit` striatum although
-multi-compartment work sits outside the seat-selection similarity
-criterion; (b) **Giossi et al. 2024** added to seat 2 — the seat-7
-rejection (modeler-authored) stands, but its GPe findings should be taken
-into account, and in seat 2 they inform the persona that authored them;
-(c) **Meier et al. 2022** removed from seat 5 — TVB-based BOLD is a
-different approach from ours, its DBS implementation is simpler than ours,
-and its BG model is the same as Maith et al. 2021 (already listed).
-Consequence of (c), recorded in the README: the partial in-panel audit of
-the simulated-BOLD/DBS side is gone, so the BOLD-has-no-reviewer
-limitation now holds without mitigation; Meier et al. 2022 stays noted as
-the nearest published precedent for the synthesis to cite. Seat totals are
-now 4/5/3/3/3/2 + 6 = 26. Next: step 3, the reviews, from these full
-texts only.
+### 34. Survey the BG-modeling community's conventions via reviewer personas — resolved 2026-08-13, moved to Resolved
 
 ---
 
@@ -2018,3 +1878,211 @@ actions" were checked against §1/§3/§6 and found already recorded there
 which was re-verified and is §6's update of today. `CLAUDE.md` now states the
 loss design and parameter rationale as current state, and every living-document
 reference to `PLAN.md` was repointed in the same sweep.
+
+### 34. Survey the BG-modeling community's conventions via reviewer personas
+
+*Opened 2026-08-13 10:38 · resolved 2026-08-13 20:54 · 4 updates, last 2026-08-13*
+
+**Opened 2026-08-13 10:38:** We do not know whether the model violates
+conventions of the active basal ganglia neurocomputational community — things
+every comparable model does that ours silently doesn't. The task is a
+structured survey, in three steps, producing review documents; implementing
+any accepted change is explicitly *not* part of this entry — each accepted
+proposal spawns its own numbered entry, and §34 resolves when the review
+documents exist.
+
+**Step 1 — the panel.** Select 5-8 research groups/lineages (the unit is a
+group sharing one modeling approach — e.g. Rubin-Terman counts once — not an
+individual). Primary ranking: similarity of the modeling approach to ours
+(mesoscopic, populations of point neurons, possibly spiking, multiple
+functionally connected BG regions) weighted with citation impact. Detailed
+single-cell/morphology modeling is dissimilar regardless of citations.
+Secondary criterion: the panel must include at least 1-2 groups that model
+DBS at the network level, so the mechanisms of §14-§17 get a reviewer with
+standing (Jonathan Rubin qualifies on both counts and is the seed
+suggestion). The Hamker/Chemnitz lineage is included as one persona, judged
+against its own published standards. **Strict recency:** both the groups and
+the papers must be from roughly the last 10 years (2016+). Accepted
+consequence: foundational papers (Terman & Rubin 2002/2004, Humphries 2006)
+are excluded, so each persona is reconstructed from recent work only —
+conventions stated long ago and silently assumed since may be missed. No
+seat for BOLD/whole-brain (mean-field) groups: they fail the
+approach-similarity criterion; instead the synthesis must explicitly record
+that the BOLD pipeline had no peer reviewer, as a known limitation.
+Checkpoint: the group list is confirmed by Oliver before step 2.
+
+**Step 2 — the reading list.** 2-4 papers per group (~15-25 total): the
+flagship network-model paper of the recent era plus the most recent relevant
+one, more only if the group's approach shifted. Delivered as a DOI list;
+Oliver downloads the PDFs, and step 3 reads the saved full texts, not
+abstracts. Checkpoint: the list goes to Oliver for download before any
+review is written.
+
+**Step 3 — the reviews.** One review per group, written in character as that
+group reviewing our model, applying the group's *full* standards unfiltered
+— structure (regions, neuron types), connectivity, dynamics, validation
+data, DBS representation. Every raised point is tagged with whether it
+plausibly matters for our stated goal (single-subject resting-state BOLD
+fitting and DBS inference), so nothing is pre-filtered but triage is
+pre-structured. Then one synthesis document: merge overlapping points, rank
+by how many personas raise them (convergence across groups = community
+convention; a single voice = one lab's taste), and attach one concrete
+change proposal per point — exactly what we would modify.
+
+**Location:** new top-level `community_review/` — committed README (group
+list with selection rationale, DOI reading list) and committed review
+documents; PDFs saved beside them but untracked (the remote is public; cite
+DOIs, never commit publisher PDFs — the `experimental_data/` pattern).
+
+**Ordering:** the survey is laptop reading work and runs in parallel with
+the workstation/cache track (§6, §3), but the fits (§32) must not launch
+until the synthesis is triaged — a structural finding discovered after the
+fits would mean paying for them twice. See the Roadmap.
+
+**Update 2026-08-13 (step 1 done):** panel selected, written up with
+selection rationale in `community_review/README.md`, and confirmed by
+Oliver — all six seats: Kumar–Hellgren Kotaleski (KTH), Rubin/Verstynen
+(Pittsburgh/CMU, DBS standing, the seed), Girard–Doya (ISIR/OIST), Grill
+(Duke, DBS standing), Hamker (Chemnitz, own lineage), Chakravarthy (IIT
+Madras, optional-seat-made-firm). Considered and excluded, with rationale
+recorded in the README: Bogacz (mean-field/oscillator approach), Rubchinsky
+(thin post-2016 full-network output), Humphries (recency rule), McIntyre
+(biophysical/axonal), whole-brain/TVB groups (by design — the README also
+records the resulting BOLD-has-no-reviewer limitation, and that Meier et
+al. 2022's TVB co-simulation of the Hamker-lineage BG model is the nearest
+published precedent for our BOLD pipeline, for the synthesis to note).
+Candidates were verified against web searches (lineage activity and
+in-window output), not memory; no full texts read yet. Next: step 2, the
+DOI reading list.
+
+**Update 2026-08-13 (step 1 amended: seat 7, the experimentalist):** the
+panel as confirmed was all modeling lineages, so the review would only
+catch what the *modeling* community already models — experimental findings
+the modeling literature has not yet absorbed (most prominently the GPe
+reorganization of roughly 2015–2024: arkypallidal/prototypic cell types,
+pallido-striatal projections, bridging collaterals — directly relevant
+since v07 already contains `gpe_arky`/`gpe_cp`) would be invisible. A
+seventh seat is added: **the experimentalist**, a *review-defined
+composite* persona — a deliberate, recorded exception to the
+one-seat-one-lineage rule, since no single experimental lab covers
+whole-BG structure, connectivity and organization; its voice is what the
+selected reviews collectively assert, and it has no single lab's published
+standard to be judged against. Mandate: structure, connectivity and
+organization, **plus** auditing the model's empirical validation anchors
+(the Liang et al. 2008 medication-off firing-rate bands, the
+Borra-tracer-based cortical proportions) — experimental claims no modeling
+seat audits; the DBS representation stays with the Grill/Rubin seats.
+Reading list (extends step 2): 4–6 reviews — above the 2–4 per-seat norm
+because the seat covers a literature, not one lab's output — same 2016+
+window, preferring the most recent authoritative synthesis per topic, with
+two mandatory slots: at least one dedicated GPe review and at least one
+whole-BG circuit-organization review; the remaining slots are chosen at
+step 2 against what the model actually contains. Reviews-first with a
+narrow escape hatch: a primary paper may take a slot only where step 2
+finds no in-window review covering a mandated topic, the substitution and
+the failed search recorded in the README. Two step-3 consequences: (a) the
+synthesis convergence rule is amended for this seat — a point raised only
+by the experimentalist is weighted by convergence *within* its reading
+list (asserted by multiple independent reviews → literature consensus,
+comparable to multi-persona convergence; a single review → one voice), and
+the synthesis states which case applies; (b) every structural claim in the
+experimentalist's review carries a species-provenance tag (mouse / rat /
+macaque / human) beside the goal-relevance tag, because the recent GPe
+literature is overwhelmingly mouse while the model is a human-subject fit
+anchored on macaque tracer data. Seat definition written into
+`community_review/README.md` and confirmed by Oliver on 2026-08-13.
+
+**Update 2026-08-13 (step 2 done):** the DOI reading list is compiled,
+verified and written into `community_review/README.md` — 25 papers: 19
+across the six lineage seats (Kumar–Hellgren Kotaleski 3, Rubin/Verstynen
+4, Girard–Doya 3, Grill 3, Hamker 4, Chakravarthy 2; the four-paper seats
+are justified in the README by a documented shift in the lineage's
+approach) plus 6 reviews for the experimentalist seat. Both mandatory
+seat-7 slots were filled by in-window reviews (GPe: Courtney/Pamukcu/Chan
+2023 Nat Neurosci; whole-BG organization: McGregor & Nelson 2019 Neuron),
+so the primary-paper escape hatch was not needed. Every DOI was verified
+against Crossref and/or the publisher page on 2026-08-13; per-seat
+selections were drawn from PubMed author listings, not memory — which
+caught one wrong provisional pointer from step 1 (seat 6's 2016 Frontiers
+DBS paper is Mandali & Chakravarthy, not Muralidharan et al.; corrected in
+the README, the historical step-1 text above left as written). Notable
+selection decisions, with rationale in the README: Meier et al. 2022
+(virtual DBS, Exp Neurol) sits in seat 5's list as a Hamker-lineage paper,
+partially mitigating the BOLD-has-no-reviewer limitation from inside the
+panel; Giossi et al. 2024 (EJN GPe review) was rejected for seat 7 because
+it is authored by the seat-2 modeling lineage, whose unfiltered
+experimental counterpart seat 7 exists to provide. The list is handed to
+Oliver for download (checkpoint); step 3 starts only once the PDFs are
+saved under `community_review/` and reads only those full texts.
+
+**Update 2026-08-13 (download checkpoint passed; list amended by Oliver):**
+the PDFs are saved under `community_review/` (untracked) and the set was
+verified complete and valid against the list — 27 PDFs: 26 papers plus the
+Bahuguna 2025 correction. At the checkpoint Oliver amended the reading
+list in three places, all recorded with rationale in the README: (a)
+**Hjorth et al. 2020** (PNAS, `10.1073/pnas.2000671117`, verified against
+Crossref) added to seat 1 — the lineage's own striatal-microcircuit
+standard, relevant to v07's `Microcircuit` striatum although
+multi-compartment work sits outside the seat-selection similarity
+criterion; (b) **Giossi et al. 2024** added to seat 2 — the seat-7
+rejection (modeler-authored) stands, but its GPe findings should be taken
+into account, and in seat 2 they inform the persona that authored them;
+(c) **Meier et al. 2022** removed from seat 5 — TVB-based BOLD is a
+different approach from ours, its DBS implementation is simpler than ours,
+and its BG model is the same as Maith et al. 2021 (already listed).
+Consequence of (c), recorded in the README: the partial in-panel audit of
+the simulated-BOLD/DBS side is gone, so the BOLD-has-no-reviewer
+limitation now holds without mitigation; Meier et al. 2022 stays noted as
+the nearest published precedent for the synthesis to cite. Seat totals are
+now 4/5/3/3/3/2 + 6 = 26. Next: step 3, the reviews, from these full
+texts only.
+
+**Resolved 2026-08-13 20:54 (step 3 done; the review documents exist,
+which is what this entry resolves on):** seven reviews plus a synthesis are
+committed under `community_review/`, each written from the full texts of
+the saved PDFs — 26 papers across the seven seats, read page by page, no
+abstracts. Point counts: seat 1 eleven, seat 2 ten, seat 3 eight, seat 4
+nine, seat 5 eleven, seat 6 six, seat 7 sixteen. Every point carries a
+goal-relevance tag, and seat 7's structural claims additionally carry a
+species-provenance tag and a statement of within-reading-list convergence,
+as its seat definition requires. `synthesis.md` merges them into 24
+findings **F1–F24**, ranked in four tiers by how many seats raised each,
+with one concrete change proposal per finding.
+
+The four Tier-1 findings — five or more seats each — all bear on whether
+the project's central claim can be made at all: (F1) nothing separates a
+fitted parameter change from optimiser noise, reached independently by six
+seats as degeneracy, as identifiability, as a regression against Maith et
+al. 2021's twenty runs and 59-parameter sensitivity analysis, and as
+sweep-versus-fit; (F2) nothing validates the model except the loss it is
+fitted to, six seats, each naming a different held-out statistic; (F3)
+input correlation is zero nearly everywhere while
+`experimental_data/input_streams/README.md` §3 already computes that it
+dominates the observable — the one hard blocker on §32, and §25 already
+carries it; (F4) each of the three DBS parameters has a distinct problem,
+with both DBS-standing seats leading.
+
+Two facts the review established that the project did not know, both now
+recorded in `community_review/README.md`. The GPe BOLD pooling factors
+(0.5 / 0.17 / 0.10), which `model_v07.md` §3.6 records as having no source,
+are GPe cell-type abundances — PV⁺ 50 %, arkypallidal 18 %,
+cortex-projecting 12 %, the missing 0.23 being cell types the model does
+not contain (seat 7, from Courtney et al. 2023) — confirming that
+document's own conjecture. And the seven subcortical delays in
+`parameters.csv` are Kumaravelu et al. 2016 Table 1 exactly, i.e. rat
+values with real provenance the project does not record (seat 4). Two
+further findings came from opening the data directory rather than the
+papers: **three** subjects have BOLD and VTA data, not one (bearing on
+F1), and `experimental_data/berlin_data/vta/` resolves the VTA against all
+three STN functional subdivisions while `get_loss.py` uses only the motor
+row — with a unit inconsistency between the overlap and volume files that
+should be settled before the 0.4 is relied on further.
+
+The BOLD-pipeline-has-no-peer-reviewer limitation stands as recorded
+above, without mitigation; `synthesis.md` states it at the top and F11 is
+the only finding that reaches it from the model side.
+
+Per this entry's own terms, implementing anything is **not** part of §34.
+The triage — the Roadmap item that follows — decides which findings are
+accepted, and each accepted one spawns its own numbered entry. §34 closes
+here because the review documents exist.

@@ -7,14 +7,50 @@ definition, the three steps and their checkpoints are in `TODO.md` §34.
 Implementing accepted changes is not part of this survey — each accepted
 proposal spawns its own `TODO.md` entry.
 
-**Status: step 2 done and the download checkpoint passed — the PDFs were
-downloaded by Oliver and saved here on 2026-08-13, and the set was
-verified complete against the list (27 valid PDFs: 26 papers + the
-Bahuguna correction). At the checkpoint Oliver amended the list in three
-places — Hjorth et al. 2020 added to seat 1, Giossi et al. 2024 added to
-seat 2, Meier et al. 2022 removed from seat 5 — each recorded with
-rationale at the entry it touches. Step 3 (the reviews) may start and
-reads only these full texts.**
+**Status: all three steps done (2026-08-13).** The seven reviews and the
+synthesis are in this directory; every one was written from the full texts
+of the PDFs saved here, not from abstracts. The survey is complete and
+`TODO.md` §34 is resolved. What remains is the **triage** — the Roadmap item
+that follows §34 — which decides which of the synthesis's 24 findings are
+accepted; each accepted proposal spawns its own `TODO.md` entry.
+
+## The documents
+
+| file | contents |
+|---|---|
+| `review_seat1_kumar_hellgren_kotaleski.md` | seat 1, 11 points |
+| `review_seat2_rubin_verstynen.md` | seat 2, 10 points |
+| `review_seat3_girard_doya.md` | seat 3, 8 points |
+| `review_seat4_grill.md` | seat 4 (DBS standing), 9 points |
+| `review_seat5_hamker.md` | seat 5, our own lineage, 11 points |
+| `review_seat6_chakravarthy.md` | seat 6, 6 points |
+| `review_seat7_experimentalist.md` | seat 7, 16 points, species-tagged |
+| `synthesis.md` | **start here** — 24 merged findings F1–F24, ranked in four tiers by cross-seat convergence, one change proposal each |
+
+Every point in every review carries a goal-relevance tag; seat 7's structural
+claims additionally carry a species-provenance tag and a within-reading-list
+convergence statement, per the §34 amendment.
+
+Two facts the reviews established that the project did not know, recorded here
+because they are referenced from several documents:
+
+- **The GPe BOLD pooling factors (0.5 / 0.17 / 0.10) are GPe cell-type
+  abundances** — PV⁺ 50 %, arkypallidal 18 %, cortex-projecting 12 %, with the
+  missing 0.23 being ChAT⁺ and unclassified cells the model does not contain
+  (seat 7, from Courtney et al. 2023). `model_v07.md` §3.6's own conjecture was
+  right; the factors are no longer unsourced.
+- **The seven subcortical delays in `parameters.csv` are Kumaravelu et al. 2016
+  Table 1 exactly** — rat values with real provenance the project does not
+  record (seat 4).
+
+### Step-2 history
+
+The PDFs were downloaded by Oliver and saved here on 2026-08-13, and the set was
+verified complete against the list (27 valid PDFs: 26 papers + the Bahuguna
+correction). At the checkpoint Oliver amended the list in three places —
+Hjorth et al. 2020 added to seat 1, Giossi et al. 2024 added to seat 2, Meier
+et al. 2022 removed from seat 5 — each recorded with rationale at the entry it
+touches.
 
 ## Selection criteria (from §34)
 

@@ -13,6 +13,16 @@ the DBS-off and DBS-on model. `model_v07.md` walks through how the real model is
 built, step by step from `setup()` to `compile()`; `model_v08.md` does the same
 for the reduced model, as a delta against it.
 
+`community_review/` holds the community-conventions survey (`TODO.md` §34,
+resolved 2026-08-13): seven reviews of this model written in character as seven
+research lineages from their own published standards, plus
+`community_review/synthesis.md` — **24 findings F1–F24 ranked by how many seats
+raised each, with a change proposal apiece.** Start there before changing the
+model: its four top-tier findings all bear on whether the project's central
+claim can be made, and the triage that decides which are accepted is the next
+Roadmap item. The findings are not themselves referenceable — anything accepted
+becomes its own `TODO.md` entry. PDFs live beside the documents, untracked.
+
 ## Three repos, one environment
 
 | repo | path | install | branch |
