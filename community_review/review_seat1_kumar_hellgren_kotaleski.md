@@ -142,11 +142,15 @@ which projects to STN and the output nuclei and — per Glajch 2016 and Saunders
 back to striatum at all (Abdi 2015). BGM_22 has `gpe_proto`, `gpe_arky` **and**
 `gpe_cp`, where `gpe_cp` projects to `str_d1`, `str_d2` and `str_fsi` at
 weights 0.5/0.5/0.8 and receives from `str_d1`, `str_d2` and `stn`
-(`model_v07.md` §5). If `cp` denotes the caudal/prototypic-projecting
-subpopulation of Abdi 2015 / Mallet 2012, then its SPN projections need a
-citation, because that is the property the literature assigns to TA and
-explicitly withholds from TI. If it denotes something else, the document does not
-say what.
+(`model_v07.md` §5). `cp` denotes the *cortex-projecting* GPe neurons of
+Abecassis 2020 — established here from Goenner et al. 2021, the project's own
+lineage, which introduced the population (seat 5's reading list). Two things
+follow. Its projections onto both SPN types are an arkypallidal property in our
+reading of the literature and want a citation in a population that is not
+arkypallidal. And its defining efferent, the one back to cortex, cannot exist
+here, because BGM_22's cortex is a precomputed input stream — so inside this
+model `gpe_cp` is a second striatum-projecting GPe population carrying
+`gpe_proto`'s Izhikevich parameters.
 
 Our own model's arrangement was itself a bet, and Lindahl 2016 §"Model
 robustness" reports what testing it cost us: the TA→MSN synaptic time constant
