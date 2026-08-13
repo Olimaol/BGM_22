@@ -7,10 +7,14 @@ definition, the three steps and their checkpoints are in `TODO.md` §34.
 Implementing accepted changes is not part of this survey — each accepted
 proposal spawns its own `TODO.md` entry.
 
-**Status: step 2 done — the DOI reading list below was compiled and
-verified on 2026-08-13 and handed to Oliver for download. Step 3 (the
-reviews) starts only once the PDFs are saved here, and reads only those
-full texts.**
+**Status: step 2 done and the download checkpoint passed — the PDFs were
+downloaded by Oliver and saved here on 2026-08-13, and the set was
+verified complete against the list (27 valid PDFs: 26 papers + the
+Bahuguna correction). At the checkpoint Oliver amended the list in three
+places — Hjorth et al. 2020 added to seat 1, Giossi et al. 2024 added to
+seat 2, Meier et al. 2022 removed from seat 5 — each recorded with
+rationale at the entry it touches. Step 3 (the reviews) may start and
+reads only these full texts.**
 
 ## Selection criteria (from §34)
 
@@ -56,7 +60,10 @@ Hellgren Kotaleski (2016, eNeuro) is the flagship; the Bahuguna/Kumar line of
 STN–GPe beta-oscillation papers (through ~2020, PLOS Comput Biol) carries it
 forward. High citation impact in exactly our niche. (The lineage's separate
 detailed striatal microcircuit work — Hjorth et al., multi-compartment — is
-outside the similarity criterion and not what this seat reviews with.)
+outside the similarity criterion for *seat selection*; Oliver nonetheless
+added Hjorth et al. 2020 to the reading list at the download checkpoint,
+since it is this lineage's own striatal-microcircuit standard and v07's
+striatum is built by `Microcircuit` — see the step-2 list.)
 
 ### 2. Rubin lineage (Pittsburgh / CMU, with Verstynen) — **DBS standing, panel seed**
 
@@ -167,14 +174,15 @@ experimental claims no modeling seat audits. The DBS representation is
 
 ## Step 2 — the reading list (DOIs)
 
-Compiled 2026-08-13. Per §34: the flagship network-model paper of the
-recent era plus the most recent relevant one per lineage seat, more only
-where the lineage's approach shifted; 4–6 reviews for seat 7. All entries
-are in-window (2016+). **25 papers total.** Every DOI was verified against
-Crossref and/or the publisher page on 2026-08-13; no entry is cited from
-memory.
+Compiled 2026-08-13, amended by Oliver at the download checkpoint the
+same day (three changes, marked at the entries they touch). Per §34: the
+flagship network-model paper of the recent era plus the most recent
+relevant one per lineage seat, more only where the lineage's approach
+shifted; 4–6 reviews for seat 7. All entries are in-window (2016+).
+**26 papers total.** Every DOI was verified against Crossref and/or the
+publisher page on 2026-08-13; no entry is cited from memory.
 
-### Seat 1 — Kumar–Hellgren Kotaleski (3)
+### Seat 1 — Kumar–Hellgren Kotaleski (4)
 
 1. Lindahl M, Hellgren Kotaleski J (2016). *Untangling basal ganglia
    network dynamics and function: role of dopamine depletion and inhibition
@@ -191,8 +199,15 @@ memory.
    and low-dopamine state.* eNeuro 9(2).
    DOI: `10.1523/ENEURO.0376-21.2022` — the most recent full-BG paper with
    both lineage PIs, validated against Nambu-lab cortical-stimulation data.
+4. Hjorth JJJ, Kozlov A, Carannante I, et al. (2020). *The microcircuits of
+   striatum in silico.* PNAS 117(17):9554–9565.
+   DOI: `10.1073/pnas.2000671117` — **added by Oliver at the download
+   checkpoint**: the lineage's own striatal-microcircuit standard, directly
+   relevant to auditing v07's `Microcircuit` striatum even though its
+   multi-compartment approach sits outside the seat-selection similarity
+   criterion (verified against Crossref 2026-08-13).
 
-### Seat 2 — Rubin/Verstynen (4 — the shift from parkinsonian-dynamics networks to the CBGT decision framework justifies the fourth slot)
+### Seat 2 — Rubin/Verstynen (5 — the shift from parkinsonian-dynamics networks to the CBGT decision framework justifies the fourth slot; the fifth was added at the checkpoint)
 
 1. Corbit VL, Whalen TC, Zitelli KT, Crilly SY, Rubin JE, Gittis AH (2016).
    *Pallidostriatal projections promote β oscillations in a dopamine-depleted
@@ -212,6 +227,14 @@ memory.
    modeling biological decision making.* PLOS ONE 20(1): e0310367.
    DOI: `10.1371/journal.pone.0310367` — the most recent: the lineage's
    published framework, i.e. what it considers a complete CBGT network.
+5. Giossi C, Rubin JE, Gittis A, Verstynen T, Vich C (2024). *Rethinking
+   the external globus pallidus and information flow in cortico-basal
+   ganglia-thalamic circuits.* Eur J Neurosci 60(10).
+   DOI: `10.1111/ejn.16348` — **added by Oliver at the download
+   checkpoint**: not a modeling study, but its findings on GPe information
+   flow should still be taken into account; it sits in this seat (not
+   seat 7) because it is authored by this lineage and articulates its
+   perspective — see "Considered for the list, not selected" below.
 
 ### Seat 3 — Girard–Doya (3)
 
@@ -249,7 +272,7 @@ memory.
    DOI: `10.3389/fnins.2019.00956` — the most recent network-level use of
    the model in its DBS-controller role.
 
-### Seat 5 — Hamker, our own lineage (4 — the shift from rate-coded pathway models to spiking networks fitted to human imaging justifies the fourth slot)
+### Seat 5 — Hamker, our own lineage (3 — a fourth slot was compiled but removed at the checkpoint, see below)
 
 1. Schroll H, Hamker FH (2016). *Basal ganglia dysfunctions in movement
    disorders: what can be learned from computational simulations.*
@@ -266,14 +289,20 @@ memory.
    arkypallidal neurons.* Eur J Neurosci 53(7):2296–2321.
    DOI: `10.1111/ejn.15082` — the lab's own bar for modeling
    arkypallidal/prototypic GPe, which v07 inherits.
-4. Meier JM, Perdikis D, Blickensdörfer A, Stefanovski L, Liu Q, Maith O,
-   Dinkelbach HÜ, Baladron J, Hamker FH, Ritter P (2022). *Virtual deep
-   brain stimulation: multiscale co-simulation of a spiking basal ganglia
-   model and a whole-brain mean-field model with The Virtual Brain.*
-   Exp Neurol 354:114111. DOI: `10.1016/j.expneurol.2022.114111` — the
-   nearest published precedent of our BOLD pipeline (already flagged under
-   "Considered and excluded"); as a lineage paper it lets seat 5 partially
-   audit the simulated-BOLD/DBS side that no other seat covers.
+A fourth slot — Meier JM, et al. (2022), *Virtual deep brain stimulation:
+multiscale co-simulation of a spiking basal ganglia model and a
+whole-brain mean-field model with The Virtual Brain,* Exp Neurol 354
+(`10.1016/j.expneurol.2022.114111`) — was compiled but **removed by
+Oliver at the download checkpoint**: it simulates BOLD via TVB, a
+different approach from ours; its DBS implementation is simpler than
+ours, leaving nothing further to draw inspiration from; and its BG model
+is the same as Maith et al. (2021), already slot 2. Consequence: the
+partial from-inside-the-panel audit of the simulated-BOLD/DBS side that
+this slot would have provided is gone, so the
+**BOLD-pipeline-has-no-peer-reviewer limitation** in the selection
+criteria above now holds without mitigation. Meier et al. 2022 remains
+noted under "Considered and excluded" as the nearest published precedent
+of our BOLD pipeline, for the synthesis to cite.
 
 ### Seat 6 — Chakravarthy (2)
 
@@ -336,7 +365,10 @@ itself will tag every claim, per the seat definition).
   ganglia-thalamic circuits,* Eur J Neurosci (`10.1111/ejn.16348`) — a GPe
   review, but authored by the seat-2 modeling lineage; seat 7 exists
   precisely to hear the experimental literature unfiltered by modelers,
-  and seat 2's persona already carries this perspective.
+  and seat 2's persona already carries this perspective. *Amended at the
+  download checkpoint:* the seat-7 rejection stands, but Oliver added the
+  paper to **seat 2's** list instead — its findings should be taken into
+  account, and there they inform the very persona that authored them.
 - **Hegeman DJ, Hong ES, Hernández VM, Chan CS (2016),** *The external
   globus pallidus: progress and perspectives,* Eur J Neurosci
   (`10.1111/ejn.13196`) — the classic dedicated GPe review; superseded for

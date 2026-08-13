@@ -1020,6 +1020,28 @@ experimental counterpart seat 7 exists to provide. The list is handed to
 Oliver for download (checkpoint); step 3 starts only once the PDFs are
 saved under `community_review/` and reads only those full texts.
 
+**Update 2026-08-13 (download checkpoint passed; list amended by Oliver):**
+the PDFs are saved under `community_review/` (untracked) and the set was
+verified complete and valid against the list — 27 PDFs: 26 papers plus the
+Bahuguna 2025 correction. At the checkpoint Oliver amended the reading
+list in three places, all recorded with rationale in the README: (a)
+**Hjorth et al. 2020** (PNAS, `10.1073/pnas.2000671117`, verified against
+Crossref) added to seat 1 — the lineage's own striatal-microcircuit
+standard, relevant to v07's `Microcircuit` striatum although
+multi-compartment work sits outside the seat-selection similarity
+criterion; (b) **Giossi et al. 2024** added to seat 2 — the seat-7
+rejection (modeler-authored) stands, but its GPe findings should be taken
+into account, and in seat 2 they inform the persona that authored them;
+(c) **Meier et al. 2022** removed from seat 5 — TVB-based BOLD is a
+different approach from ours, its DBS implementation is simpler than ours,
+and its BG model is the same as Maith et al. 2021 (already listed).
+Consequence of (c), recorded in the README: the partial in-panel audit of
+the simulated-BOLD/DBS side is gone, so the BOLD-has-no-reviewer
+limitation now holds without mitigation; Meier et al. 2022 stays noted as
+the nearest published precedent for the synthesis to cite. Seat totals are
+now 4/5/3/3/3/2 + 6 = 26. Next: step 3, the reviews, from these full
+texts only.
+
 ---
 
 ## Resolved
