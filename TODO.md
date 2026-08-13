@@ -944,6 +944,22 @@ the workstation/cache track (§6, §3), but the fits (§32) must not launch
 until the synthesis is triaged — a structural finding discovered after the
 fits would mean paying for them twice. See the Roadmap.
 
+**Update 2026-08-13 (step 1 done):** panel selected, written up with
+selection rationale in `community_review/README.md`, and confirmed by
+Oliver — all six seats: Kumar–Hellgren Kotaleski (KTH), Rubin/Verstynen
+(Pittsburgh/CMU, DBS standing, the seed), Girard–Doya (ISIR/OIST), Grill
+(Duke, DBS standing), Hamker (Chemnitz, own lineage), Chakravarthy (IIT
+Madras, optional-seat-made-firm). Considered and excluded, with rationale
+recorded in the README: Bogacz (mean-field/oscillator approach), Rubchinsky
+(thin post-2016 full-network output), Humphries (recency rule), McIntyre
+(biophysical/axonal), whole-brain/TVB groups (by design — the README also
+records the resulting BOLD-has-no-reviewer limitation, and that Meier et
+al. 2022's TVB co-simulation of the Hamker-lineage BG model is the nearest
+published precedent for our BOLD pipeline, for the synthesis to note).
+Candidates were verified against web searches (lineage activity and
+in-window output), not memory; no full texts read yet. Next: step 2, the
+DOI reading list.
+
 ---
 
 ## Resolved
