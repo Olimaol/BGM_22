@@ -107,7 +107,40 @@ floor; a parametric bootstrap over the model's own stochasticity, refitting from
 several ANNarchy seeds; and, if the Berlin dataset has more subjects with both
 conditions, a small group.
 
+*Added after seat 6's review, which went looking in the data directory:*
+`experimental_data/berlin_data/bold_data_roi/` contains **three** subjects —
+`sub-01`, `sub-03`, `sub-04` — and
+`experimental_data/berlin_data/vta/stim_settings.csv` records all three with STN
+electrodes and both conditions. So a three-subject group is available in the
+repository today. That does not make a *t* test, but three within-subject on/off
+contrasts that agree on the sign of a parameter change is a qualitatively
+different claim from one, and it costs three fits rather than one.
+
 **Goal relevance: high.**
+
+### 5.2b The predecessor's within-population local connections were dropped
+
+Maith 2021 §2.2: "Additionally, local inhibitory connections were included in the
+GPi, GPe, dSN and iSN population." They were not decoration — Table 5 reports
+GPe–GPe as one of the significantly changed connection strengths between control
+and Parkinsonian models (+38.9 %, Cohen's *d* = 1.17, *p* < .001), among the
+larger effects in the paper.
+
+BGM_22 has no within-population recurrent connection in any nucleus: checking
+`model_v07.md` §5's projection table, there is no `stn → stn`, no
+`gpe_proto → gpe_proto`, no `snr → snr`. The six GPe lateral projections run
+between the three GPe populations, never within one. In v07 the striatal laterals
+live inside the microcircuit; every other nucleus has none.
+
+Seat 6 raises the same omission from the Chakravarthy lineage's synchrony
+standard, and seats 1 and 3 arrive at neighbouring concerns about unopposed gain
+and homogeneity. We raise it as the fourth regression against the predecessor:
+the connection this lab fitted, found significant, and published is not in the
+successor model.
+
+**Goal relevance: medium–high.** A population without recurrent inhibition
+responds to its fitted drive weight without opposition, which is exactly the
+coupling point 5.5 is about.
 
 ### 5.3 No sensitivity analysis over the fixed parameters, which this lab did
 publish and which found the fixed parameters to matter
@@ -302,7 +335,8 @@ equivalent plan.
 
 ## What we would ask for before publication
 
-1. Multiple optimisation restarts per DBS condition, with the between-restart
+1. Multiple optimisation restarts per DBS condition, and the two further subjects
+   already in the repository fitted as well, with the between-restart
    spread reported as the noise floor against which every on-minus-off parameter
    change is judged (point 5.1) — the lab's own published practice.
 2. The fixed-parameter sensitivity analysis of Maith 2021 §2.6, repeated
