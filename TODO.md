@@ -57,39 +57,74 @@ step sequence when that file was dissolved into this one on 2026-08-11; §33
 maps the old "step N" numbers that historical blocks and commit messages still
 use.
 
-1. **§1 — the bounds.** First, before anything expensive: the fits (§32) must
-   not start on unvalidated bounds, and the per-population sweep has to be
-   redone anyway because the DBS retrofit moved every number it was measured
-   on.
-2. **§29 — the CI cache validation gap.** Before the next cache build; free
-   while no cache exists. The same free window is the cheapest moment for
-   **§30** (the `phi` values — changing them after a build shifts the realised
-   rates against the bands and re-opens §4) and the natural time to land
-   **§27**'s build-time `f(d)` check.
-3. **§6 — workstation setup, then the full caches.** Push the repos and carry
-   the patched ANNarchy across, then build the full-length caches for both DBS
-   conditions in **§3**'s smaller layout (do the relayout in the same pass —
-   building 2 x 1.25 TiB in the old layout just to redo it is waste), timing
-   one evaluation per machine.
-4. **§31 — the five-generation mini-run.** The milestone green: proves the
-   whole pipeline on a workstation, and produces the numbers that calibrate
-   the **§10** gate threshold.
-5. **§34 — the community-conventions review.** Runs in *parallel* with the
-   workstation track (3-4 above): it is laptop reading work while the
-   machines build caches and run the mini-run. But it blocks **§32**: the
-   fits must not launch until §34's synthesis is triaged, or a structural
-   finding would invalidate them and they'd be paid for twice. Accepted
-   proposals spawn their own entries, which slot in here on triage.
-6. **§32 — the fits: DBS-off, then DBS-on.** Blocked by everything above,
-   including §34's triage.
-7. **After the first fit:** **§4** (missing-GABA self-consistency against the
-   fitted rates), **§2** (the DBS-on inference design — decides what the
-   on-fit may claim), **§16** (sensitivity to the hard-coded DBS constants,
-   before anything is written up).
+Reordered 2026-08-13 into three phases: finalize the model, then make it
+fast, then clarify and run the fits. The reason for the order: nearly any
+model change invalidates the input caches, and a structural finding from §34
+would invalidate the fits — so nothing expensive (full-length caches,
+workstation runs, fits) is built until the model is final. This also
+repositions §1 by its own logic ("before anything expensive"): the expensive
+part now starts in phase 3.
 
-No assigned order — each entry states its own trigger: §5, §8, §13, §14, §15,
-§17, §23, §24, §25, §26, §28. (By definition this is every open entry not
-ordered above; keep the enumeration complete when entries open or resolve.)
+**Phase 1 — finalize the model.**
+
+1. **§29 + §27 + §13 — harden cache validation first.** Free while no cache
+   exists, and it must land before the *first* short-cache build below so no
+   cache — even a throwaway one — is built through the weaker validation
+   path. Pure code work, independent of everything later in the phase.
+2. **§34 — the community-conventions review, then its triage.** Runs before
+   any model verdicts because its findings bear on exactly what the verdicts
+   rule on (§23, §24, §25, §26, §28, §30). Hard blocker on everything
+   downstream, deliberately without a timebox. Accepted proposals spawn their
+   own entries, which join the verdict pass below on triage.
+3. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
+   plus anything §34 spawned. Each entry gets an explicit verdict: **fix
+   now** (implemented within this phase) or **accepted limitation**
+   (rationale documented; the entry stays open on its own trigger). §16 is
+   pulled into the model phase deliberately — unvalidated DBS constants are
+   a model gap, not a write-up-time sensitivity check.
+4. **The validation run pair — the phase's exit criterion.** v07, DBS off
+   *and* on, short caches (`--n-trs 5`, built on the laptop and rebuilt
+   cheaply after model changes), each producing firing rates and BOLD.
+   Checked against the targets: rates inside the `get_firing_rate_loss`
+   bands or deviations explained, stream statistics matching
+   `experimental_data/input_streams/README.md`, and a demonstrated on-vs-off
+   difference in the putamen loop. Outputs kept as artefacts — in this
+   project "written" has not meant "run". At 5 TRs the BOLD side proves only
+   that the signal is produced, not that it is meaningful; that is accepted.
+
+**Phase 2 — make it fast.** Short-cache builds are phase-1 laptop work; only
+the full-length builds belong here.
+
+5. **§6 + §3 as one pass.** Workstation setup (push the repos, carry the
+   patched ANNarchy across), implement §3's smaller layout, build the
+   full-length caches for both DBS conditions directly in that layout —
+   building 2 x 1.25 TiB in the old layout just to redo it is waste — and
+   time one full evaluation per machine. The timing is the decision gate:
+   further speedup work opens as new entries only if the fits would be
+   infeasibly slow. Exit: validated full caches for both conditions on a
+   workstation, evaluation cost known.
+
+**Phase 3 — clarify and run the fits.**
+
+6. **§1 — the bounds.** The fits must not start on unvalidated bounds, and
+   the per-population sweep has to be redone anyway because the DBS retrofit
+   moved every number it was measured on.
+7. **§31 — the five-generation mini-run.** After §1, so the numbers that
+   calibrate the **§10** gate threshold come from sensible sampling rather
+   than the saturated regime. Also the first end-to-end CMA-ES exercise on a
+   workstation — phase 2's timed evaluation covers everything below the
+   orchestration layer.
+8. **§32 — the fits: DBS-off, then DBS-on.** Blocked by everything above.
+   The first pair stays as §2 already decided: all free parameters,
+   pipeline-proving.
+9. **After the first fit:** **§4** (missing-GABA self-consistency against
+   the fitted rates), **§2** (the DBS-on inference design — decides what the
+   on-fit may claim).
+
+No assigned order — each entry states its own trigger: §5, §8. Verdict-pass
+entries whose verdict is "accepted limitation" rejoin this list on their own
+triggers. (By definition this is every open entry not ordered above; keep
+the enumeration complete when entries open or resolve.)
 
 ---
 
