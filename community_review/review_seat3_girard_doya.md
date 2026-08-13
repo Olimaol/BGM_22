@@ -122,6 +122,14 @@ simultaneously. The hyperdirect pathway's defining property is that it is
 *faster* than the trans-striatal route — 4 ms against 6–9 ms in our estimates —
 and in this model that difference is zero.
 
+*Added after seat 4's review:* the Grill seat established that BGM_22's seven
+subcortical delays match Kumaravelu et al. 2016 Table 1 exactly, so they are the
+rat delay set of that lineage rather than round numbers. Our objection is
+therefore not that they are unsourced but that they are rat values in a human
+fit, and that the source literatures — rat stimulation latencies against our
+macaque ones — disagree by up to a factor of two on the striatofugal pathways.
+The zero cortical delay stands as written.
+
 **Goal relevance: low for the BOLD fit, medium for DBS.** At a 2310 ms TR a
 millisecond-scale delay cannot move the fitted time course. But `DBS.md`'s known
 limitation 1 already records that DBS axon spikes bypass the delay lines
