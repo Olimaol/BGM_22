@@ -835,10 +835,16 @@ that layer is **switched off** and step 2b is skipped entirely: the only
 correlation between two receivers' missing-GABA streams is the pool overlap
 `f(d)`.
 
-The realised shared fractions were verified against the analytic `f(d)` of the
-pre-rewrite code, but only **once, manually, at the current geometry** (commit
-`148aec2`) — nothing enforces it at build time (only the degree check above
-runs), and no analytic `f(d)` code remains (`TODO.md` §27):
+The realised shared fractions are checked against the analytic `f(d)` **at
+every build** since 2026-08-13 (`TODO.md` §27, resolved):
+`Microcircuit._check_realised_shared_fractions` re-derives
+`f(d) = E_shared(d) / E_outer` by the double quadrature the geometric
+construction replaced (`_expected_shared_for_d`, restored from git history) and
+compares it with the mean realised shared fraction around three probe
+distances, raising beyond a 25 % relative tolerance (probes where the analytic
+value is < 1e-3 are recorded but not judged); the probe table is stored in
+`stream_statistics` under `f_d_check`. The original one-off manual
+verification at the current geometry (commit `148aec2`):
 
 | pair | `f(0)` analytic | `f(dmax)` analytic | realised (near / mid / far) |
 |---|---|---|---|
@@ -980,9 +986,10 @@ One thing is then checked, because it is a prediction rather than an input:
 
 The 20 % is about 4σ of a spread measured at 1.6 % (dSPN→dSPN) to 4.8 %
 (FS→dSPN) across source clouds, with a bias below 1 %. The realised shared
-fractions are computed (`realised_shared_fractions`) but only to feed the
-statistics check of step 4 their mean; their agreement with the analytic `f(d)`
-was verified once, manually (§7.3, `TODO.md` §27).
+fractions (`realised_shared_fractions`) are checked too, against the analytic
+`f(d)` at three probe distances (`_check_realised_shared_fractions`, 25 %
+tolerance, raising; §7.3) — since 2026-08-13; before that only their mean fed
+the step-4 statistics check.
 
 **(1c) `CorticalInputs` — a flat split.**
 `simulate_receiver_counts_homogeneous_to_memmap`.
@@ -1267,19 +1274,22 @@ The checks that bite in practice:
 - **`n_steps` must match exactly.** A cache is built for one duration and is
   usable at that duration only. This is why `mc_ci_cache_5tr` (115 500 steps) can
   only serve `--n-trs 5`.
-- **`cortical_rate_path` is compared as a string** (after `Path()`
-  normalisation and `~` expansion on both sides). `parameters.py` stores it
-  relative (`../striatal_microcircuit_requirements/...`), so build and
-  evaluation must be launched from the same working directory —
-  `BOLD_optimization/`. See `TODO.md` §13.
+- **`cortical_rate_path` is stored and compared as a resolved absolute path**
+  (since 2026-08-13; `TODO.md` §13, resolved). `parameters.py` builds it from
+  its own file location, so this check no longer ties builds and evaluations
+  to a launch directory — but it does tie a cache to the machine (repo path)
+  it was built on. Before, the verbatim string comparison forced both to run
+  from `BOLD_optimization/`.
 - `dbs_condition`, `dt`, the proportions dict, `N_cortical_inputs_dict`,
-  `shared_fraction` and the correlation fields are compared too. The stored "key
-  set" is also compared, but against keys taken from the **same pickle**, so
-  that check only catches a corrupted state file, not a configuration change.
-- Any **mismatch** raises; nothing is silently rebuilt. An *absent* field is a
-  different story: most of these checks are skipped when an old state file
-  simply lacks the field — only the three correlation fields hard-fail on a
-  pre-recording pickle. The missing-input state of §7.3 is stricter throughout.
+  `shared_fraction` and the correlation fields are compared too. The stored
+  stream keys are compared against the pairs the **current configuration**
+  would generate, and each stream's stored receiver count `R` against the
+  population size (both since 2026-08-13 — the old "key set" check compared
+  the pickle against itself and only caught corruption).
+- Any **mismatch** raises; nothing is silently rebuilt. Since 2026-08-13 an
+  *absent* field also raises, for every compared field in all three state
+  files (`TODO.md` §29): a state file written by the current code always
+  records all of them, so absence means a pre-format or corrupt file.
 
 Sizes follow directly from the row counts. Across both loops the streams total
 24 084 rows (caudate 11 342, putamen 12 742), so one DBS condition costs
@@ -1451,13 +1461,15 @@ memmaps, the `TimedArray` + `CurrentInjection` pair per stream, the fitted
 `mean_weights_by_type` multiplication in `update()`, and `reset()` — is the
 same.
 
-**The cache validation is *weaker* than the Microcircuit's, not the same.** It
-checks one extra field — the stored `name` must match the loop — plus `dt`,
-`n_steps`, `dbs_condition`, the rate path, the proportions dict and
-`N_cortical_inputs_dict`. But `CorticalInputs._save_cortical_input_state`
-records neither `shared_fraction_dict` nor any correlation field, so **changing
-those silently reuses a stale CI cache** while the same change correctly
-invalidates the MC cache. `TODO.md` §29; the fix is free while no cache exists.
+**The cache validation mirrors the Microcircuit's** since 2026-08-13
+(`TODO.md` §29, resolved; it used to be strictly weaker).
+`CorticalInputs._save_cortical_input_state` records `shared_fraction_dict`,
+`cortical_correlation`, `correlation_window_ms`, `correlation_timescale_ms`
+and the per-stream statistics, and `_load_cortical_input_state` compares them
+— plus the stored `name` against the loop, `dt`, `n_steps`, `dbs_condition`,
+the resolved rate path, the proportions dict, `N_cortical_inputs_dict`, the
+stream keys against what the current configuration would generate, and each
+stream's receiver count against the population size. Any absent field raises.
 
 The smallest stream is M1 → gpe/stn in the caudate: `round(0.02 · 500) = 10`
 presynaptic neurons. It survives the zero-skip, but a bin can then only take the

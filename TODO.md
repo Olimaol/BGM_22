@@ -65,24 +65,22 @@ workstation runs, fits) is built until the model is final. This also
 repositions §1 by its own logic ("before anything expensive"): the expensive
 part now starts in phase 3.
 
-**Phase 1 — finalize the model.**
+**Phase 1 — finalize the model.** (Its first item — §29 + §27 + §13, the
+cache-validation hardening — was completed 2026-08-13, before any cache was
+built through the weaker path.)
 
-1. **§29 + §27 + §13 — harden cache validation first.** Free while no cache
-   exists, and it must land before the *first* short-cache build below so no
-   cache — even a throwaway one — is built through the weaker validation
-   path. Pure code work, independent of everything later in the phase.
-2. **§34 — the community-conventions review, then its triage.** Runs before
+1. **§34 — the community-conventions review, then its triage.** Runs before
    any model verdicts because its findings bear on exactly what the verdicts
    rule on (§23, §24, §25, §26, §28, §30). Hard blocker on everything
    downstream, deliberately without a timebox. Accepted proposals spawn their
    own entries, which join the verdict pass below on triage.
-3. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
+2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus anything §34 spawned. Each entry gets an explicit verdict: **fix
    now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
    a model gap, not a write-up-time sensitivity check.
-4. **The validation run pair — the phase's exit criterion.** v07, DBS off
+3. **The validation run pair — the phase's exit criterion.** v07, DBS off
    *and* on, short caches (`--n-trs 5`, built on the laptop and rebuilt
    cheaply after model changes), each producing firing rates and BOLD.
    Checked against the targets: rates inside the `get_firing_rate_loss`
@@ -95,7 +93,7 @@ part now starts in phase 3.
 **Phase 2 — make it fast.** Short-cache builds are phase-1 laptop work; only
 the full-length builds belong here.
 
-5. **§6 + §3 as one pass.** Workstation setup (push the repos, carry the
+4. **§6 + §3 as one pass.** Workstation setup (push the repos, carry the
    patched ANNarchy across), implement §3's smaller layout, build the
    full-length caches for both DBS conditions directly in that layout —
    building 2 x 1.25 TiB in the old layout just to redo it is waste — and
@@ -106,18 +104,18 @@ the full-length builds belong here.
 
 **Phase 3 — clarify and run the fits.**
 
-6. **§1 — the bounds.** The fits must not start on unvalidated bounds, and
+5. **§1 — the bounds.** The fits must not start on unvalidated bounds, and
    the per-population sweep has to be redone anyway because the DBS retrofit
    moved every number it was measured on.
-7. **§31 — the five-generation mini-run.** After §1, so the numbers that
+6. **§31 — the five-generation mini-run.** After §1, so the numbers that
    calibrate the **§10** gate threshold come from sensible sampling rather
    than the saturated regime. Also the first end-to-end CMA-ES exercise on a
    workstation — phase 2's timed evaluation covers everything below the
    orchestration layer.
-8. **§32 — the fits: DBS-off, then DBS-on.** Blocked by everything above.
+7. **§32 — the fits: DBS-off, then DBS-on.** Blocked by everything above.
    The first pair stays as §2 already decided: all free parameters,
    pipeline-proving.
-9. **After the first fit:** **§4** (missing-GABA self-consistency against
+8. **After the first fit:** **§4** (missing-GABA self-consistency against
    the fitted rates), **§2** (the DBS-on inference design — decides what the
    on-fit may claim).
 
@@ -459,18 +457,7 @@ into an expensive fit.
 
 ### 12. Cost of building the input caches, measured — resolved 2026-08-11, superseded by the §22 rebuild, moved to Resolved
 
-### 13. Cache state files store the cortical rate path as a bare string
-
-*Opened 2026-08-04 09:39*
-
-**Opened 2026-08-04 09:39:**
-
-`Microcircuit` and `CorticalInputs` compare the saved `cortical_rate_path` verbatim
-against the one they are given, so a cache built from `../striatal_.../x.npz` is
-rejected when the same file is later named through a different path. This is why
-`build_input_caches.py` has to be run from `BOLD_optimization/`, like `get_loss.py`.
-Harmless once known; worth normalizing to a resolved absolute path if the caches are
-ever built from somewhere else.
+### 13. Cache state files store the cortical rate path as a bare string — resolved 2026-08-13, moved to Resolved
 
 ---
 
@@ -762,36 +749,7 @@ this block holds the forward-looking part.
 
 ## From the session on 2026-08-07 (verifying model_v07.md against the code)
 
-### 27. The realised `f(d)` of the geometric pools is not checked at build time
-
-*Opened 2026-08-07 15:28*
-
-**Opened 2026-08-07 15:28:**
-
-The geometric source pools of the missing-GABA streams are checked on exactly
-one prediction: the realised mean degree against `E_outer`, 20 % tolerance,
-raising (`microcircuit.py → _simulate_distance_dependent_spike_counts`). The
-realised shared fractions are computed (`realised_shared_fractions`) but only to
-feed the step-4 statistics check their mean; their agreement with the analytic
-`f(d)` was verified **once, manually**, at the current 10×10×10 geometry
-(commits `fd2cbde`/`148aec2` — analytic 0.0372→0.0318, realised
-0.0364/0.0344/0.0314 for dSPN→dSPN), and no analytic `f(d)` code remains in the
-tree.
-
-**Why it matters:** the whole point of the geometric construction is that `f(d)`
-emerges correctly at *any* geometry, which is what keeps §24 (the larger,
-sparser cube) reachable. That property is currently only verified at one
-geometry; a future `nx`/`density` change would silently trust it.
-
-**Proposal:** re-add the analytic double quadrature (it exists in git history,
-pre-`fd2cbde`) as a build-time check — it runs once per pair per build, so the
-cost is negligible against the stream generation itself.
-
-**Caveats:** the 20 % degree check already catches gross pool errors (a degree
-that is right and a shared fraction that is badly wrong requires a subtle bug,
-not a gross one); and the tolerance for the `f(d)` comparison would need the
-same care as the step-4 tolerances — the realised values scatter across source
-clouds, so a naive tight bound would fire on good draws.
+### 27. The realised `f(d)` of the geometric pools is not checked at build time — resolved 2026-08-13, moved to Resolved
 
 ### 28. The striatal populations start at `v = 0` — a synchronous spike at t = 0
 
@@ -819,27 +777,7 @@ train to shift; (b) the init must be set **before** compile or re-applied after
 every reset site, per the reset trap (`model_v07.md` §11); (c) bounded benefit —
 the probe bias is ~0.1 Hz, so this is hygiene, not a suspect for bad fits.
 
-### 29. `CorticalInputs`' cache validation is strictly weaker than `Microcircuit`'s
-
-*Opened 2026-08-07 15:28*
-
-**Opened 2026-08-07 15:28:**
-
-`CorticalInputs._save_cortical_input_state` records neither
-`shared_fraction_dict` nor any correlation field
-(`cortical_correlation`/`correlation_window_ms`/`correlation_timescale_ms`), so
-`_load_cortical_input_state` cannot check them: **changing any of those
-parameters silently reuses a stale CI cache**, while the same change correctly
-invalidates the MC cache (`microcircuit.py` records and checks all of them, and
-hard-fails on state files that predate the fields). Also, the CI state's "key
-set" comparison checks keys taken from the same pickle against themselves — it
-catches a corrupted state file, not a configuration change.
-
-**Fix:** record the missing fields in `_save_cortical_input_state` and compare
-them in `_load_cortical_input_state`, mirroring `microcircuit.py`, including the
-hard fail on their absence. **Do it before the next cache build:** no cache
-currently exists, so adding fields now invalidates nothing; every day it waits,
-the next cache is one parameter change away from being silently stale.
+### 29. `CorticalInputs`' cache validation is strictly weaker than `Microcircuit`'s — resolved 2026-08-13, moved to Resolved
 
 ## From the session on 2026-08-10 (model_v07.md §6 follow-up)
 
@@ -1195,6 +1133,35 @@ probe — remain true and live in CLAUDE.md.
 The next cost measurement belongs to the §3 layout rebuild on the workstations
 (PLAN step 8), which waits on the §1 bounds (step 7); a fresh cost record
 should be taken there, not extrapolated from the laptop.
+
+### 13. Cache state files store the cortical rate path as a bare string
+
+*Opened 2026-08-04 09:39 · resolved 2026-08-13 11:36*
+
+**Opened 2026-08-04 09:39:**
+
+`Microcircuit` and `CorticalInputs` compare the saved `cortical_rate_path` verbatim
+against the one they are given, so a cache built from `../striatal_.../x.npz` is
+rejected when the same file is later named through a different path. This is why
+`build_input_caches.py` has to be run from `BOLD_optimization/`, like `get_loss.py`.
+Harmless once known; worth normalizing to a resolved absolute path if the caches are
+ever built from somewhere else.
+
+**Resolved 2026-08-13 11:36:** Both classes now resolve `cortical_rate_path`
+to an absolute path at construction (`Path(...).expanduser().resolve()` in
+their `__init__`s), record the resolved string in the state file, and refuse a
+state file that lacks it. `parameters.py` builds `mc.cortical_rate_path` from
+its own file location instead of storing `../striatal_...`, so the comparison
+no longer depends on the launch directory at all (the *other* paths in
+`parameters.py` are still relative — everything keeps being run from
+`BOLD_optimization/` for those). Trade-off, accepted: the recorded path is
+machine-specific, so a cache copied to a host where the repo sits at a
+different absolute path is refused instead of matching by coincidence; the
+full-length caches are built directly on the workstations anyway (§6).
+Covered by `CompNeuroPy/src/CompNeuroPy/test/test_striatal_state_validation.py`
+(reload through a different cwd + relative spelling passes; absent field
+refused), which ran green on 2026-08-13. Done together with §29's hardening
+pass, before any cache exists, so nothing was invalidated.
 
 ### 18. DBS.md's line references drift silently
 
@@ -1680,6 +1647,109 @@ layer of `spike_input_cortex`.
 
 Generation is also **~6x faster**: ~7 h per DBS condition at full length against
 ~42 h before, because `beta.ppf`, `binom.ppf` and both copula draws are gone.
+
+### 27. The realised `f(d)` of the geometric pools is not checked at build time
+
+*Opened 2026-08-07 15:28 · resolved 2026-08-13 11:36*
+
+**Opened 2026-08-07 15:28:**
+
+The geometric source pools of the missing-GABA streams are checked on exactly
+one prediction: the realised mean degree against `E_outer`, 20 % tolerance,
+raising (`microcircuit.py → _simulate_distance_dependent_spike_counts`). The
+realised shared fractions are computed (`realised_shared_fractions`) but only to
+feed the step-4 statistics check their mean; their agreement with the analytic
+`f(d)` was verified **once, manually**, at the current 10×10×10 geometry
+(commits `fd2cbde`/`148aec2` — analytic 0.0372→0.0318, realised
+0.0364/0.0344/0.0314 for dSPN→dSPN), and no analytic `f(d)` code remains in the
+tree.
+
+**Why it matters:** the whole point of the geometric construction is that `f(d)`
+emerges correctly at *any* geometry, which is what keeps §24 (the larger,
+sparser cube) reachable. That property is currently only verified at one
+geometry; a future `nx`/`density` change would silently trust it.
+
+**Proposal:** re-add the analytic double quadrature (it exists in git history,
+pre-`fd2cbde`) as a build-time check — it runs once per pair per build, so the
+cost is negligible against the stream generation itself.
+
+**Caveats:** the 20 % degree check already catches gross pool errors (a degree
+that is right and a shared fraction that is badly wrong requires a subtle bug,
+not a gross one); and the tolerance for the `f(d)` comparison would need the
+same care as the step-4 tolerances — the realised values scatter across source
+clouds, so a naive tight bound would fire on good draws.
+
+**Resolved 2026-08-13 11:36:** Implemented as proposed.
+`_expected_shared_for_d` (the nested quadrature) was restored from pre-`fd2cbde`
+history into `microcircuit.py`, and a new
+`Microcircuit._check_realised_shared_fractions` runs at every build, directly
+after the `E_outer` degree check and before any stream is written: it evaluates
+the analytic `f(d) = E_shared(d) / E_outer` on a 16-point grid (interpolated to
+pair distances), compares the mean realised shared fraction of the ~30–500
+receiver pairs around three probe distances (5th/50th/90th percentile of pair
+distances below `2·r_out`), and raises beyond a 25 % relative tolerance. Probes
+with analytic `f < 1e-3` are recorded but not judged — a relative test on a
+vanishing value only measures noise. The probe table is stored in
+`stream_statistics["<pre>-<post>"]["f_d_check"]`, so every cache carries the
+comparison. On the caveats: the tolerance was set against measured scatter —
+across 6 seeds x 3 probes on a synthetic lattice the worst deviation of the
+binned means was ~12 % (largest where `f` is smallest), while a wrong `r_in` or
+kernel sigma moves the analytic value far outside 25 % and fires. Verified at a
+10³ lattice *and* a larger, sparser 14³ one (the §24 scenario), in
+`CompNeuroPy/src/CompNeuroPy/test/test_striatal_f_d_check.py`, green on
+2026-08-13. Note the check is deliberately density-blind: `rho_pre` cancels out
+of `f(d)`, so density errors remain the degree check's job. Cost: a few seconds
+per build.
+
+### 29. `CorticalInputs`' cache validation is strictly weaker than `Microcircuit`'s
+
+*Opened 2026-08-07 15:28 · resolved 2026-08-13 11:36*
+
+**Opened 2026-08-07 15:28:**
+
+`CorticalInputs._save_cortical_input_state` records neither
+`shared_fraction_dict` nor any correlation field
+(`cortical_correlation`/`correlation_window_ms`/`correlation_timescale_ms`), so
+`_load_cortical_input_state` cannot check them: **changing any of those
+parameters silently reuses a stale CI cache**, while the same change correctly
+invalidates the MC cache (`microcircuit.py` records and checks all of them, and
+hard-fails on state files that predate the fields). Also, the CI state's "key
+set" comparison checks keys taken from the same pickle against themselves — it
+catches a corrupted state file, not a configuration change.
+
+**Fix:** record the missing fields in `_save_cortical_input_state` and compare
+them in `_load_cortical_input_state`, mirroring `microcircuit.py`, including the
+hard fail on their absence. **Do it before the next cache build:** no cache
+currently exists, so adding fields now invalidates nothing; every day it waits,
+the next cache is one parameter change away from being silently stale.
+
+**Resolved 2026-08-13 11:36:** Implemented as specified, and the same pass
+hardened all three state-file loaders beyond the entry's minimum, since no
+cache exists and stricter costs nothing:
+
+- `CorticalInputs._save_cortical_input_state` now records
+  `shared_fraction_dict`, `cortical_correlation`, `correlation_window_ms`,
+  `correlation_timescale_ms` **and** `stream_statistics` (audit parity with
+  the MC states); `_load_cortical_input_state` compares them all.
+- **Every** compared field in all three loaders
+  (`CorticalInputs._load_cortical_input_state`,
+  `Microcircuit._load_cortical_input_state`,
+  `Microcircuit._load_missing_input_state`) is now hard-required — the old
+  `payload.get(field, current)` / `if saved is not None` patterns treated an
+  absent field as a match.
+- The self-referential "key set" check (in both cortical-input loaders) was
+  replaced by a comparison against the pairs the **current configuration**
+  would generate, reproducing the loop logic of the respective
+  `_simulate_*_spike_counts`.
+- Each stream's stored receiver count `R` is checked against the current
+  population size (`pop.size` / `type_counts`), which nothing verified before.
+
+Covered by
+`CompNeuroPy/src/CompNeuroPy/test/test_striatal_state_validation.py` — a real
+tiny CI cache built with mock populations plus crafted MC state files; every
+mismatch and every stripped field is proven to raise — green on 2026-08-13.
+Done together with §13 (the rate-path normalization), before any cache was
+built through the weaker path.
 
 ### 33. PLAN.md dissolved into this file
 

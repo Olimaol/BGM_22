@@ -1,3 +1,5 @@
+from pathlib import Path
+
 ### parameters for test_microcircuit
 parameters_test_microcircuit = {}
 ### general
@@ -154,9 +156,19 @@ parameters_test_microcircuit["data_folder"] = "data_BOLD_optimization"
 parameters_test_microcircuit["mc.fitted_params_path"] = (
     "../striatal_microcircuit_requirements/connectivity_parameters/connectivity_fit_data/fitted_params.json"
 )
+# Absolute on purpose: the path is recorded (resolved) in every input-cache
+# state file and compared on load, so a relative path would tie a cache to the
+# launch directory (TODO.md §13, resolved 2026-08-13). Built from this file's
+# location, it is stable per machine; a cache is therefore also per machine.
+_cortical_rate_dir = (
+    Path(__file__).resolve().parent.parent
+    / "striatal_microcircuit_requirements"
+    / "cortical_firing_rates"
+    / "cortical_firing_rates_data"
+)
 parameters_test_microcircuit["mc.cortical_rate_path"] = {
-    "on": "../striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data/firing_rates_matlab_condition-on.npz",
-    "off": "../striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_data/firing_rates_matlab_condition-off.npz",
+    "on": str(_cortical_rate_dir / "firing_rates_matlab_condition-on.npz"),
+    "off": str(_cortical_rate_dir / "firing_rates_matlab_condition-off.npz"),
 }
 # deap cma parameters
 parameters_test_microcircuit["deap_cma.run.max_evals"] = (

@@ -448,7 +448,8 @@ def v07_model_creation_kwargs(
     them; that is what build_input_caches.py does. Every evaluation loads them,
     so both paths have to agree on all of these values -- in particular the
     caches are only accepted when their n_steps equals int(duration_ms / dt),
-    and the stored cortical_rate_path string must match exactly.
+    and the stored cortical_rate_path (recorded as a resolved absolute path
+    since TODO.md section 13) must match the resolved current one.
     """
     cache_dir = cache_dir if cache_dir is not None else paramsS["mc_ci_cache_dir"]
     return {

@@ -14,9 +14,11 @@ firing-rate probe -- check both, because a short smoke test can invert the two.
 
 The model creation kwargs come from get_loss.v07_model_creation_kwargs, so the
 caches are built with exactly the settings the evaluation will later demand.
-Note that the cortical rate path is stored in the cache as the *string* it was
-passed, and reloading compares it verbatim: run this script from the same
-working directory as get_loss.py (BOLD_optimization/).
+The cortical rate path is stored in the cache resolved to an absolute path
+(parameters.py builds it from its own location since TODO.md section 13), so
+the cache no longer cares which directory this script is launched from -- but
+the other paths in parameters.py are still relative, so run it from
+BOLD_optimization/ like get_loss.py anyway.
 
 Examples
 --------

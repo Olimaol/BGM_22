@@ -122,12 +122,17 @@ so it is built for one `--n-trs` and usable only at that `--n-trs`. It must also
 cover the fixed 9900 ms firing-rate probe, which is the binding constraint below 5
 TRs; the script refuses that case up front. A cache also has to match everything
 it was drawn at — `firing_rate_dict`, `correlation_dict`, `shared_fraction`,
-`cortical_correlation`, `correlation_window_ms`, `correlation_timescale_ms`,
-`source_multiplicity` — and one written before any of those were recorded is
-refused outright. Each stream is checked against the statistics its own
-parameters imply as it is written, **raising** on a mismatch, and the measured
-mean, Fano factor and pairwise correlation are stored in the state file so a
-cache can be audited without regenerating it.
+`shared_fraction_dict`, `cortical_correlation`, `correlation_window_ms`,
+`correlation_timescale_ms`, `source_multiplicity` — and a state file missing
+**any** compared field is refused outright (hardened 2026-08-13, `TODO.md`
+§29: `CorticalInputs` used to record none of the shared-fraction/correlation
+fields, so changing them silently reused a stale CI cache). Each stream is
+checked against the statistics its own parameters imply as it is written,
+**raising** on a mismatch, and the measured mean, Fano factor and pairwise
+correlation are stored in the state file (by `Microcircuit` *and*
+`CorticalInputs`) so a cache can be audited without regenerating it. The
+missing-GABA streams' realised `f(d)` is additionally checked at build time
+against the analytic double quadrature (`TODO.md` §27, resolved 2026-08-13).
 
 **What the streams are required to reproduce is written down** in
 `experimental_data/input_streams/README.md`, together with what this approach
@@ -149,9 +154,14 @@ smaller one.
 
 `storage_dir` is resolved **relative to the working directory you launch from**,
 which is how `mc_ci_cache/` and `mc_caudate_off_cache/` came to hold overlapping
-data. Pass absolute paths — but note the cortical rate path inside the cache state
-is compared verbatim, so build and evaluate from `BOLD_optimization/` either way
-(`TODO.md` §13).
+data. Pass absolute paths. The cortical rate path inside the cache state is no
+longer launch-directory-sensitive: it is recorded and compared as a resolved
+absolute path, and `parameters.py` builds it from its own file location
+(`TODO.md` §13, resolved 2026-08-13) — which also means a cache records the
+machine it was built on and will not validate after being copied to a host
+where the repo lives at a different absolute path. The *other* paths in
+`parameters.py` are still relative, so run everything from
+`BOLD_optimization/` regardless.
 
 ## Running things
 
