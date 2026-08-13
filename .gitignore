@@ -37,3 +37,7 @@ striatal_microcircuit_requirements/cortical_firing_rates/cortical_firing_rates_d
 !docs/stream_demo/figures/*.png
 !docs/stream_demo/results.json
 !docs/stream_demo/bench.json
+
+# community_review: publisher PDFs are never committed (public remote; cite DOIs)
+community_review/**/*.pdf
+community_review/*.pdf
