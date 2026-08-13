@@ -7,9 +7,10 @@ definition, the three steps and their checkpoints are in `TODO.md` §34.
 Implementing accepted changes is not part of this survey — each accepted
 proposal spawns its own `TODO.md` entry.
 
-**Status: step 1 done — panel confirmed by Oliver on 2026-08-13 (all six
-lineage seats), amended the same day with seat 7 (the experimentalist,
-also confirmed). Next: step 2, the DOI reading list.**
+**Status: step 2 done — the DOI reading list below was compiled and
+verified on 2026-08-13 and handed to Oliver for download. Step 3 (the
+reviews) starts only once the PDFs are saved here, and reads only those
+full texts.**
 
 ## Selection criteria (from §34)
 
@@ -164,6 +165,187 @@ experimental claims no modeling seat audits. The DBS representation is
   overwhelmingly mouse, while this model is a human-subject fit anchored
   on macaque tracer data.
 
+## Step 2 — the reading list (DOIs)
+
+Compiled 2026-08-13. Per §34: the flagship network-model paper of the
+recent era plus the most recent relevant one per lineage seat, more only
+where the lineage's approach shifted; 4–6 reviews for seat 7. All entries
+are in-window (2016+). **25 papers total.** Every DOI was verified against
+Crossref and/or the publisher page on 2026-08-13; no entry is cited from
+memory.
+
+### Seat 1 — Kumar–Hellgren Kotaleski (3)
+
+1. Lindahl M, Hellgren Kotaleski J (2016). *Untangling basal ganglia
+   network dynamics and function: role of dopamine depletion and inhibition
+   investigated in a spiking network model.* eNeuro 3(6).
+   DOI: `10.1523/ENEURO.0156-16.2016` — the flagship: full spiking BG,
+   healthy vs dopamine-depleted, validated on in-vivo rates and oscillations.
+2. Bahuguna J, Sahasranamam A, Kumar A (2020). *Uncoupling the roles of
+   firing rates and spike bursts in shaping the STN-GPe beta band
+   oscillations.* PLOS Comput Biol 16(3): e1007748.
+   DOI: `10.1371/journal.pcbi.1007748` — the STN–GPe beta line. (A 2025
+   correction exists, `10.1371/journal.pcbi.1013638` — download both.)
+3. Chakravarty K, Roy S, Sinha A, Nambu A, Chiken S, Hellgren Kotaleski J,
+   Kumar A (2022). *Transient response of basal ganglia network in healthy
+   and low-dopamine state.* eNeuro 9(2).
+   DOI: `10.1523/ENEURO.0376-21.2022` — the most recent full-BG paper with
+   both lineage PIs, validated against Nambu-lab cortical-stimulation data.
+
+### Seat 2 — Rubin/Verstynen (4 — the shift from parkinsonian-dynamics networks to the CBGT decision framework justifies the fourth slot)
+
+1. Corbit VL, Whalen TC, Zitelli KT, Crilly SY, Rubin JE, Gittis AH (2016).
+   *Pallidostriatal projections promote β oscillations in a dopamine-depleted
+   biophysical network model.* J Neurosci 36(20).
+   DOI: `10.1523/JNEUROSCI.0339-16.2016` — the in-window flagship of the
+   parkinsonian-network line; directly on our `gpe_arky`/`gpe_cp` content.
+2. Rubin JE (2017). *Computational models of basal ganglia dysfunction: the
+   dynamics is in the details.* Curr Opin Neurobiol 46:127–135.
+   DOI: `10.1016/j.conb.2017.08.011` — the persona's stated standards for
+   PD/DBS network models; carries the seat's DBS standing in-window.
+3. Dunovan K, Vich C, Clapp M, Verstynen T, Rubin J (2019). *Reward-driven
+   changes in striatal pathway competition shape evidence evaluation in
+   decision-making.* PLOS Comput Biol 15(5): e1006998.
+   DOI: `10.1371/journal.pcbi.1006998` — the CBGT-line flagship.
+4. Clapp M, Bahuguna J, Giossi C, Rubin JE, Verstynen T, Vich C (2025).
+   *CBGTPy: an extensible cortico-basal ganglia-thalamic framework for
+   modeling biological decision making.* PLOS ONE 20(1): e0310367.
+   DOI: `10.1371/journal.pone.0310367` — the most recent: the lineage's
+   published framework, i.e. what it considers a complete CBGT network.
+
+### Seat 3 — Girard–Doya (3)
+
+1. Girard B, Liénard J, Gutierrez CE, Delord B, Doya K (2021). *A
+   biologically constrained spiking neural network model of the primate
+   basal ganglia with overlapping pathways exhibits action selection.*
+   Eur J Neurosci 53(7):2254–2277. DOI: `10.1111/ejn.14869` — the flagship:
+   parameter fitting under quantitative anatomical constraints, primate.
+2. Shouno O, Tachibana Y, Nambu A, Doya K (2017). *Computational model of
+   recurrent subthalamo-pallidal circuit for generation of parkinsonian
+   oscillations.* Front Neuroanat 11:21. DOI: `10.3389/fnana.2017.00021` —
+   the OIST spiking STN–GPe model with DBS exploration.
+3. Liénard J, et al. (2024). *Estimation of the transmission delays in the
+   basal ganglia of the macaque monkey and subsequent predictions about
+   oscillatory activity under dopamine depletion.* Eur J Neurosci.
+   DOI: `10.1111/ejn.16271` — the most recent: the same lineage's
+   data-constrained fitting program carried forward.
+
+### Seat 4 — Grill (3)
+
+1. Kumaravelu K, Brocker DT, Grill WM (2016). *A biophysical model of the
+   cortex-basal ganglia-thalamus network in the 6-OHDA lesioned rat model
+   of Parkinson's disease.* J Comput Neurosci 40(2):207–229.
+   DOI: `10.1007/s10827-016-0593-9` — the flagship and the community's
+   closed-loop-DBS evaluation platform.
+2. Kumaravelu K, Oza CS, Behrend CE, Grill WM (2018). *Model-based
+   deconstruction of cortical evoked potentials generated by subthalamic
+   nucleus deep brain stimulation.* J Neurophysiol 120(2):662–680.
+   DOI: `10.1152/jn.00862.2017` — how this lineage represents DBS at the
+   pathway level (orthodromic/antidromic decomposition); the sharpest
+   standard to hold `DBS.md`'s mechanisms against.
+3. Su F, Kumaravelu K, Wang J, Grill WM (2019). *Model-based evaluation of
+   closed-loop deep brain stimulation controller to adapt to dynamic
+   changes in reference signal.* Front Neurosci 13:956.
+   DOI: `10.3389/fnins.2019.00956` — the most recent network-level use of
+   the model in its DBS-controller role.
+
+### Seat 5 — Hamker, our own lineage (4 — the shift from rate-coded pathway models to spiking networks fitted to human imaging justifies the fourth slot)
+
+1. Schroll H, Hamker FH (2016). *Basal ganglia dysfunctions in movement
+   disorders: what can be learned from computational simulations.*
+   Mov Disord 31(11). DOI: `10.1002/mds.26719` — the lab's own stated
+   evaluative standards for BG models of disease.
+2. Maith O, Villagrasa Escudero F, Dinkelbach HÜ, Baladron J, Horn A,
+   Irmen F, Kühn AA, Hamker FH (2021). *A computational model-based
+   analysis of basal ganglia pathway changes in Parkinson's disease
+   inferred from resting-state fMRI.* Eur J Neurosci 53(7):2133–2153.
+   DOI: `10.1111/ejn.14868` — the direct predecessor of this project:
+   spiking BG fitted to human resting-state fMRI, patient data.
+3. Goenner L, Maith O, Koulouri I, Baladron J, Hamker FH (2021). *A spiking
+   model of basal ganglia dynamics in stopping behavior supported by
+   arkypallidal neurons.* Eur J Neurosci 53(7):2296–2321.
+   DOI: `10.1111/ejn.15082` — the lab's own bar for modeling
+   arkypallidal/prototypic GPe, which v07 inherits.
+4. Meier JM, Perdikis D, Blickensdörfer A, Stefanovski L, Liu Q, Maith O,
+   Dinkelbach HÜ, Baladron J, Hamker FH, Ritter P (2022). *Virtual deep
+   brain stimulation: multiscale co-simulation of a spiking basal ganglia
+   model and a whole-brain mean-field model with The Virtual Brain.*
+   Exp Neurol 354:114111. DOI: `10.1016/j.expneurol.2022.114111` — the
+   nearest published precedent of our BOLD pipeline (already flagged under
+   "Considered and excluded"); as a lineage paper it lets seat 5 partially
+   audit the simulated-BOLD/DBS side that no other seat covers.
+
+### Seat 6 — Chakravarthy (2)
+
+1. Mandali A, Chakravarthy VS (2016). *Probing the role of medication, DBS
+   electrode position, and antidromic activation on impulsivity using a
+   computational model of basal ganglia.* Front Hum Neurosci 10:450.
+   DOI: `10.3389/fnhum.2016.00450` — the in-window flagship: Izhikevich
+   spiking BG with explicit STN-DBS including antidromic effects. (This
+   corrects the provisional pointer above: the 2016 Frontiers DBS paper is
+   Mandali & Chakravarthy, not Muralidharan et al.)
+2. Nair SS, Muddapu VR, Chakravarthy VS (2022). *A multiscale,
+   systems-level, neuropharmacological model of cortico-basal ganglia
+   system for arm reaching under normal, parkinsonian, and levodopa
+   medication conditions.* Front Comput Neurosci 15:756881.
+   DOI: `10.3389/fncom.2021.756881` — the most recent: the lineage's
+   current multiscale cortico-BG program including medication state.
+
+### Seat 7 — the experimentalist (6 reviews)
+
+All slots were filled by in-window reviews — the primary-paper escape
+hatch was **not needed**. Dominant species noted per entry (the review
+itself will tag every claim, per the seat definition).
+
+1. **[mandatory GPe slot]** Courtney CD, Pamukcu A, Chan CS (2023). *Cell
+   and circuit complexity of the external globus pallidus.* Nat Neurosci
+   26:1147–1159. DOI: `10.1038/s41593-023-01368-7` — the most recent
+   authoritative synthesis of the GPe reorganization
+   (arkypallidal/prototypic, pallido-striatal projections, bridging
+   collaterals); overwhelmingly mouse.
+2. **[mandatory whole-BG organization slot]** McGregor MM, Nelson AB
+   (2019). *Circuit mechanisms of Parkinson's disease.* Neuron
+   101(6):1042–1056. DOI: `10.1016/j.neuron.2019.03.004` — whole-BG
+   circuit organization read through the disease state the model actually
+   fits; largely rodent, with primate/human anchors.
+3. Tepper JM, Koós T, Ibáñez-Sandoval O, Tecuapetla F, Faust TW, Assous M
+   (2018). *Heterogeneity and diversity of striatal GABAergic
+   interneurons: update 2018.* Front Neuroanat 12:91.
+   DOI: `10.3389/fnana.2018.00091` — audits the microcircuit's cell-type
+   choices (dSPN/iSPN/FS and what is deliberately absent); rodent.
+4. Wichmann T (2019). *Changing views of the pathophysiology of
+   parkinsonism.* Mov Disord 34(8). DOI: `10.1002/mds.27741` — firing
+   rates vs patterns in parkinsonism, nonhuman primate and human; the
+   direct audit anchor for the Liang et al. 2008 firing-rate bands
+   (`experimental_data/activity_striatum/README.md`).
+5. Haber SN (2016). *Corticostriatal circuitry.* Dialogues Clin Neurosci
+   18(1):7–21. DOI: `10.31887/DCNS.2016.18.1/shaber` — primate
+   corticostriatal topography from the field's authority; the audit anchor
+   for the Borra-tracer-based cortical proportions
+   (`experimental_data/cortical_proportions/README.md`); macaque/human.
+6. Emmi A, Antonini A, Macchi V, Porzionato A, De Caro R (2020). *Anatomy
+   and connectivity of the subthalamic nucleus in humans and non-human
+   primates.* Front Neuroanat 14:13. DOI: `10.3389/fnana.2020.00013` —
+   STN afferents/efferents and internal organization in the species that
+   matter for a human-subject fit; human/macaque.
+
+### Considered for the list, not selected
+
+- **Giossi C, Rubin JE, Gittis A, Verstynen T, Vich C (2024),** *Rethinking
+  the external globus pallidus and information flow in cortico-basal
+  ganglia-thalamic circuits,* Eur J Neurosci (`10.1111/ejn.16348`) — a GPe
+  review, but authored by the seat-2 modeling lineage; seat 7 exists
+  precisely to hear the experimental literature unfiltered by modelers,
+  and seat 2's persona already carries this perspective.
+- **Hegeman DJ, Hong ES, Hernández VM, Chan CS (2016),** *The external
+  globus pallidus: progress and perspectives,* Eur J Neurosci
+  (`10.1111/ejn.13196`) — the classic dedicated GPe review; superseded for
+  our purpose by the same group's 2023 Nature Neuroscience synthesis
+  (rule: most recent authoritative synthesis per topic).
+- **Whalen/Gittis delta-oscillation and SNr papers (Rubin co-authored,
+  2020–2024)** — primary experimental papers; the seat-2 selection keeps
+  to network models per §34.
+
 ## Considered and excluded
 
 - **Bogacz lineage (Oxford)** — high-impact network-level DBS theory
@@ -194,9 +376,16 @@ experimental claims no modeling seat audits. The DBS representation is
 Panel candidates were checked against web searches on 2026-08-13 (lineage
 activity and in-window network-model output); no full texts have been read
 yet. Reviews (step 3) will be written **only** from PDFs Oliver downloads
-against the step-2 DOI list, not from abstracts or search summaries — and
-the DOI list itself will be verified against the publisher pages when it is
-compiled.
+against the step-2 DOI list, not from abstracts or search summaries.
+
+The step-2 DOI list was verified on 2026-08-13: every DOI was resolved
+through the Crossref API and/or the publisher page (Wiley, PLOS, Frontiers,
+Elsevier/Cell, Springer, SfN, Nature) and matched against title, authors and
+journal. The lineage publication records behind the per-seat selections were
+taken from PubMed author listings (Rubin JE, Grill WM, Hamker FH,
+Chakravarthy VS), not from memory. One provisional pointer from step 1 was
+corrected in the process (seat 6: Mandali & Chakravarthy 2016, previously
+remembered as "Muralidharan et al. 2016").
 
 ## PDFs
 

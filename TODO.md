@@ -997,6 +997,29 @@ literature is overwhelmingly mouse while the model is a human-subject fit
 anchored on macaque tracer data. Seat definition written into
 `community_review/README.md` and confirmed by Oliver on 2026-08-13.
 
+**Update 2026-08-13 (step 2 done):** the DOI reading list is compiled,
+verified and written into `community_review/README.md` — 25 papers: 19
+across the six lineage seats (Kumar–Hellgren Kotaleski 3, Rubin/Verstynen
+4, Girard–Doya 3, Grill 3, Hamker 4, Chakravarthy 2; the four-paper seats
+are justified in the README by a documented shift in the lineage's
+approach) plus 6 reviews for the experimentalist seat. Both mandatory
+seat-7 slots were filled by in-window reviews (GPe: Courtney/Pamukcu/Chan
+2023 Nat Neurosci; whole-BG organization: McGregor & Nelson 2019 Neuron),
+so the primary-paper escape hatch was not needed. Every DOI was verified
+against Crossref and/or the publisher page on 2026-08-13; per-seat
+selections were drawn from PubMed author listings, not memory — which
+caught one wrong provisional pointer from step 1 (seat 6's 2016 Frontiers
+DBS paper is Mandali & Chakravarthy, not Muralidharan et al.; corrected in
+the README, the historical step-1 text above left as written). Notable
+selection decisions, with rationale in the README: Meier et al. 2022
+(virtual DBS, Exp Neurol) sits in seat 5's list as a Hamker-lineage paper,
+partially mitigating the BOLD-has-no-reviewer limitation from inside the
+panel; Giossi et al. 2024 (EJN GPe review) was rejected for seat 7 because
+it is authored by the seat-2 modeling lineage, whose unfiltered
+experimental counterpart seat 7 exists to provide. The list is handed to
+Oliver for download (checkpoint); step 3 starts only once the PDFs are
+saved under `community_review/` and reads only those full texts.
+
 ---
 
 ## Resolved
