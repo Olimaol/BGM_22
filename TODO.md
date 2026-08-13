@@ -960,6 +960,43 @@ Candidates were verified against web searches (lineage activity and
 in-window output), not memory; no full texts read yet. Next: step 2, the
 DOI reading list.
 
+**Update 2026-08-13 (step 1 amended: seat 7, the experimentalist):** the
+panel as confirmed was all modeling lineages, so the review would only
+catch what the *modeling* community already models — experimental findings
+the modeling literature has not yet absorbed (most prominently the GPe
+reorganization of roughly 2015–2024: arkypallidal/prototypic cell types,
+pallido-striatal projections, bridging collaterals — directly relevant
+since v07 already contains `gpe_arky`/`gpe_cp`) would be invisible. A
+seventh seat is added: **the experimentalist**, a *review-defined
+composite* persona — a deliberate, recorded exception to the
+one-seat-one-lineage rule, since no single experimental lab covers
+whole-BG structure, connectivity and organization; its voice is what the
+selected reviews collectively assert, and it has no single lab's published
+standard to be judged against. Mandate: structure, connectivity and
+organization, **plus** auditing the model's empirical validation anchors
+(the Liang et al. 2008 medication-off firing-rate bands, the
+Borra-tracer-based cortical proportions) — experimental claims no modeling
+seat audits; the DBS representation stays with the Grill/Rubin seats.
+Reading list (extends step 2): 4–6 reviews — above the 2–4 per-seat norm
+because the seat covers a literature, not one lab's output — same 2016+
+window, preferring the most recent authoritative synthesis per topic, with
+two mandatory slots: at least one dedicated GPe review and at least one
+whole-BG circuit-organization review; the remaining slots are chosen at
+step 2 against what the model actually contains. Reviews-first with a
+narrow escape hatch: a primary paper may take a slot only where step 2
+finds no in-window review covering a mandated topic, the substitution and
+the failed search recorded in the README. Two step-3 consequences: (a) the
+synthesis convergence rule is amended for this seat — a point raised only
+by the experimentalist is weighted by convergence *within* its reading
+list (asserted by multiple independent reviews → literature consensus,
+comparable to multi-persona convergence; a single review → one voice), and
+the synthesis states which case applies; (b) every structural claim in the
+experimentalist's review carries a species-provenance tag (mouse / rat /
+macaque / human) beside the goal-relevance tag, because the recent GPe
+literature is overwhelmingly mouse while the model is a human-subject fit
+anchored on macaque tracer data. Seat definition written into
+`community_review/README.md` and confirmed by Oliver on 2026-08-13.
+
 ---
 
 ## Resolved

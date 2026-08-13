@@ -8,7 +8,8 @@ Implementing accepted changes is not part of this survey — each accepted
 proposal spawns its own `TODO.md` entry.
 
 **Status: step 1 done — panel confirmed by Oliver on 2026-08-13 (all six
-seats). Next: step 2, the DOI reading list.**
+lineage seats), amended the same day with seat 7 (the experimentalist,
+also confirmed). Next: step 2, the DOI reading list.**
 
 ## Selection criteria (from §34)
 
@@ -31,11 +32,18 @@ seats). Next: step 2, the DOI reading list.**
   this panel.** No persona will audit the balloon model, the BOLD-signal
   source assumptions, or the fit-to-fMRI methodology; the panel reviews the
   neuronal model that feeds it.
+- **One deliberate exception to all of the above (added 2026-08-13): seat 7,
+  the experimentalist** — not a lineage and not a modeling approach, but a
+  review-defined composite persona representing the recent experimental
+  literature on basal ganglia structure, connectivity and organization. See
+  its section below for the full definition; the amendment is logged in
+  `TODO.md` §34.
 
 ## Proposed panel
 
-Ordered by approach similarity. Paper pointers below are provisional
-orientation only — the reading list is fixed in step 2.
+Seats 1–6 ordered by approach similarity; seat 7 sits outside that
+ordering by design. Paper pointers below are provisional orientation only
+— the reading list is fixed in step 2.
 
 ### 1. Kumar–Hellgren Kotaleski lineage (KTH Stockholm / Freiburg)
 
@@ -99,6 +107,62 @@ since). In-window and approach-similar, but lower citation impact than seats
 1–5 and flagship papers sit at the 2015/2016 boundary. Included as the only
 non-US/EU lineage and a third DBS-capable voice; Oliver confirmed the seat
 on 2026-08-13.
+
+### 7. The experimentalist — *review-defined composite seat* (added 2026-08-13)
+
+**Why the seat exists.** Seats 1–6 are all modeling lineages, so the panel
+would only catch what the modeling community already models. Experimental
+findings the modeling literature has not yet absorbed — most prominently
+the GPe reorganization of roughly 2015–2024 (arkypallidal/prototypic cell
+types, pallido-striatal projections, bridging collaterals), directly
+relevant since v07 already contains `gpe_arky`/`gpe_cp` — would otherwise
+be invisible to the review.
+
+**What the persona is.** A deliberate, recorded exception to the
+one-seat-one-lineage rule: no single experimental lab covers whole-BG
+structure, connectivity and organization (the GPe work, striatal cell
+types, and primate circuit anatomy are different lineages). The persona is
+therefore defined entirely by its step-2 reading list; its voice is what
+those reviews *collectively assert*, and — unlike the lineage seats — it
+has no single lab's published standard to be judged in character against.
+
+**Mandate.** Structure, connectivity, and organization of the basal
+ganglia, **plus** auditing the model's empirical validation anchors — the
+Liang et al. 2008 medication-off firing-rate bands
+(`experimental_data/activity_striatum/README.md`) and the
+macaque-tracer-based cortical proportions
+(`experimental_data/cortical_proportions/README.md`) — which are
+experimental claims no modeling seat audits. The DBS representation is
+**out of scope** for this seat; it stays with the Grill and Rubin seats.
+
+**Reading list rules (extend step 2).**
+
+- **4–6 reviews** — above the 2–4 per-seat norm, justified because the
+  seat covers an entire literature rather than one lab's output.
+- Same **2016+** window as the rest of the panel, preferring the most
+  recent authoritative synthesis per topic.
+- **Two mandatory slots:** at least one dedicated GPe review and at least
+  one whole-BG circuit-organization review. The remaining slots are chosen
+  at step 2 against what the model actually contains (striatal cell types,
+  cortico-BG anatomy/proportions, STN, firing-rate physiology).
+- **Reviews-first with a narrow escape hatch:** a primary paper may take a
+  slot only where step 2 finds no in-window review covering a mandated
+  topic; the substitution and the failed search are recorded here.
+
+**Step-3 consequences.**
+
+- **Synthesis weighting:** the convergence rule (many personas = community
+  convention, one voice = one lab's taste) is amended for this seat. A
+  point raised only by the experimentalist is weighted by convergence
+  *within its own reading list*: asserted by multiple independent reviews →
+  treated as literature consensus, comparable to multi-persona
+  convergence; found in a single review → one voice. The synthesis states
+  which case applies for each such point.
+- **Species-provenance tags:** every structural claim in the
+  experimentalist's review carries a species tag (mouse / rat / macaque /
+  human) beside the goal-relevance tag — the recent GPe literature is
+  overwhelmingly mouse, while this model is a human-subject fit anchored
+  on macaque tracer data.
 
 ## Considered and excluded
 
