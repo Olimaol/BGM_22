@@ -74,8 +74,15 @@ use.
 4. **§31 — the five-generation mini-run.** The milestone green: proves the
    whole pipeline on a workstation, and produces the numbers that calibrate
    the **§10** gate threshold.
-5. **§32 — the fits: DBS-off, then DBS-on.** Blocked by everything above.
-6. **After the first fit:** **§4** (missing-GABA self-consistency against the
+5. **§34 — the community-conventions review.** Runs in *parallel* with the
+   workstation track (3-4 above): it is laptop reading work while the
+   machines build caches and run the mini-run. But it blocks **§32**: the
+   fits must not launch until §34's synthesis is triaged, or a structural
+   finding would invalidate them and they'd be paid for twice. Accepted
+   proposals spawn their own entries, which slot in here on triage.
+6. **§32 — the fits: DBS-off, then DBS-on.** Blocked by everything above,
+   including §34's triage.
+7. **After the first fit:** **§4** (missing-GABA self-consistency against the
    fitted rates), **§2** (the DBS-on inference design — decides what the
    on-fit may claim), **§16** (sensitivity to the hard-coded DBS constants,
    before anything is written up).
@@ -901,6 +908,68 @@ surround assumption), §2 (inference design over the fitted result) and §16
 (DBS-constant sensitivity) — see the Roadmap.
 
 ### 33. PLAN.md dissolved into this file — resolved 2026-08-11, moved to Resolved
+
+## From the session on 2026-08-13 (community conventions review)
+
+### 34. Survey the BG-modeling community's conventions via reviewer personas
+
+*Opened 2026-08-13 10:38*
+
+**Opened 2026-08-13 10:38:** We do not know whether the model violates
+conventions of the active basal ganglia neurocomputational community — things
+every comparable model does that ours silently doesn't. The task is a
+structured survey, in three steps, producing review documents; implementing
+any accepted change is explicitly *not* part of this entry — each accepted
+proposal spawns its own numbered entry, and §34 resolves when the review
+documents exist.
+
+**Step 1 — the panel.** Select 5-8 research groups/lineages (the unit is a
+group sharing one modeling approach — e.g. Rubin-Terman counts once — not an
+individual). Primary ranking: similarity of the modeling approach to ours
+(mesoscopic, populations of point neurons, possibly spiking, multiple
+functionally connected BG regions) weighted with citation impact. Detailed
+single-cell/morphology modeling is dissimilar regardless of citations.
+Secondary criterion: the panel must include at least 1-2 groups that model
+DBS at the network level, so the mechanisms of §14-§17 get a reviewer with
+standing (Jonathan Rubin qualifies on both counts and is the seed
+suggestion). The Hamker/Chemnitz lineage is included as one persona, judged
+against its own published standards. **Strict recency:** both the groups and
+the papers must be from roughly the last 10 years (2016+). Accepted
+consequence: foundational papers (Terman & Rubin 2002/2004, Humphries 2006)
+are excluded, so each persona is reconstructed from recent work only —
+conventions stated long ago and silently assumed since may be missed. No
+seat for BOLD/whole-brain (mean-field) groups: they fail the
+approach-similarity criterion; instead the synthesis must explicitly record
+that the BOLD pipeline had no peer reviewer, as a known limitation.
+Checkpoint: the group list is confirmed by Oliver before step 2.
+
+**Step 2 — the reading list.** 2-4 papers per group (~15-25 total): the
+flagship network-model paper of the recent era plus the most recent relevant
+one, more only if the group's approach shifted. Delivered as a DOI list;
+Oliver downloads the PDFs, and step 3 reads the saved full texts, not
+abstracts. Checkpoint: the list goes to Oliver for download before any
+review is written.
+
+**Step 3 — the reviews.** One review per group, written in character as that
+group reviewing our model, applying the group's *full* standards unfiltered
+— structure (regions, neuron types), connectivity, dynamics, validation
+data, DBS representation. Every raised point is tagged with whether it
+plausibly matters for our stated goal (single-subject resting-state BOLD
+fitting and DBS inference), so nothing is pre-filtered but triage is
+pre-structured. Then one synthesis document: merge overlapping points, rank
+by how many personas raise them (convergence across groups = community
+convention; a single voice = one lab's taste), and attach one concrete
+change proposal per point — exactly what we would modify.
+
+**Location:** new top-level `community_review/` — committed README (group
+list with selection rationale, DOI reading list) and committed review
+documents; PDFs saved beside them but untracked (the remote is public; cite
+DOIs, never commit publisher PDFs — the `experimental_data/` pattern).
+
+**Ordering:** the survey is laptop reading work and runs in parallel with
+the workstation/cache track (§6, §3), but the fits (§32) must not launch
+until the synthesis is triaged — a structural finding discovered after the
+fits would mean paying for them twice. See the Roadmap.
 
 ---
 
