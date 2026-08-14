@@ -16,8 +16,10 @@ for the reduced model, as a delta against it.
 `community_review/` holds the community-conventions survey (`TODO.md` §34,
 resolved 2026-08-13): seven reviews of this model written in character as seven
 research lineages from their own published standards, plus
-`community_review/synthesis.md` — **24 findings F1–F24 ranked by how many seats
-raised each, with a change proposal apiece.** Start there before changing the
+`community_review/round1/synthesis.md` — **24 findings F1–F24 ranked by how many
+seats raised each, with a change proposal apiece.** (The 2026-08-13 review
+documents moved under `round1/` on 2026-08-14; a second round is being written
+under `round2/`.) Start there before changing the
 model: its four top-tier findings all bear on whether the project's central
 claim can be made, and the triage that decides which are accepted is the next
 Roadmap item. The findings are not themselves referenceable — anything accepted

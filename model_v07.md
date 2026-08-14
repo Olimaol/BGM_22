@@ -223,8 +223,8 @@ uses the integer cell counts after `int()` truncation and the remainder fix-up
 
 **The GPe factors are GPe cell-type abundances** — identified by the
 community-conventions review of 2026-08-13
-(`community_review/review_seat7_experimentalist.md` point 7.1 and
-`community_review/synthesis.md` F6), against Courtney, Pamukcu & Chan 2023
+(`community_review/round1/review_seat7_experimentalist.md` point 7.1 and
+`community_review/round1/synthesis.md` F6), against Courtney, Pamukcu & Chan 2023
 (*Nat Neurosci* 26:1147, `10.1038/s41593-023-01368-7`): PV⁺ ≈ 50 %,
 NPAS1⁺FOXP2⁺ (arkypallidal) ≈ 18 %, NPAS1⁺NKX2.1⁺ (cortex-projecting) ≈ 12 %,
 with ChAT⁺ ≈ 5 % and unclassified ≈ 15 % making up the missing 0.23 — exactly
@@ -398,11 +398,11 @@ Brocker & Grill 2016 (*J Comput Neurosci* 40:207, `10.1007/s10827-016-0593-9`)
 Table 1 **exactly** — `str→snr` 4, `str→gpe` 5, `stn→snr` 1.5, `stn→gpe` 2,
 `gpe→stn` 4, `gpe→snr` 3, `snr→thal` 5 — i.e. that lineage's **rat** delay set,
 sourced there to Nakanishi 1987, Kita & Kitai 1991, Fujimoto & Kita 1993 and Xu
-2008 (`community_review/review_seat4_grill.md` point 4.1). Nothing in this
+2008 (`community_review/round1/review_seat4_grill.md` point 4.1). Nothing in this
 project recorded that. Two caveats the review attaches: they are rat values in a
 human fit, and Liénard et al. 2024's macaque estimates disagree by up to a
 factor of two on the striatofugal pathways
-(`community_review/review_seat3_girard_doya.md` point 3.2). Separately, the
+(`community_review/round1/review_seat3_girard_doya.md` point 3.2). Separately, the
 cortical drive arrives with **no delay at all** — `CurrentInjection` injects
 into the current timestep (§7.7) — so the hyperdirect route has no speed
 advantage over the trans-striatal one.

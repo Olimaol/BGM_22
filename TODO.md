@@ -72,7 +72,7 @@ review — was completed the same day; its 24 findings now feed the triage
 below.)
 
 1. **The community-review triage.** §34 is resolved and its output is
-   `community_review/synthesis.md`: 24 findings F1–F24, ranked by how many of
+   `community_review/round1/synthesis.md`: 24 findings F1–F24, ranked by how many of
    the seven seats raised each, one change proposal apiece. This step decides
    which are accepted. Every accepted finding **spawns its own numbered
    entry**, which then joins the verdict pass below; a rejected one is

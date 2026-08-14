@@ -7,10 +7,12 @@ definition, the three steps and their checkpoints are in `TODO.md` §34.
 Implementing accepted changes is not part of this survey — each accepted
 proposal spawns its own `TODO.md` entry.
 
-**Status: all three steps done (2026-08-13).** The seven reviews and the
-synthesis are in this directory; every one was written from the full texts
-of the PDFs saved here, not from abstracts. The survey is complete and
-`TODO.md` §34 is resolved. What remains is the **triage** — the Roadmap item
+**Status: all three steps done (2026-08-13); step 3 rerun as round 2 on
+2026-08-14.** The seven reviews and the synthesis of the first round are in
+`round1/`; every one was written from the full texts of the PDFs saved here,
+not from abstracts. The round-2 documents are being written into `round2/`
+under two additional requirements recorded in `TODO.md` §34. The survey is
+complete and `TODO.md` §34 is resolved. What remains is the **triage** — the Roadmap item
 that follows §34 — which decides which of the synthesis's 24 findings are
 accepted; each accepted proposal spawns its own `TODO.md` entry.
 
@@ -18,14 +20,14 @@ accepted; each accepted proposal spawns its own `TODO.md` entry.
 
 | file | contents |
 |---|---|
-| `review_seat1_kumar_hellgren_kotaleski.md` | seat 1, 11 points |
-| `review_seat2_rubin_verstynen.md` | seat 2, 10 points |
-| `review_seat3_girard_doya.md` | seat 3, 8 points |
-| `review_seat4_grill.md` | seat 4 (DBS standing), 9 points |
-| `review_seat5_hamker.md` | seat 5, our own lineage, 11 points |
-| `review_seat6_chakravarthy.md` | seat 6, 6 points |
-| `review_seat7_experimentalist.md` | seat 7, 16 points, species-tagged |
-| `synthesis.md` | **start here** — 24 merged findings F1–F24, ranked in four tiers by cross-seat convergence, one change proposal each |
+| `round1/review_seat1_kumar_hellgren_kotaleski.md` | seat 1, 11 points |
+| `round1/review_seat2_rubin_verstynen.md` | seat 2, 10 points |
+| `round1/review_seat3_girard_doya.md` | seat 3, 8 points |
+| `round1/review_seat4_grill.md` | seat 4 (DBS standing), 9 points |
+| `round1/review_seat5_hamker.md` | seat 5, our own lineage, 11 points |
+| `round1/review_seat6_chakravarthy.md` | seat 6, 6 points |
+| `round1/review_seat7_experimentalist.md` | seat 7, 16 points, species-tagged |
+| `round1/synthesis.md` | 24 merged findings F1–F24, ranked in four tiers by cross-seat convergence, one change proposal each |
 
 Every point in every review carries a goal-relevance tag; seat 7's structural
 claims additionally carry a species-provenance tag and a within-reading-list
