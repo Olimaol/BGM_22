@@ -243,8 +243,9 @@ factors summing to 1.54), so each `gpe_proto` effectively weighs ≈ 0.325 — n
 The open question is now a different one: the model **weights the BOLD** by
 these realistic abundances while **simulating** the three populations at 100
 neurons each, so the network dynamics carry three times as many arkypallidal
-neurons relative to prototypic ones as the abundances imply. See `synthesis.md`
-F6 for the proposal.
+neurons relative to prototypic ones as the abundances imply. See
+`community_review/round2/synthesis.md` F22 for the proposal (the round-1
+pointer was F6).
 
 **The input variable differs by population family.** BGM populations expose the
 total current as `I`; the Humphries striatal populations expose it as `I_v`. Cau

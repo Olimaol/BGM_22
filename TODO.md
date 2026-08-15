@@ -68,28 +68,36 @@ expensive"): the expensive part now starts in phase 3.
 **Phase 1 — finalize the model.** (Its first item — §29 + §27 + §13, the
 cache-validation hardening — was completed 2026-08-13, before any cache was
 built through the weaker path. Its second — §34, the community-conventions
-review — was completed the same day; its 24 findings now feed the triage
-below.)
+review — was completed the same day, and its step 3 was rerun as round 2 on
+2026-08-14/15 under hardened evidence requirements; the 32 round-2 findings
+now feed the triage below.)
 
-1. **The community-review triage.** §34 is resolved and its output is
-   `community_review/round1/synthesis.md`: 24 findings F1–F24, ranked by how many of
-   the seven seats raised each, one change proposal apiece. This step decides
-   which are accepted. Every accepted finding **spawns its own numbered
-   entry**, which then joins the verdict pass below; a rejected one is
-   recorded as rejected with its reason in the spawning entry or, where no
-   entry is warranted, nowhere — the synthesis is not itself referenceable, so
-   anything meant to survive must become an entry. Runs before any model
-   verdicts because the findings bear on exactly what the verdicts rule on
-   (§23, §24, §25, §26, §28, §30). Hard blocker on everything downstream,
-   deliberately without a timebox.
+1. **The community-review triage.** §34 is resolved and its output — after
+   the step-3 rerun of 2026-08-14/15 — is
+   `community_review/round2/synthesis.md`: 32 findings F1–F32 (numbers local
+   to that document; the round-1 synthesis under `round1/` is superseded,
+   its numbering included), ranked in four tiers by how many of the seven
+   seats raised each, each carrying an evidence class (experimentally
+   grounded / methodological / difference), with change proposals only where
+   the first two classes license them. This step decides which are accepted.
+   Every accepted finding **spawns its own numbered entry**, which then joins
+   the verdict pass below; a rejected one is recorded as rejected with its
+   reason in the spawning entry or, where no entry is warranted, nowhere —
+   the synthesis is not itself referenceable, so anything meant to survive
+   must become an entry. Runs before any model verdicts because the findings
+   bear on exactly what the verdicts rule on (§23, §24, §25, §26, §28, §30).
+   Hard blocker on everything downstream, deliberately without a timebox.
 
-   Three orderings the synthesis's own reading guide implies, kept here
-   because they are ordering and nothing else: the input-correlation finding
-   is the one hard blocker on §32 and is already carried by **§25**; four
-   findings would invalidate the input caches if accepted, so they must be
-   settled inside this phase rather than after phase 2 builds them; and the
-   subject's medication state must be established before any full-length
-   cache is built, because a wrong answer invalidates every one of them.
+   Orderings the round-2 synthesis's reading guide implies, kept here because
+   they are ordering and nothing else: the input-correlation scan stays the
+   one hard blocker on §32 and is already carried by **§25**; the rate-band
+   derivation document must precede §10's gate calibration; five findings
+   would invalidate input caches if accepted (the striatal-kernel state
+   refit, the STN cortical-proportion table, the `ci.n_*` derivation of §8,
+   the cube size already carried by §24, and the medication state if the
+   answer is "on"), so they must be settled inside this phase rather than
+   after phase 2 builds them; and the acceptance criterion for "DBS changed
+   this parameter" must be fixed in §2 before any on-fit is interpreted.
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned. Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
@@ -1881,7 +1889,7 @@ reference to `PLAN.md` was repointed in the same sweep.
 
 ### 34. Survey the BG-modeling community's conventions via reviewer personas
 
-*Opened 2026-08-13 10:38 · resolved 2026-08-13 20:54 · 4 updates, last 2026-08-13*
+*Opened 2026-08-13 10:38 · resolved 2026-08-13 20:54 · 5 updates, last 2026-08-15*
 
 **Opened 2026-08-13 10:38:** We do not know whether the model violates
 conventions of the active basal ganglia neurocomputational community — things
@@ -2086,3 +2094,47 @@ Per this entry's own terms, implementing anything is **not** part of §34.
 The triage — the Roadmap item that follows — decides which findings are
 accepted, and each accepted one spawns its own numbered entry. §34 closes
 here because the review documents exist.
+
+**Update 2026-08-15 08:25 (step 3 rerun as round 2; round 1 archived):**
+Oliver had step 3 redone: round 1's reviews held BGM_22 against the seats'
+own modeling practice without asking what that practice rests on, and their
+phrasing left the BGM_22-versus-lineage contrast implicit. The rerun imposed
+two requirements on every seat. (1) **Evidence basis**: every appeal to a
+lineage's own practice states the experimental evidence behind the
+lineage's own choice — source, species, preparation, what was measured, as
+documented in its papers — or admits the choice is a convention, estimate
+or tuned value, in which case the point is a difference, not a deficiency
+of BGM_22, and may carry no change proposal; change proposals require
+concretely cited experimental findings or a self-standing methodological
+argument. (2) **Explicit contrast**: every point is structured as labelled
+parts (what BGM_22 does / what we do / evidence behind our choice / why
+that would or would not be better for this project's goal), ending in
+exactly one verdict — experimentally grounded deficiency / methodological
+deficiency / difference, not deficiency — plus the goal-relevance tag;
+seat 7 keeps its species tags and within-list convergence statements. The
+2026-08-13 documents moved to `community_review/round1/` (pure renames;
+living-document path references updated in the same commit), and the
+round-2 documents were written into `community_review/round2/` by seven
+parallel sessions, each reading only its own seat's PDFs in full plus the
+repository — no round-1 document, no other seat's file, and not the shared
+README — with the synthesis then written from the seven finished reviews.
+Result: 98 points (13/13/12/14/16/14/16 per seat; 22 experimentally
+grounded, 33 methodological, 43 differences, 19 of those explicitly in
+BGM_22's favour), merged into `community_review/round2/synthesis.md` as
+**32 findings F1–F32** in four convergence tiers with evidence classes, a
+section recording the thirteen proposals the evidence rule caused seats to
+withdraw, and a triage reading guide. Round-2 finding numbers are local to
+that document; round 1 is superseded, its numbering included. The
+unanimous Tier-1 finding — all seven seats — is that the six non-striatal
+firing-rate bands are unsourced and state-blind ("[Li et al., 2015]"
+resolves to nothing) while gating every evaluation. Facts round 2
+established beyond round 1's, recorded in the README: all 28 v07
+projection weights are Goenner et al. 2021 Tables 4–5 (verbatim, or ×C on
+striatal targets), self-described there as "determined mainly by
+functional constraints" — verified independently by seats 2 and 5; and the
+striatal connectivity kernel fit pools Taverna 2008's 6-OHDA/reserpine
+rows and Gittis 2011's 6-OHDA rows with baseline rows into one state-less
+kernel (seat 1, from the condition-labelled spreadsheet and
+`connectivity_fit.py`). The resolution above stands — the review documents
+exist; the triage (Roadmap phase 1 item 1) now runs on the round-2
+synthesis.

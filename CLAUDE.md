@@ -14,16 +14,23 @@ built, step by step from `setup()` to `compile()`; `model_v08.md` does the same
 for the reduced model, as a delta against it.
 
 `community_review/` holds the community-conventions survey (`TODO.md` §34,
-resolved 2026-08-13): seven reviews of this model written in character as seven
-research lineages from their own published standards, plus
-`community_review/round1/synthesis.md` — **24 findings F1–F24 ranked by how many
-seats raised each, with a change proposal apiece.** (The 2026-08-13 review
-documents moved under `round1/` on 2026-08-14; a second round is being written
-under `round2/`.) Start there before changing the
-model: its four top-tier findings all bear on whether the project's central
-claim can be made, and the triage that decides which are accepted is the next
-Roadmap item. The findings are not themselves referenceable — anything accepted
-becomes its own `TODO.md` entry. PDFs live beside the documents, untracked.
+resolved 2026-08-13; step 3 rerun as round 2, completed 2026-08-15): seven
+reviews of this model written in character as seven research lineages from
+their own published standards, plus a synthesis. **Round 2, under
+`community_review/round2/`, is the operative version** — rerun under two
+hardened requirements: every appeal to a lineage's own practice must state the
+experimental evidence that practice rests on or be demoted to a
+difference-not-deficiency without a change proposal, and every point is an
+explicit BGM_22-vs-lineage contrast ending in one of three verdicts. Start
+with `community_review/round2/synthesis.md` — **32 findings F1–F32 in four
+convergence tiers, evidence class and (where licensed) a change proposal
+apiece, plus the proposals the evidence rule caused seats to withdraw** —
+before changing the model: its Tier-1 findings bear on whether the project's
+central claim can be made, and the triage that decides which are accepted is
+the next Roadmap item. The findings are not themselves referenceable —
+anything accepted becomes its own `TODO.md` entry. The 2026-08-13 first round
+is archived under `round1/`, superseded (its F-numbering included). PDFs live
+at the folder's top level, untracked.
 
 ## Three repos, one environment
 

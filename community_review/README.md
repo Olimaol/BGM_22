@@ -7,33 +7,66 @@ definition, the three steps and their checkpoints are in `TODO.md` §34.
 Implementing accepted changes is not part of this survey — each accepted
 proposal spawns its own `TODO.md` entry.
 
-**Status: all three steps done (2026-08-13); step 3 rerun as round 2 on
-2026-08-14.** The seven reviews and the synthesis of the first round are in
-`round1/`; every one was written from the full texts of the PDFs saved here,
-not from abstracts. The round-2 documents are being written into `round2/`
-under two additional requirements recorded in `TODO.md` §34. The survey is
-complete and `TODO.md` §34 is resolved. What remains is the **triage** — the Roadmap item
-that follows §34 — which decides which of the synthesis's 24 findings are
-accepted; each accepted proposal spawns its own `TODO.md` entry.
+**Status: all three steps done (2026-08-13); step 3 rerun as round 2,
+completed 2026-08-15.** Round 2 is the operative version of the survey: seven
+seat reviews plus a synthesis under `round2/`, written independently of round
+1 (no round-1 document was consulted by any seat) from the full texts of the
+PDFs saved here, under the two round-2 requirements below. The first round's
+documents are archived under `round1/`, superseded — including their finding
+numbering. The survey is complete and `TODO.md` §34 is resolved. What remains
+is the **triage** — the Roadmap item that follows §34 — which decides which of
+the round-2 synthesis's 32 findings are accepted; each accepted proposal
+spawns its own `TODO.md` entry.
+
+## The round-2 requirements (2026-08-14)
+
+Round 1's reviews argued partly from the seats' own modeling habits — "our
+model does it differently" — without asking what those habits rest on. Oliver
+had step 3 rerun with two hardened requirements, logged in `TODO.md` §34:
+
+1. **Evidence basis.** Every appeal a seat makes to its own practice must
+   state the experimental evidence that practice rests on — source, species,
+   preparation, what was measured, as documented in the lineage's own papers —
+   or admit that it is a convention, an estimate, or a tuned value. A seat's
+   convention may be reported as a *difference between approaches*, never as a
+   deficiency of BGM_22, and no change proposal may rest on it; proposals
+   require concretely cited experimental findings or a self-standing
+   methodological argument (identifiability, statistics, numerics).
+2. **Explicit contrast.** Every point is structured with labelled parts —
+   what BGM_22 does / what we do / evidence behind our choice / why that would
+   (or would not) be better for this project's goal — ending in exactly one
+   verdict (**experimentally grounded deficiency**, **methodological
+   deficiency**, or **difference, not deficiency**) plus the goal-relevance
+   tag. Seat 7 keeps its species tags and within-reading-list convergence
+   statements.
+
+Independence rules of the rerun: no seat read any `round1/` document, any
+other seat's round-2 file, or this README while writing (reading lists were
+supplied per seat); facts the living model docs attribute to round-1 documents
+were treated as project documentation. The synthesis adds a section recording
+the proposals seats *withdrew* under requirement 1 — differences round 1 would
+have turned into change requests.
 
 ## The documents
 
 | file | contents |
 |---|---|
-| `round1/review_seat1_kumar_hellgren_kotaleski.md` | seat 1, 11 points |
-| `round1/review_seat2_rubin_verstynen.md` | seat 2, 10 points |
-| `round1/review_seat3_girard_doya.md` | seat 3, 8 points |
-| `round1/review_seat4_grill.md` | seat 4 (DBS standing), 9 points |
-| `round1/review_seat5_hamker.md` | seat 5, our own lineage, 11 points |
-| `round1/review_seat6_chakravarthy.md` | seat 6, 6 points |
-| `round1/review_seat7_experimentalist.md` | seat 7, 16 points, species-tagged |
-| `round1/synthesis.md` | 24 merged findings F1–F24, ranked in four tiers by cross-seat convergence, one change proposal each |
+| `round2/review_seat1_kumar_hellgren_kotaleski.md` | seat 1, 13 points |
+| `round2/review_seat2_rubin_verstynen.md` | seat 2, 13 points |
+| `round2/review_seat3_girard_doya.md` | seat 3, 12 points |
+| `round2/review_seat4_grill.md` | seat 4 (DBS standing), 14 points |
+| `round2/review_seat5_hamker.md` | seat 5, our own lineage, 16 points |
+| `round2/review_seat6_chakravarthy.md` | seat 6, 14 points |
+| `round2/review_seat7_experimentalist.md` | seat 7, 16 points, species-tagged |
+| `round2/synthesis.md` | **start here** — 32 merged findings F1–F32 in four convergence tiers, evidence class and (where licensed) one change proposal each, plus the proposals declined under the evidence rule |
+| `round1/…` | the 2026-08-13 first round, archived and superseded: seven seat reviews (11/10/8/9/11/6/16 points) and `round1/synthesis.md` (24 findings; its F-numbering is superseded by round 2's) |
 
-Every point in every review carries a goal-relevance tag; seat 7's structural
-claims additionally carry a species-provenance tag and a within-reading-list
-convergence statement, per the §34 amendment.
+Every point in every review carries a goal-relevance tag; round-2 points
+additionally end in exactly one of the three verdicts defined above; seat 7's
+structural claims additionally carry a species-provenance tag and a
+within-reading-list convergence statement, per the §34 amendment.
 
-Two facts the reviews established that the project did not know, recorded here
+Facts the reviews established that the project did not know, recorded here
 because they are referenced from several documents:
 
 - **The GPe BOLD pooling factors (0.5 / 0.17 / 0.10) are GPe cell-type
@@ -43,7 +76,21 @@ because they are referenced from several documents:
   right; the factors are no longer unsourced.
 - **The seven subcortical delays in `parameters.csv` are Kumaravelu et al. 2016
   Table 1 exactly** — rat values with real provenance the project does not
-  record (seat 4).
+  record (seat 4; re-verified in round 2, point 4.1, with the note that the one
+  rat-vs-human latency comparison in that lineage's own data supports the
+  transfer).
+- **All 28 v07 projection weights are Goenner et al. 2021 Tables 4–5** —
+  verbatim for non-striatal targets, ×C (50 for SPNs, 80 for FSIs) for
+  striatal ones — verified independently by two round-2 seats (points 2.4 and
+  5.1). Goenner 2021 §4.4 itself describes them as "determined mainly by
+  functional constraints", i.e. tuned for a stopping task, not
+  literature-measured (round-2 synthesis F9).
+- **The striatal connectivity kernel fit pools dopamine states**: the
+  `connectivity_fit.py` datasets mix Taverna 2008's 6-OHDA/reserpine rows and
+  Gittis 2011's 6-OHDA rows with baseline rows into one state-less kernel
+  (round-2 seat 1, point 1.1; synthesis F11). The rows are condition-labelled
+  in `connectivity_probabilities.ods`, so a per-condition refit needs no new
+  data.
 
 ### Step-2 history
 
@@ -459,5 +506,6 @@ remembered as "Muralidharan et al. 2016").
 
 ## PDFs
 
-Saved beside these documents, **untracked** (the remote is public: cite
-DOIs, never commit publisher PDFs — the `experimental_data/` pattern).
+Saved at this directory's top level (beside this README, shared by both
+rounds), **untracked** (the remote is public: cite DOIs, never commit
+publisher PDFs — the `experimental_data/` pattern).
