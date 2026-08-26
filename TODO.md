@@ -101,7 +101,7 @@ now feed the triage below.)
    this parameter" must be fixed in §2 before any on-fit is interpreted
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
-   plus everything the triage spawned (so far: §35). Each entry gets an explicit verdict:
+   plus everything the triage spawned (so far: §35, §36). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -111,7 +111,8 @@ now feed the triage below.)
    cheaply after model changes), each producing firing rates and BOLD.
    Checked against the targets: rates inside the `get_firing_rate_loss`
    bands or deviations explained, stream statistics matching
-   `experimental_data/input_streams/README.md`, and a demonstrated on-vs-off
+   `experimental_data/input_streams/README.md`, §36's regime diagnostics
+   computed and recorded, and a demonstrated on-vs-off
    difference in the putamen loop. Outputs kept as artefacts — in this
    project "written" has not meant "run". At 5 TRs the BOLD side proves only
    that the signal is produced, not that it is meaningful; that is accepted.
@@ -1025,6 +1026,65 @@ document derives, and point the code comment at the document.
 **Blocking:** precedes §10's threshold calibration (calibrating a threshold
 against undocumented bands sets one unknown from another) and any fit whose
 gate is enabled. Whether the bands need a DBS-on variant stays with §10.
+
+### 36. Report the fitted models' dynamical regime from the probe spikes
+
+*Opened 2026-08-26 11:58*
+
+**Opened 2026-08-26 11:58:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F3 — five seats; evidence class
+experimentally grounded; the synthesis is not referenceable, so the
+substance is restated here).
+
+The only spiking statistics the pipeline ever computes are mean rates over
+the 9.9 s probe (`get_loss.Spikes10s` → `get_firing_rate_10s`, last 80 % of
+the probe). Whether a fitted model is asynchronous or oscillatory — whether
+its STN–GPe loop sits below or above the oscillation boundary — is never
+measured, and the BOLD loss cannot see it (the drive is per-TR, the balloon
+model low-passes the rest). But pattern, not rate, is the field's
+parkinsonian marker: in Shouno et al. 2017 (Fig. 3, Table 1, recomputed
+from Tachibana 2011 monkey spike data) the parameter regions whose *mean
+rates* match the normal and parkinsonian states overlap, while the states
+separate cleanly on oscillation and burst measures (STN oscillatory cells
+5.5 % normal vs 36.3 % parkinsonian); both physiology reviews the round
+consulted (Wichmann 2019, McGregor & Nelson 2019) make the rate-to-pattern
+shift their organising theme.
+
+Nobody demands *fitting* these statistics — the subject's electrophysiology
+does not exist. The demand is a **reported diagnostic**, and it is cheap:
+the probe already records every spike (`get_loss` builds
+`monitor_dictionary = {pop_name: ["spike"] ...}` over all non-TimedInput
+populations), so the statistics cost one analysis function and no new
+simulation. It catches three failure modes the inference would otherwise
+inherit silently:
+
+1. An off-fit that is not recognisably parkinsonian in the one currency the
+   field trusts (a result to *report* either way, not to hide).
+2. An off-fit whose oscillation frequency is an artefact of the rat delay
+   set (the review's F26 carries the delay question itself).
+3. An on-vs-off delta that works by flipping the network across the
+   oscillation boundary while being reported as a drive-weight change —
+   and, relatedly, an uninterpretable `dbs_depolarization`: the review's
+   numerical check found it acts as a suppress-and-entrain knob that
+   phase-locks the stimulated STN at high amplitude, which only a spectral
+   diagnostic surfaces.
+
+**The task.** Compute per-population burst fractions, 8–35 Hz spectral
+power and a pairwise spike-count synchrony summary from the existing probe
+recordings; write them into `data_BOLD_optimization/loss_<appendix>.json`
+beside the firing rates; include them in the phase-1 validation-run
+artefacts; and for the accepted off- and on-fits, report them against the
+stated references (Shouno 2017 Table 1; the directions of McGregor & Nelson
+2019 Fig. 4). Caveat to record when implementing: the probe is 9.9 s, so
+low-beta resolution and burst statistics are limited — state the window
+alongside the numbers rather than extending the probe silently (a longer
+probe would change cache divisibility constraints).
+
+**Blocking:** none for its implementation (one analysis function); the
+reporting side joins §2's interpretation checklist and the phase-1
+validation run.
 
 ---
 
