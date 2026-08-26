@@ -101,7 +101,7 @@ now feed the triage below.)
    this parameter" must be fixed in §2 before any on-fit is interpreted
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
-   plus everything the triage spawned (so far: §35, §36). Each entry gets an explicit verdict:
+   plus everything the triage spawned (so far: §35, §36, §37). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -1085,6 +1085,65 @@ probe would change cache divisibility constraints).
 **Blocking:** none for its implementation (one analysis function); the
 reporting side joins §2's interpretation checklist and the phase-1
 validation run.
+
+### 37. Write the parameter-provenance companion for parameters.csv
+
+*Opened 2026-08-26 12:57*
+
+**Opened 2026-08-26 12:57:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F4 — four seats; evidence class
+methodological: auditability, and internal consistency with the project's
+own standard; the synthesis is not referenceable, so the substance is
+restated here).
+
+`parameters.csv` is a value table with no reference column, and the only
+lineage record is the `BGM_v07` docstring. The known provenance gaps:
+
+- `get_loss.py` calls the projection weights "the literature values"
+  without saying which literature (the answer — Goenner et al. 2021's
+  table, rescaled — was recovered by the review's archaeology, carried as
+  its F9).
+- The GPe neuron refit is recorded in one CSV header cell ("refitted, data
+  from Bogacz et al. 2016") with no fit protocol or quality comparison, and
+  "Bogacz et al. 2016" is not resolved to a citable reference.
+- The synaptic constants (`tau_ampa` 2 ms, `tau_gaba` 10 ms, `E_gaba`
+  −70 mV) differ from *both* predecessors' published sets (10/20/−90 in
+  Goenner 2021, 10/10/−90 in Maith 2021) with the departure recorded
+  nowhere.
+- The uniform in-degree (`connect_fixed_number_pre` with `number = 10` on
+  every BG-internal projection) has no stated basis — presumably inherited
+  lineage convention (the v01–v06 columns carry the same 10), but nothing
+  says so. The *substantive* adequacy of 10 is a separate question (the
+  review's F25); this entry only owes the origin sentence.
+- The delays' provenance was recovered only by the previous review round.
+
+The community anchor is a reporting convention, admitted as such by all
+four seats: per-row source columns with tuned values named as tuned
+(Corbit 2016 Table 2; Lindahl 2016 Tables 7–9 with "n.d., estimated"
+written out; Girard 2021 Tables 1–2; Kumaravelu 2016 Table 1). Its value
+was demonstrated by the round itself: three of its sharpest findings (the
+weight-table lineage, the kernel state question, the delay set) required
+archaeology that a reference column would have made one-line checks. And
+the repository's own `experimental_data/` READMEs are the counterexample to
+its own CSV — the project demonstrably knows the format. The project's
+product is a statement *about parameters*; a fitted scaling on a base
+weight of unstated origin transmits no interpretable meaning.
+
+**The task.** A provenance companion document for the `BGM_v07_p01` column
+in Corbit-Table-2 form: per row (or per CSV section) the source —
+"Goenner et al. 2021 Table 4/5, ×C rescaled" where that is the answer,
+"refit on Abdi/Bogacz step-current data" with the fit record and an f–I
+comparison (Goenner 2021 Fig. 2 is the template), "no source" where that is
+the truth; one sentence on the origin of `number = 10`; the
+synaptic-constant departure from both predecessors recorded next to the
+values; "Bogacz et al. 2016" resolved to citable form. "[Li et al., 2015]"
+is resolved by §35 and referenced from here.
+
+**Blocking:** nothing blocks it; pure documentation and archaeology. Doing
+it early makes the verdict-pass entries it feeds (§35, and the eventual
+weight/delay verdicts) one-line checks instead of digs.
 
 ---
 
