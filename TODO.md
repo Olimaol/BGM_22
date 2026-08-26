@@ -91,7 +91,8 @@ now feed the triage below.)
    Orderings the round-2 synthesis's reading guide implies, kept here because
    they are ordering and nothing else: the input-correlation scan stays the
    one hard blocker on §32 and is already carried by **§25**; the rate-band
-   derivation document must precede §10's gate calibration; five findings
+   derivation document (accepted 2026-08-26 as **§35**) must precede §10's
+   gate calibration; five findings
    would invalidate input caches if accepted (the striatal-kernel state
    refit, the STN cortical-proportion table, the `ci.n_*` derivation of §8,
    the cube size already carried by §24, and the medication state if the
@@ -99,7 +100,7 @@ now feed the triage below.)
    after phase 2 builds them; and the acceptance criterion for "DBS changed
    this parameter" must be fixed in §2 before any on-fit is interpreted.
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
-   plus everything the triage spawned. Each entry gets an explicit verdict:
+   plus everything the triage spawned (so far: §35). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -909,6 +910,77 @@ surround assumption), §2 (inference design over the fitted result) and §16
 ## From the session on 2026-08-13 (community conventions review)
 
 ### 34. Survey the BG-modeling community's conventions via reviewer personas — resolved 2026-08-13, moved to Resolved
+
+## From the session on 2026-08-26 (community-review triage)
+
+### 35. Derive and document the six non-striatal firing-rate bands
+
+*Opened 2026-08-26 11:45*
+
+**Opened 2026-08-26 11:45:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F1 — the unanimous finding of the
+round, raised by all seven seats; the synthesis is not referenceable, so the
+substance is restated here). Evidence class: experimentally grounded.
+
+`get_loss.get_firing_rate_loss` scores nine populations per loop against its
+`plausible_ranges` table. The three striatal bands are derived, sourced and
+caveated in `experimental_data/activity_striatum/README.md`; the six
+non-striatal ones are not: `stn` (28, 80) and `snr` (21, 93) carry only the
+code comment "from [Li et al., 2015]" — a citation with no journal, DOI,
+species, preparation or disease state, which resolves to nothing anywhere in
+the repository — and `gpe_proto` (75, 85), `gpe_arky` (15, 20), `gpe_cp`
+(75, 85) and `thal` (15, 30) carry no citation at all. These bands are half
+the total loss and the whole of the gate, and §10 records that both DBS
+conditions score ~0.87 against them — the gate fires on everything, and
+nobody can say whether the bands or the model are at fault.
+
+Three compounding problems, with the review's measured anchors:
+
+- **Provenance.** An unresolvable citation on half the loss cannot be
+  audited by anyone, including this project's future self — while the
+  striatal side of the same function shows exactly how it should be done.
+- **Disease state.** No band states whether it is healthy or parkinsonian.
+  Measured directions: in MPTP macaques GPe *falls* from 65.1 ± 25.6 to
+  41.1 ± 22.3 Hz (Tachibana et al. 2011, as recomputed in Shouno et al. 2017
+  Table 1(A)); McGregor & Nelson 2019 Fig. 4 tabulates prototypic GPe
+  *down*, STN and GPi/SNr *up*, thalamus "?" in parkinsonism. The model is
+  required to hold `gpe_proto` and `gpe_cp` at 75–85 Hz — at or above the
+  *normal*-macaque band and roughly double the parkinsonian-macaque mean.
+  The arky band (15–20 Hz) excludes the rodent in-vivo average (~10 Hz,
+  Giossi et al. 2024). `gpe_cp` — an Npas1-class population by the model's
+  own BOLD-weight citation — gets the prototypic band although the one
+  condition-relevant datum for Npas1⁺ cells is *hypoactivity* under
+  depletion (Pamukcu et al. 2020, mouse).
+- **Width.** The two GPe bands are the narrowest in the table (±6 % of
+  centre, against ±49 % for dSPN and SDs of ±25 Hz in any monkey GPe
+  sample), with no width rule stated — the least-sourced bands bind the
+  gate hardest.
+
+Two additional tensions recorded by the review: four of the six bands
+exclude or sit at the edge of the operating point at which the inherited
+weight table was validated (GPe-Proto ≈ 40 Hz, GPe-Arky ≈ 10–12 Hz,
+STN ≈ 15 Hz, thal ≈ 10 Hz; Goenner et al. 2021 Fig. 7), so the gate pushes
+the network away from the regime the frozen weight ratios were tuned in.
+And GPi/STN rates depend on disease *stage* through extrastriatal dopamine
+(Wichmann 2019, macaque/human); the model has no extrastriatal dopamine
+term, so the fitted `base_mean` parameters absorb whatever that effect is —
+this bears on §30, which frames the dopamine question as striatal only.
+
+**The task.** Write the derivation document for the six non-striatal bands
+in the style of `experimental_data/activity_striatum/README.md` — per band:
+resolvable source, species, preparation, medication state, and a stated
+width rule; resolve or replace "[Li et al., 2015]"; check each band's
+parkinsonian *direction* against Tachibana 2011 (via Shouno 2017 Table 1)
+and McGregor & Nelson 2019 Fig. 4; mark the thalamic band as unconstrained
+in parkinsonism (both physiology reviews mark it so); state explicitly
+where a band is an assumption. Update `plausible_ranges` to whatever the
+document derives, and point the code comment at the document.
+
+**Blocking:** precedes §10's threshold calibration (calibrating a threshold
+against undocumented bands sets one unknown from another) and any fit whose
+gate is enabled. Whether the bands need a DBS-on variant stays with §10.
 
 ---
 
