@@ -98,7 +98,8 @@ now feed the triage below.)
    the cube size already carried by §24, and the medication state if the
    answer is "on"), so they must be settled inside this phase rather than
    after phase 2 builds them; and the acceptance criterion for "DBS changed
-   this parameter" must be fixed in §2 before any on-fit is interpreted.
+   this parameter" must be fixed in §2 before any on-fit is interpreted
+   (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
@@ -238,7 +239,7 @@ roughly [5e-4, 2e-3], carries the same caveat.
 
 ### 2. Design the DBS-on inference properly
 
-*Opened 2026-08-04 06:24 · 1 update, 2026-08-11 10:04*
+*Opened 2026-08-04 06:24 · 2 updates, last 2026-08-26 11:51*
 
 **Opened 2026-08-04 06:24:**
 
@@ -270,6 +271,49 @@ must be explained entirely by its cortical drive — a falsifiable prediction th
 inference gets for free. Proven exact on v08 (same drive, only DBS parameters
 differing: every caudate population identical to 2 dp while nine putamen
 populations move; see §33's step-6 record).
+
+**Update 2026-08-26 11:51:**
+
+The community-review triage accepted round-2 F2 of
+`community_review/round2/synthesis.md` (six seats; evidence class
+methodological, uncontested) into this entry: the central claim currently
+has no acceptance criterion. The planned ~10-seed stability rerun of one
+winning vector (§32) measures simulator stochasticity, not optimizer
+multi-modality — the lab's own predecessor (Maith et al. 2021 §2.4, §3.2)
+ran twenty optimization processes per fitted dataset and asserted parameter
+differences only across groups with t-tests, FDR and effect sizes, and
+Liénard 2024 §5.4 / Girard 2021 §2.5 document >1000 equally-plausible
+parameterizations reducible to 15 base solutions, all carried through every
+analysis. The off-fit's solution set enters the on-vs-off difference exactly
+as the on-fit's does.
+
+What this entry must now decide and fix **before §32's on-fit is
+interpreted** (the review's seven commitments; 1–3 change how many fits are
+needed, so they are decided first):
+
+1. **N independent restarts per condition** — both conditions, not just on.
+2. **Per-parameter restart scatter** reported beside every fitted vector.
+3. **The pre-stated acceptance rule**: a parameter is reported as "changed
+   by DBS" only where its on-off delta exceeds that scatter (plus a
+   seed-robustness re-evaluation of the final vectors).
+4. **The 2×2 cross-condition evaluation** (off-parameters on on-data and
+   vice versa; Maith 2021 Table 4's discriminability check, single-subject
+   analogue): if the on-fit does not beat the off-parameters on on-data by
+   more than the restart scatter, the refit captured noise.
+5. **Parameter recovery on synthetic data**: simulate BOLD at known DBS
+   parameters, refit, report which of the 13 on-stage parameters are
+   recoverable at all at this noise level — the cheapest test of the
+   central claim (Dunovan 2019's resampled-pipeline discipline).
+6. **A held-out-TR split**, with per-region correlation uncertainties
+   reported next to every on-vs-off delta (a 309-sample correlation has
+   SE ≈ 0.06; no artifact currently records this).
+7. **The caudate free control pre-registered as pass/fail**: state before
+   the on-fit what caudate BOLD correlations and rates must do for the
+   inference to stand (it is currently a prediction without a threshold).
+
+The option family in the Opened block (single-mechanism scans, multi-start,
+L1) remains the solution space for 1–3; the review adds no new option there,
+it adds the commitment and the checks 4–7.
 
 ### 3. Regenerate the input caches with a transposed layout
 
