@@ -210,6 +210,16 @@ A `—` means no `scale_factor` is passed, so `BoldMonitor` falls back to weight
 each population by its share of the pooled neuron count (the size-share fallback
 in `BoldMonitor.__init__`).
 
+**The two loops therefore enter GPi, GPe and STN at 50/50.** For GPi and STN
+that is the size-share fallback on two 100-neuron populations; for GPe the
+passed factors are the same cell-type abundances in both loops, so the loop
+split is 50/50 there too. Nothing chose that ratio — it follows from
+`stn.size = 100`. The subject's own territory volumes make the motor
+territory ≈ 37 % of the STN, so the DBS-carrying loop is over-weighted by
+≈ 1.34, a factor the fitted DBS parameters would absorb. `TODO.md` §38 carries
+the accepted remedy and the arithmetic, including the 8.8 % associative VTA
+overlap that the caudate-loop exclusion sets to zero.
+
 **No striatal scale factors in v07.** `Microcircuit` already sizes dSPN/iSPN/FS by
 the del Rey et al. (2022) proportions (`microcircuit.py → props_delRey`), so the
 size-proportional default *is* the del Rey weighting and passing it explicitly

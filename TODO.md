@@ -101,7 +101,7 @@ now feed the triage below.)
    this parameter" must be fixed in §2 before any on-fit is interpreted
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
-   plus everything the triage spawned (so far: §35, §36, §37). Each entry gets an explicit verdict:
+   plus everything the triage spawned (so far: §35, §36, §37, §38). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -1204,6 +1204,80 @@ is resolved by §35 and referenced from here.
 **Blocking:** nothing blocks it; pure documentation and archaeology. Doing
 it early makes the verdict-pass entries it feeds (§35, and the eventual
 weight/delay verdicts) one-line checks instead of digs.
+
+### 38. The pooled GPi/GPe/STN ROIs weight the two loops by population size
+
+*Opened 2026-08-27 09:33*
+
+**Opened 2026-08-27 09:33:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F6 — three seats; evidence
+class methodological; seat 4 rates its own half "difference, not
+deficiency"; the synthesis is not referenceable, so the substance is
+restated here). Accepted on a **narrower cut than the review proposed** —
+see the "what this is not" paragraph.
+
+`get_loss`'s `bold_region_compartments` pools both loops' copies of each
+nucleus into the `GPi`, `GPe` and `STN` monitors. `GPi` and `STN` pass
+`scale_factor=None`, so `BoldMonitor` falls back to weighting by
+population size — both copies are 100 neurons, hence **50/50**. `GPe` does
+pass `scale_factors`, but they are the cell-type abundances
+(`gpe_proportions`), identical in both loops, so its loop split is 50/50
+too. That ratio is set by `stn.size = 100`, not chosen.
+
+The subject's own files (`experimental_data/berlin_data/vta/`, with the
+arithmetic quoted by seat 4) give the STN territory volumes in voxels,
+both hemispheres: motor 70+75 = 145, associative 68+68 = 136, limbic
+54+55 = 109, total 390. The motor territory — what the putamen loop stands
+for — is therefore 145/390 ≈ **37 %** of the real STN, against 50 % in the
+pooled monitor: the model over-weights the DBS-carrying compartment by
+≈ 0.50/0.37 ≈ 1.34.
+
+**What this is not.** Two readings were considered and rejected in the
+triage:
+
+- *Not a problem with the 0.4 VTA proportion.* `population_proportion =
+  (35+23)/(70+75) = 0.4` is this subject's measured VTA overlap **of the
+  motor territory**, exactly the quantity the putamen loop needs; it lives
+  inside the loop and is untouched by the pooling weights. Seat 4's
+  observation that the DBS-affected share of the pooled STN BOLD is
+  0.4 × 0.5 = 20 %, close to the whole-STN overlap of 76/390 = 19.5 %, is
+  labelled by seat 4 itself as a coincidence rather than a derivation.
+- *Not "half the ROI is DBS-blind, so the signal is diluted".* The measured
+  BOLD pools territories too, and in the real brain DBS also acts mostly in
+  the motor territory, so dilution as such is symmetric and cancels. What
+  does not cancel is the mismatch between the two weightings: to reproduce
+  a measured pooled on-off change, the model's putamen STN need only
+  produce ≈ 0.74 of what the real motor STN produced, and the fitted DBS
+  parameters absorb that factor. The defect is an unjustified ≈ 1.3 scaling
+  sitting in exactly the three parameters the project's claim is about —
+  not a structural blindness.
+
+**The task**, in three parts:
+
+1. **Set the loop weights from the subject's territory volumes** instead of
+   from population size. For `STN` the numbers are in the repository
+   already; for `GPi` and `GPe` this entry has to establish what is
+   available (the same VTA files, another subject-level source, or a stated
+   assumption) and say which it used. Mechanically this is the existing
+   `scale_factor` path — for `GPe` the loop weight multiplies into the
+   cell-type factors rather than replacing them. No cache, network or
+   neuron model is touched.
+2. **Report, for fitted models,** each loop's share of every pooled ROI's
+   variance and of its on-off change, so the compensation that actually
+   happened is visible rather than inferred.
+3. **Document it in `model_v07.md` §3.6**, beside the GPe abundance
+   discussion — including seat 4's second point from the same files: the
+   subject's *associative* VTA overlap is 12/136 = **8.8 %**, set to
+   exactly zero by excluding the caudate loop. That exclusion is
+   deliberate (it is what makes the caudate loop §2's free control), but
+   the caveat should quote the 8.8 % rather than assert that DBS reaches
+   only the motor territory.
+
+**Blocking:** nothing blocks it, and it blocks nothing structurally — but
+part 1 changes what the fitted DBS parameter values mean, so it belongs
+before §32's on-fit is interpreted, alongside §2's checklist.
 
 ---
 
