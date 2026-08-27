@@ -63,6 +63,32 @@ cells. Renormalising means the seven ROIs we do have stand in for the entire
 cortical input — so these are *relative* shares among seven regions, not absolute
 shares of the cortical drive.
 
+**What that asserts about time courses.** The omitted afferents are not
+dropped; renormalising *reassigns* them to the retained series in proportion
+to the retained shares. In the caudate column, where dlPFC holds 0.55, dlPFC
+therefore carries most of the omitted limbic and associative input — an
+afferent from rostral cingulate is given the dlPFC time course. The claim
+being made is not "we ignore these regions" but "**they fluctuate, TR by TR,
+like the retained ones**", and since the loss is a time-course correlation,
+that is a claim about precisely the fitted quantity.
+
+**It is asymmetric between the loops.** Reading the four wholly absent groups
+off Borra 2022 Table 2 below (rostral cingulate, caudal cingulate, insula,
+temporal) gives a lower bound on the omitted fraction: **≈ 47% at the caudate
+head** (46.8 lateral, 46.7 medial) against 5–21% at the motor putamen sites
+(20.8 dorsal, 12.8–12.9 middle, 5.4 midventral), with 36.6% at rostral
+putamen and 9.6% at the motor-dominated caudate body. Rostral cingulate
+alone, the largest omitted category, is 21.5–30.6% at the caudate head
+against 2.6–15.3% at motor putamen. The caudate loop's drive is thus the more
+heavily reconstructed of the two — and the loop contrast is what the
+inference reads out. (Only a bound: Borra's groups do not map cleanly onto
+our seven, since of "prefrontal" only dlPFC is retained and of "parietal"
+only S1, while "motor" is retained wholesale.)
+
+`TODO.md` §46 carries the bracketing test that would bound how much this
+matters, and the pre-stated rule for whether it justifies asking Berlin for
+the missing ROIs.
+
 The seven ROIs are fixed by the experimental file: `sub-01_subdiv_results.h5`
 labels them `M1, PMd, PMv, preSMA, SMA, S1, dlPFC` alongside `Cau` and `Put`.
 `Cau` and `Put` are whole anatomical nuclei, which is why the derivation below

@@ -100,12 +100,14 @@ now feed the triage below.)
    the cube size already carried by §24, and the medication state — accepted
    2026-08-27 as **§39**, which therefore precedes every full-length build
    and feeds §30), so they must be settled inside this phase rather than
-   after phase 2 builds them; and the acceptance criterion for "DBS changed
+   after phase 2 builds them; **§46**'s decision rule must likewise be fixed
+   here, before its bracketing comparison rides along with phase 2's build;
+   and the acceptance criterion for "DBS changed
    this parameter" must be fixed in §2 before any on-fit is interpreted
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
-   §40, §41, §42, §43, §44, §45). Each entry gets an explicit verdict:
+   §40, §41, §42, §43, §44, §45, §46). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -1883,6 +1885,104 @@ uses the per-region series (`get_loss`'s own note on
 **Blocking.** Cache-invalidating for the **CI caches** if part 2 changes
 the table, so it sits in Roadmap phase 1 before any full-length build. Part
 1 blocks nothing and can be done immediately.
+
+### 46. Renormalising over seven ROIs asserts the omitted cortex covaries with the retained
+
+*Opened 2026-08-27 14:14*
+
+**Opened 2026-08-27 14:14:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F14 — one seat; evidence class
+experimentally grounded, narrow; within-list consensus that the omitted
+input is large and concentrated. The synthesis is not referenceable, so
+the substance is restated here.) Distinct from §45, which concerns the same
+table being reused for targets it was not derived for; this entry concerns
+what the renormalisation itself asserts.
+
+The model has exactly seven cortical ROIs, fixed by
+`sub-01_subdiv_results.h5`: **dlPFC, preSMA, PMd, PMv, SMA, M1, S1**. Each
+carries one deconvolved firing-rate series per TR. The proportion columns
+renormalise over these seven and sum to 1, so *all* of a receiver's
+cortical afferents are driven by the seven retained series. The omitted
+afferents are therefore not dropped — they are **reassigned** to the
+retained series in proportion to the retained shares. In the caudate loop,
+where dlPFC holds 0.55, dlPFC absorbs most of the omitted limbic and
+associative input: an afferent from rostral cingulate is given the dlPFC
+time course.
+
+That is the assumption: not "we ignore these regions" but "**these regions
+fluctuate, TR by TR, like the retained ones**". The loss is a time-course
+correlation, so the assumption is about precisely the fitted quantity, and
+the omitted regions are limbic and associative — functionally distinct from
+the retained seven. `experimental_data/cortical_proportions/README.md`
+states the omission ("relative shares among seven regions, not absolute
+shares") but not this consequence.
+
+**The asymmetry, computed during triage from the README's own Borra 2022
+Table 2.** The mapping from Borra's region groups to our seven ROIs is not
+clean — the "motor" group is retained wholesale (F1–F7), but of "prefrontal"
+only dlPFC is retained (orbital and ventrolateral are not) and of "parietal"
+only S1 — so exact retained fractions cannot be read off the table. What can
+be stated is a **lower bound** on the omitted fraction, from the four groups
+that are wholly absent (rostral cingulate, caudal cingulate, insula,
+temporal):
+
+| injection site | at least omitted |
+|---|---|
+| caudate, lateral head | **46.8 %** |
+| caudate, medial head | **46.7 %** |
+| putamen, rostral | 36.6 % |
+| putamen, dorsal motor | 20.8 % |
+| putamen, middle motor | 12.8–12.9 % |
+| putamen, midventral motor | 5.4 % |
+| caudate, body | 9.6 % |
+
+Plus the non-dlPFC prefrontal and non-S1 parietal remainders. The caudate
+head omits at least ~47 % against 5–21 % at the motor putamen sites, so the
+caudate loop's drive is the more heavily reconstructed — and the loop
+contrast is what the inference reads. Rostral cingulate alone, the largest
+omitted category, is 21.5/30.6 % at the caudate head against 2.6–15.3 % at
+motor putamen. (The caudate *body* is the exception, being motor-dominated;
+`Cau` and `Put` are whole nuclei, so the README averages over
+subterritories.)
+
+**The task**, three parts:
+
+1. **Owed now: document the assumption** and the bounds above in
+   `experimental_data/cortical_proportions/README.md`, beside the existing
+   renormalisation caveat — including that renormalisation reassigns the
+   omitted mass proportionally, so in the caudate loop dlPFC carries it.
+2. **The bracketing test, attached to phase 2.** The review proposes
+   columns summing to the retained fraction with the remainder driven flat
+   at the same 5 Hz mean. Rejected as designed: a flat remainder removes
+   the *variance* of ~half the afferents as well as their covariance, and
+   `experimental_data/input_streams/README.md` §3 shows input correlation
+   dominates simulated BOLD amplitude — so the comparison would largely
+   measure the variance loss. Use instead a **variance-matched but
+   decorrelated surrogate** for the remainder (e.g. phase-randomised
+   versions of the series), which isolates the covariance claim. The two
+   runs then bracket it: perfect correlation with the retained regions
+   against none. Cost: the proportions are baked into the caches, so this
+   needs a rebuild — build short first to confirm the drive statistics
+   move at all, and attach the full-length BOLD comparison to phase 2's
+   build rather than paying for it separately.
+3. **A pre-stated decision rule for the data request.** Asking Berlin for
+   the missing ROIs is the real fix, and it is expensive: new deconvolution
+   (`cortical_drive_by_bold_run.py`, which needs MATLAB and an interactive
+   MathWorks sign-in — §21), a re-derived proportion table for the new
+   region set (Borra's groups are coarse, so more ROIs does not
+   automatically mean better numbers), a regenerated rate `.npz`, and every
+   v07 cache rebuilt. So part 2 is the decision procedure for part 3: fix
+   a threshold beforehand — if the per-region BOLD correlations shift by
+   less than it, the request is not warranted and the omission is recorded
+   as a quantified limitation; if more, the request is made **with a
+   number attached**. The request stays a named, untaken option here until
+   then.
+
+**Blocking.** Nothing blocks part 1. Parts 2–3 are cache-touching and
+belong with the phase-1/phase-2 boundary; the decision rule must be fixed
+before the comparison is run, not after.
 
 ---
 
