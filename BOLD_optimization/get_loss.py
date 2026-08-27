@@ -93,9 +93,16 @@ def population_name(model_version: str, loop: str, compartment: str) -> str:
     return bg_pop_name(loop, compartment)
 
 
-### Projection weight clusters. Instead of freeing every weight, the literature
-### values already in BGM.params are scaled by one factor per functional cluster,
+### Projection weight clusters. Instead of freeing every weight, the base values
+### already in BGM.params are scaled by one factor per functional cluster,
 ### which preserves their relative balance and keeps the search well conditioned.
+### Those base values are NOT "literature values" in the measured sense, as this
+### comment used to say: all 28 are Goenner et al. 2021 Tables 4-5 (verbatim for
+### non-striatal targets, xC for striatal ones), which that paper describes as
+### "rather abstract and ... determined mainly by functional constraints" -- tuned
+### for a rat stop-signal task under different synaptic kinetics. Where
+### subtype-resolved measurements exist they contradict some frozen ratios, and no
+### cluster scaling can move a ratio. See TODO.md 41 (and 40 for the GPe half).
 ### v08 adds the intra-striatal projections; in v07 those live inside the
 ### Microcircuit with weights sampled from the fitted connectivity, so they are
 ### not model parameters here.

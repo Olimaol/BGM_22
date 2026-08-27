@@ -103,7 +103,7 @@ now feed the triage below.)
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
-   §40). Each entry gets an explicit verdict:
+   §40, §41). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -1445,11 +1445,13 @@ worked):
 **Relations.** The band half of the identity tension is §35's. The
 "weights the BOLD by realistic abundances while simulating 100 neurons
 each" question is the review's F22, not yet triaged. Tension 3 above
-overlaps the review's **F9** (the full 28-weight provenance and
-cluster-ratio finding, also not yet triaged, evidence class experimentally
-grounded): when F9 is triaged, decide deliberately whether the GPe-specific
-ratios are audited here or there rather than in both places. Provenance
-recording as such is §37.
+overlaps **§41** (opened 2026-08-27 from the review's F9, the full
+28-weight provenance and cluster-ratio finding). The scope was settled when
+§41 opened: this entry owns the GPe-specific empirical audit and feeds its
+findings into §41's per-cluster decision, while §41 owns the mechanism-level
+question — whether frozen within-cluster ratios are defensible, the
+cluster-splitting decision, the non-GPe ratios and the post-fit sensitivity
+check. Provenance recording as such is §37.
 
 **Blocking:** the documentation half blocks nothing. The audit half could
 license a connectivity change, which would move every GPe spike train and
@@ -1457,6 +1459,83 @@ invalidate nothing cache-side (weights are not cache parameters) — but per
 the repository convention a baseline must be captured first, and the
 ANNarchy global-RNG caveat in `CLAUDE.md` applies if any random variable is
 added or removed.
+
+### 41. The weight table is task-tuned and its within-cluster ratios are frozen
+
+*Opened 2026-08-27 10:50*
+
+**Opened 2026-08-27 10:50:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F9 — two seats; evidence class
+experimentally grounded, plus methodological for the provenance half; the
+synthesis is not referenceable, so the substance is restated here).
+
+**What was established.** Two seats independently diffed all 28 v07
+projection weights against Goenner et al. 2021 Tables 4–5: every value
+matches — verbatim for non-striatal targets, ×C (50 for SPNs, 80 for FSIs)
+for striatal ones. `get_loss.py` calls them "the literature values" and
+nothing in the repository records the lineage (the recording itself is
+§37's). The source characterises them differently: "the weight strengths…
+are rather abstract and were determined mainly by functional constraints"
+(Goenner 2021 §4.4) — i.e. tuned until a rat stop-signal network stopped
+correctly. They were tuned under synaptic constants 10/20/−90 and run here
+under 2/10/−70 (seat 5).
+
+**Why this is more than provenance.** Where subtype-resolved measurements
+exist, they contradict the frozen ratios (as reported in the round-2 seat
+reviews; primary papers to be read, not recalled, when this entry is
+worked):
+
+- Aristieta et al. 2021 (mouse, via Giossi 2024): iSPN→arkypallidal 85 %
+  *weaker* than iSPN→prototypic, STN→arkypallidal 74 % weaker than
+  STN→prototypic. The table has `str_d2__gpe_arky` (0.08) at **twice**
+  `str_d2__gpe_proto` (0.04), and `stn__gpe_proto/arky/cp` all **equal**
+  (0.001).
+- Corbit et al. 2016 (mouse slice, ChR2 — seat 2's own lineage): GPe→FSI
+  IPSCs 566 ± 560 pA in every FSI sampled against 28–108 pA in SPNs,
+  modelled there as a 12–40× conductance ratio. BGM_22's aggregate ratio at
+  equal in-degree is ~1.4–2.3×, with the prototypic-vs-arkypallidal order
+  onto FSIs reversed relative to Giossi 2024's account.
+
+**And the mechanism forecloses the repair.** The affected ratios sit inside
+`PROJ_CLUSTERS_COMMON` entries — `str_d2__bg`, `stn__gpe`, `gpe_striatum`,
+`gpe_laterals` — where the optimizer fits one common scale per cluster.
+Cluster scaling preserves relative balance to condition the search, which
+is sound exactly when the encoded balance is trustworthy; here it is
+task-tuning for a different task under different kinetics, and **no fitted
+scaling can move a frozen ratio**.
+
+**The task.** Decide, per affected cluster, between three outcomes —
+recording the reasoning either way:
+
+1. **Re-derive** the within-cluster ratios from the reported measurements,
+   with species caveats documented (all of it is marker-defined mouse work
+   that Courtney 2023 and Wichmann 2019 both call untested in primate).
+2. **Split** the cluster so the fit can move the ratio. Note the cost the
+   review does not price: splitting raises the free-parameter count
+   (`n_opt_params`, currently 19 for v07) and so degrades exactly the
+   conditioning the clusters exist to provide — this is a trade-off to
+   argue, not a free improvement.
+3. **Reject with reasons**, and then, after the first fit, check the
+   conclusions' sensitivity to the unanchored ratios *before* interpreting
+   any cluster scaling.
+
+**Scope, against §40.** §40 owns the GPe-specific empirical audit — the
+cell-type identity, the three-way division, the intra-GPe and
+striatopallidal connectivity, and whether Goenner 2021 read its own cited
+sources correctly. This entry owns the mechanism-level question for the
+whole table: the provenance status of the weights as task-tuned, whether
+frozen within-cluster ratios are defensible at all, the cluster-splitting
+decision, the non-GPe ratios (notably GPe→FSI vs GPe→SPN), and the post-fit
+sensitivity check. §40's findings feed this entry's per-cluster decision;
+neither entry re-does the other's work.
+
+**Blocking.** Weights are not cache parameters, so nothing here invalidates
+a cache. Outcomes 1 and 2 change the fitted model, so they belong before
+§32; outcome 3's sensitivity check belongs with §2's interpretation
+checklist. A baseline must be captured before any weight changes, per the
+repository convention.
 
 ---
 
