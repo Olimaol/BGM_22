@@ -557,7 +557,7 @@ fitted `axon_spikes_per_pulse` turns out to carry a lot of the explanation.
 
 ### 15. The hyperdirect cortical afferent to STN cannot be activated
 
-*Opened 2026-08-04 15:42*
+*Opened 2026-08-04 15:42 · 1 update, 2026-08-27 08:14*
 
 **Opened 2026-08-04 15:42:**
 
@@ -571,6 +571,66 @@ Cortical fibre activation is one of the most-discussed DBS mechanisms, so its
 absence is a genuine limit on what the inference can conclude — a fitted
 "afferent" effect here is a pallidal one. Representing it would mean giving the
 cortical drive a spiking soma, which is a model change, not a bug fix.
+
+**Update 2026-08-27 08:14:**
+
+The community-review triage accepted round-2 F5 of
+`community_review/round2/synthesis.md` (four seats; evidence class
+experimentally grounded — Kumaravelu 2018: STN-DBS-evoked cortical
+potentials in awake rats decompose into R1 at 1.35 ± 0.07 ms, direct
+antidromic activation of L5 axons, anaesthesia-resistant; Chen et al. 2020:
+human DBS-evoked antidromic responses over prefrontal cortex at 6 ms) into
+this entry. The review separates three consequences, and the triage decided
+a remedy for each:
+
+- **The rate half of the cortical DBS effect is not missing.** The DBS-on
+  drive is deconvolved from the subject's own recording *under
+  stimulation*, so the net cortical rate change DBS produced — antidromic
+  cortical effects included, for every cortical stream, striatal ones too —
+  is already in the input. What the fitted DBS parameters therefore
+  estimate is the **intra-BG effect given the observed cortex**: a
+  defensible quantity but a narrower one than "what DBS did", and the
+  write-up must say so verbatim wherever fitted DBS parameters are
+  interpreted (this bound shrinks under the mechanism below but does not
+  vanish).
+- **The orthodromic terminal volley into STN is missing, and is now to be
+  built** — *accepted, in a form modified from the review's proposal*. The
+  review proposed a pulse-locked spike-count component in the STN cortical
+  stream with its amplitude as a fourth fitted DBS parameter. Decision: the
+  amplitude is instead **tied to the existing `axon_spikes_per_pulse`**, no
+  new free parameter. Rationale: `DBS.md`'s `_set_orthodromic` already sets
+  `proj.pre.prob_axon_spike` from `axon_spikes_per_pulse` for *every*
+  reachable afferent of the stimulated population — the pallidal afferent
+  `gpe_proto→stn` already emits per-pulse axon spikes at exactly that
+  probability, and only the cortical afferent falls out because a
+  `TimedArray` has no soma. Scaling a pulse-locked component in the
+  cortical spike-count stream by the same parameter is therefore the
+  faithful extension of the model's existing shared-activation-probability
+  assumption, not a new assumption; a fourth parameter would add a fresh
+  degeneracy instead. Side effect on identifiability: §2 lists
+  `axon_spikes_per_pulse` as near-degenerate with the `stn__gpe`/`stn__snr`
+  scalings — coupling it to a distinct cortical-input effect can only
+  sharpen it. Caveat to record with the implementation: hyperdirect axons
+  are large myelinated pyramidal-tract collaterals and plausibly *more*
+  excitable than the fibre classes the shared probability was written for —
+  the shared probability is the model's standing assumption, now stretched
+  one class further. Implementation is cheap by construction: the
+  count→current conversion passes through Python every 110 ms chunk and
+  pulse times are deterministic, so no cache, neuron model or compiled
+  network is touched (the Opened block's "spiking soma" remedy is heavier
+  than needed and is superseded).
+- **The remaining inexpressible part is bounded, not represented.** The
+  antidromic soma invasion also synchronises cortex (R2/R3, and via
+  pyramidal-tract collaterals potentially striatal input) at unchanged
+  deconvolved rate — a fine-timescale synchrony BOLD deconvolution cannot
+  see, while `experimental_data/input_streams/README.md` §3 shows input
+  correlation is the dominant determinant of simulated BOLD amplitude.
+  Generic stream correlation is not pulse-locked, so raising it in DBS-on
+  would be a confound, not a representation. Instead: **one sensitivity
+  run** — DBS-on once with a non-zero cortical shared modulation
+  (`make_global_p_trace` machinery exists and is merely set to zero) — and
+  the simulated BOLD amplitude change reported as the bound on whatever
+  synchrony effect the model cannot express.
 
 ### 16. The DBS constants are unvalidated single-subject values
 

@@ -342,7 +342,11 @@ terms at all. This was taken deliberately, before any real fit had been run. See
    `TimedArray` → `CurrentInjection`, which has no soma and is excluded from the
    DBS footprint, so `afferents=True` in practice means `gpe_proto→stn` only.
    Cortical fibre activation — a real and much-discussed DBS effect — is not
-   represented in this model.
+   represented in this model. A remedy is accepted but not yet implemented
+   (`TODO.md` §15, update of 2026-08-27): a pulse-locked component in the
+   cortical STN spike-count stream, scaled by `axon_spikes_per_pulse` — the
+   same per-pulse probability `_set_orthodromic` already applies to every
+   reachable afferent. This item is rewritten when that lands.
 3. **The DBS constants are unvalidated single-subject values.** The 0.4 VTA
    proportion, 125 Hz, and the choice of `snr__thal` as the one passing fibre
    come from Berlin subject 1 and one 2006 paper. The pulse width is 100 µs
