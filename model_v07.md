@@ -1503,6 +1503,17 @@ against the keys of `N_cortical_inputs_dict` (`CorticalInputs._infer_type()`),
 which is why `BGM_v07` builds that dict from `pop.name` rather than from
 literals.
 
+**The region mix here is the striatal one, reused.** `BGM_v07` passes the same
+`mc.cortical_proportions_dict` to `CorticalInputs` that it passes to
+`Microcircuit`, so `thal`, `gpe_arky`, `gpe_cp` and `stn` inherit a table
+derived for corticostriatal afferents
+(`experimental_data/cortical_proportions/README.md`, which claims no other
+target). Since each region's rate series is normalised to mean 5 Hz and the
+mix sums to 1, this does not change the mean drive — it sets its variance and
+timing, which is what the BOLD loss is made of, and `stn`'s cortical drive is
+its only excitatory input. `TODO.md` §45 carries the reuse and the question of
+a separate table.
+
 Three differences from `Microcircuit` matter:
 
 - **The streams use the flat split of §7.4 (1c), with every overlap at zero.**

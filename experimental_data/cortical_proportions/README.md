@@ -6,6 +6,18 @@ cortical ROIs the Berlin dataset provides. Those seven shares, per loop, are the
 loops share no projection and are otherwise identical, so every difference the
 inference reads out between them traces back to this table.
 
+> **The same table is also used for four non-striatal populations.** Everything
+> derived below is corticostriatal, but `BGM_v07` passes this dict to
+> `CorticalInputs` as well, so it sets the cortical mixes of `thal`,
+> `gpe_arky`, `gpe_cp` and `stn` too — a putamen `stn` neuron currently draws
+> 13 % of its afferents from S1, and a caudate one 55 % from dlPFC. The
+> corticosubthalamic topography reported in the literature does not resemble
+> these proportions, and because each region's series is normalised to mean
+> 5 Hz, the mix sets the *timing* of the drive rather than its mean.
+> `TODO.md` §45 carries the question of whether a separate table is
+> derivable; until it is resolved, treat the non-striatal use as an
+> undefended assumption.
+
 Two places consume it, and they have to agree:
 
 | consumer | what it does with the proportions |

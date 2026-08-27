@@ -95,7 +95,8 @@ now feed the triage below.)
    gate calibration; five findings
    would invalidate input caches if accepted (the striatal-kernel state
    refit — accepted 2026-08-27 as **§43**, which depends on §39 —
-   the STN cortical-proportion table, the `ci.n_*` derivation of §8,
+   the STN cortical-proportion table — accepted the same day as **§45** —
+   the `ci.n_*` derivation of §8,
    the cube size already carried by §24, and the medication state — accepted
    2026-08-27 as **§39**, which therefore precedes every full-length build
    and feeds §30), so they must be settled inside this phase rather than
@@ -104,7 +105,7 @@ now feed the triage below.)
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
-   §40, §41, §42, §43, §44). Each entry gets an explicit verdict:
+   §40, §41, §42, §43, §44, §45). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -1812,6 +1813,76 @@ pre-registered pass/fail that §2 now owes inherits both cracks.
 **Blocking.** Nothing cache-side. Part 1 belongs before §32's on-fit is
 interpreted, with §2's checklist. Part 3, if ever taken, is a model change
 and needs a captured baseline first.
+
+### 45. The corticostriatal proportion table is reused for STN, GPe and thalamus
+
+*Opened 2026-08-27 13:56*
+
+**Opened 2026-08-27 13:56:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F13 — one seat; evidence class
+experimentally grounded; the synthesis is not referenceable, so the
+substance is restated here).
+
+Verified during triage: `BGM_v07` passes the same
+`mc.cortical_proportions_dict` to `Microcircuit` **and** to
+`CorticalInputs` (`model_creation_functions.py`, both construction sites
+read the same key), so one table derived for corticostriatal afferents
+also sets the cortical mixes of `thal`, `gpe_arky`, `gpe_cp` and `stn`.
+`experimental_data/cortical_proportions/README.md` describes corticostriatal
+afferents throughout — "the model splits each striatal neuron's cortical
+afferents…" — and never claims another target. The reuse is documented
+nowhere. With the current numbers a putamen `stn` neuron draws **13 % of
+its 500 cortical afferents from S1**, a region for which the one primate
+study that looked reports no subthalamic projection, and a caudate `stn`
+neuron draws 55 % from dlPFC.
+
+**Why it reaches the inference.** The corticosubthalamic drive is the only
+excitatory input `stn` receives, and the hyperdirect route is the
+DBS-relevant one (§15). The mechanism is the one `parameters.py` states
+itself: each region's rate series is normalised to mean 5 Hz and the mix
+sums to 1, so the mix does not change the mean drive — it changes variance
+and **timing**. Timing is what the loss is made of.
+
+**The evidence, graded.** Consensus that the mixes differ (Emmi 2020 for
+the corticosubthalamic topography, Haber 2016 for the corticostriatal one),
+and the established corticosubthalamic topography — M1 dorsolateral,
+SMA/ventral-premotor medial with inverse somatotopy (Nambu 1996–2000,
+confirmed Miyachi 2006) — does not resemble the striatal proportions. The
+specific S1 negative is weaker: one voice (Von Monakow 1978, macaque
+autoradiography), and the seat says plainly that a single-study negative
+from 1978 counts for less than a replicated positive.
+
+**The task**, in two parts of different standing:
+
+1. **Owed regardless: document the reuse** in both
+   `experimental_data/cortical_proportions/README.md` and `model_v07.md`
+   §8 — that a table derived for one target is currently setting the
+   cortical mixes of three others, and what that implies for the timing of
+   the drive.
+2. **Attempt a separate `CorticalInputs` table, if the evidence licenses
+   one.** Minimally, per the review: S1 → 0 for STN, motor/premotor/SMA
+   dominant per the established topography, dlPFC marked uncertain (Von
+   Monakow and Haynes & Haber 2013 disagree). But note the asymmetry that
+   made the striatal table possible: Borra et al. report quantitative
+   *fractions*, while the corticosubthalamic literature is largely
+   topography. If no comparable quantitative source exists, then "no
+   defensible separate table — the striatal one stays as a stated
+   assumption" is a legitimate outcome of this entry, provided part 1 makes
+   the assumption explicit.
+
+**Implementation notes.** `get_loss` already reads
+`mc.cortical_proportions_dict` and `ci.cortical_proportions_dict` as
+separate attributes, so the structure for two tables exists; both are
+currently fed the same dict. The cortical rate `.npz` is **not** affected:
+only v08 is driven by the mixed `caudate_rate`/`putamen_rate`, while v07
+uses the per-region series (`get_loss`'s own note on
+`cortical_proportions_json` says the same).
+
+**Blocking.** Cache-invalidating for the **CI caches** if part 2 changes
+the table, so it sits in Roadmap phase 1 before any full-length build. Part
+1 blocks nothing and can be done immediately.
 
 ---
 
