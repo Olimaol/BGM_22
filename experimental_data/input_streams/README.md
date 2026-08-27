@@ -338,6 +338,7 @@ longer-timescale ones of order `K^(−1)`; at `K ≈ 2640` afferents that is 0.0
 | `f_FS↔SPN` is now derived from the pool (0.00885) but assumes FS and SPN sample it with equal per-axon contact probability; Ramanathan 2002 / Choi 2018 suggest higher FS convergence | `TODO.md` §26 |
 | No number for corticosubthalamic / corticothalamic overlap | `TODO.md` |
 | `ρ` and `τ_c` values await the scan described in §5 | `TODO.md` |
+| The `fitted_params.json` kernels behind `N_eff` and `f_ij` are fitted over **pooled** healthy and dopamine-depleted rows, so they describe no single physiological state — and `E_outer`, hence the size of every compensation stream, inherits that | `TODO.md` §43 |
 
 ---
 

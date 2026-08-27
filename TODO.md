@@ -94,7 +94,8 @@ now feed the triage below.)
    derivation document (accepted 2026-08-26 as **§35**) must precede §10's
    gate calibration; five findings
    would invalidate input caches if accepted (the striatal-kernel state
-   refit, the STN cortical-proportion table, the `ci.n_*` derivation of §8,
+   refit — accepted 2026-08-27 as **§43**, which depends on §39 —
+   the STN cortical-proportion table, the `ci.n_*` derivation of §8,
    the cube size already carried by §24, and the medication state — accepted
    2026-08-27 as **§39**, which therefore precedes every full-length build
    and feeds §30), so they must be settled inside this phase rather than
@@ -103,7 +104,7 @@ now feed the triage below.)
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
-   §40, §41, §42). Each entry gets an explicit verdict:
+   §40, §41, §42, §43). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -1658,6 +1659,83 @@ consequences:
 stream parameter. But it changes what every BOLD correlation means, so it
 belongs before §32 and before §10's gate calibration is read against BOLD
 losses.
+
+### 43. The striatal connectivity kernels pool healthy and depleted data
+
+*Opened 2026-08-27 11:45*
+
+**Opened 2026-08-27 11:45:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F11 — one seat, but grounded in
+this repository's own condition-labelled data and called the round's
+clearest new discovery; evidence class experimentally grounded; the
+synthesis is not referenceable, so the substance is restated here). Every
+claim below was re-verified against the files during triage.
+
+The seven `p(d)` kernels in
+`striatal_microcircuit_requirements/connectivity_parameters/connectivity_fit_data/fitted_params.json`
+— the entire intrinsic striatal connectivity, and through `E_outer` the
+size of the missing-GABA compensation in **every cache** — are
+maximum-likelihood fits over **pooled condition rows**. The conditions are
+labelled explicitly in `connectivity_fit.py`'s `datasets` dict, and the
+pools mix them:
+
+| group | depleted rows in the pool | baseline rows |
+|---|---|---|
+| dSPN→dSPN | 6-OHDA 0/7, reserpine 0/8 | 5/19, 3/7, … |
+| iSPN→dSPN | 6-OHDA 3/12 (25 %), reserpine 1/10 (10 %) | 13/24 (54 %) |
+| iSPN→iSPN | 6-OHDA 3/17, reserpine 5/18 | 14/39, 4/9, … |
+| FS→dSPN | 6-OHDA 43/80 (54 %) | 58/96 (60 %) |
+| FS→iSPN | 6-OHDA **66/86 (77 %)** | 42/108 (39 %) |
+
+The last two rows are the crux and reproduce the measured Gittis 2011
+effect: under depletion FS→iSPN roughly doubles while FS→dSPN barely
+moves. Pooling both into one fit **reverses the FS target preference** —
+every healthy dataset in the pool prefers FS→dSPN (60 % against 39 %),
+while the fitted kernels prefer FS→iSPN at short range (amplitude 0.918
+against 0.599). And the two targets of the same FS axon come out with
+σ = 394.2 µm (dSPN) against σ = 140.0 µm (iSPN), a **2.8-fold** difference
+with no anatomical reading. The SPN–SPN collapse under depletion (Taverna
+2008 — the very rows in this repository's own spreadsheet) dilutes the
+dSPN→dSPN and iSPN→ kernels the other way.
+
+**What is not affected.** Both DBS conditions share the kernel, so the
+on-vs-off contrast is not directly biased. The damage is to the absolute
+state: the kernels correspond to no preparation that exists, `E_outer` and
+therefore every cache inherits it, and §4's rate self-consistency is
+computed against it.
+
+**Why it is a consistency problem, not a preference.** The project chose
+its rate anchors by state deliberately — the medication-off values of
+Liang et al. 2008 (§20) — and §30 asks the same question of φ. §39 records
+that the subject's actual medication state is undocumented, and seat 1
+frames all of these as one requirement: rates, connectivity kernel and φ
+must describe the same physiological state. The connectivity is currently
+the only one of the three chosen by no state at all.
+
+**The task.**
+
+1. Refit the kernels **per condition** from the already-labelled rows —
+   the fit itself costs seconds — and adopt the state that matches the
+   answer §39 produces, either as a directly fitted depleted kernel or as
+   the healthy kernel plus explicit, cited depletion factors (the
+   lineage's own encoding, e.g. Lindahl 2016 Table 9). Record the
+   rodent-acute-model caveat: the state difference is measured, but
+   chronic human transfer is not established.
+2. Ask the same state question of `get_weights.py`'s IPSC-amplitude
+   mixtures (CompNeuroPy `striatal_microcircuit/get_weights.py`).
+   Verified during triage: those components carry **no condition labels
+   at all** — they are counts from a spreadsheet with no state recorded —
+   so the question there is open rather than answered wrongly.
+3. Document the choice where the kernels are documented, and rebuild the
+   short caches.
+
+**Blocking.** Cache-invalidating: it changes `E_outer` and every
+missing-GABA stream, so it is one of the findings the Roadmap orders
+inside phase 1, **before any full-length build**. It also depends on §39 —
+which state to adopt cannot be settled before the subject's state is
+known — and feeds §4.
 
 ---
 
