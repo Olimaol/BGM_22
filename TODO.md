@@ -104,7 +104,7 @@ now feed the triage below.)
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
-   §40, §41, §42, §43). Each entry gets an explicit verdict:
+   §40, §41, §42, §43, §44). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -243,7 +243,7 @@ roughly [5e-4, 2e-3], carries the same caveat.
 
 ### 2. Design the DBS-on inference properly
 
-*Opened 2026-08-04 06:24 · 2 updates, last 2026-08-26 11:51*
+*Opened 2026-08-04 06:24 · 3 updates, last 2026-08-27 13:51*
 
 **Opened 2026-08-04 06:24:**
 
@@ -318,6 +318,19 @@ needed, so they are decided first):
 The option family in the Opened block (single-mechanism scans, multi-start,
 L1) remains the solution space for 1–3; the review adds no new option there,
 it adds the commitment and the checks 4–7.
+
+**Update 2026-08-27 13:51:**
+
+The triage's acceptance of round-2 F12 (§44, opened today) bears directly on
+item 7 above: **the caudate free control is an upper bound on channel
+independence, not a clean reading.** Two measured facts, both restated with
+their sources in §44 — the reviewed anatomy's strongest cross-channel route
+runs associative → motor, precisely the direction the control assumes away,
+and the subject's own VTA overlaps the associative STN at ≈ 0.09, which the
+two-loop design rounds to zero. Whatever pass/fail this entry pre-registers
+for the caudate loop must therefore be stated as a bound, and §44 carries
+the work of quantifying the 0.09 component so the bound is a number rather
+than a caveat.
 
 ### 3. Regenerate the input caches with a transposed layout
 
@@ -1736,6 +1749,69 @@ missing-GABA stream, so it is one of the findings the Roadmap orders
 inside phase 1, **before any full-length build**. It also depends on §39 —
 which state to adopt cannot be settled before the subject's state is
 known — and feeds §4.
+
+### 44. Cross-channel convergence: the caudate control is an upper bound
+
+*Opened 2026-08-27 13:51*
+
+**Opened 2026-08-27 13:51:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F12 — two seats; evidence
+class experimentally grounded, both halves measured; the synthesis is not
+referenceable, so the substance is restated here).
+
+The two BG loops share no projection, only the putamen loop is stimulated,
+and the caudate loop's on-vs-off BOLD change is the designed free control
+(§2). Two independently measured facts say the model's channel separation
+is cleaner than the subject's:
+
+- **The anatomy has cross-channel convergence, running the direction that
+  matters here.** Corticostriatal terminal fields from areas 5 mm apart
+  overlap by 50 % (Averbeck 2014, macaque tracing). Through GPe and STN,
+  segregation holds for associative regions but *not* for motor ones,
+  which receive from associative territories (Shink 1996, EM-level). And
+  parkinsonism further degrades functional segregation (four
+  receptive-field despecification studies; within-list consensus across
+  Haber 2016, Emmi 2020, McGregor & Nelson 2019). The strongest route the
+  reviewed anatomy supports is therefore associative → motor — exactly the
+  one the model would need — and the model wires zero.
+- **The subject's own VTA reaches the associative STN.** Verified during
+  triage against `experimental_data/berlin_data/vta/sub-01/`: associative
+  overlap 5/68 (lh) and 7/68 (rh), i.e. 12/136 ≈ **0.09**, which the
+  two-loop design rounds to zero. The real caudate-territory on-off change
+  therefore contains a small *direct* DBS component that the model will
+  attribute entirely to cortical drive. (The limbic overlap, 6/109 ≈ 0.055,
+  has no representation in the model at all — it stands for neither loop.)
+
+**The consequence.** Any caudate-versus-putamen contrast is an **upper
+bound on channel independence**, not a clean control reading, and the
+pre-registered pass/fail that §2 now owes inherits both cracks.
+
+**The task.**
+
+1. **Document both facts where the control is defined** — §2 and
+   `model_v07.md` §1. The 8.8 %/0.09 figure is already owed by §38 part 3
+   as a caveat on the pooled-ROI loop weights; this entry states what it
+   means *for the control* rather than restating the arithmetic.
+2. **Bound the 0.09 effect**, analytically or with one sensitivity run
+   that gives `stn:caudate` its measured coverage. Note the implementation
+   cost: the caudate loop currently sits in `get_loss`'s
+   `excluded_populations_list`, so a run like this is a compile-level
+   extension of the DBS retrofit, not a parameter change.
+3. **Open option, deliberately not decided here:** seat 7's testable
+   version — add the single associative-GPe → motor-STN projection the
+   reviewed anatomy supports most directly, in its own optimizer cluster
+   so the fit can drive it to zero. A fitted non-zero value would be the
+   model's own estimate of channel leakage: a result rather than an
+   assumption. Against it: it breaks the two-independent-loops
+   architecture that `CLAUDE.md` documents and that makes the free control
+   possible at all, and it adds a parameter (§41 records the same
+   conditioning trade-off). Decide when parts 1 and 2 are in hand.
+
+**Blocking.** Nothing cache-side. Part 1 belongs before §32's on-fit is
+interpreted, with §2's checklist. Part 3, if ever taken, is a model change
+and needs a captured baseline first.
 
 ---
 

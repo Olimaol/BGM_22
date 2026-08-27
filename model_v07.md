@@ -26,6 +26,15 @@ loop included. `caudate` and `putamen` share no projection; they meet only when
 their populations are pooled into the shared GPi/GPe/STN BOLD monitors, and only
 the putamen loop is stimulated by DBS.
 
+That separation is cleaner in the model than in the subject, which matters
+because the caudate loop is the free control of the DBS inference (`TODO.md`
+§2). The reviewed anatomy has cross-channel convergence running
+associative → motor — the direction the design assumes away — and this
+subject's VTA overlaps the *associative* STN at ≈ 0.09, which the two-loop
+split rounds to zero. Any caudate-versus-putamen contrast is therefore an
+upper bound on channel independence; `TODO.md` §44 carries the sources, the
+bound and the question of whether to represent the leakage at all.
+
 **Two naming schemes coexist, and the reason is which code created the object.**
 Everything created by `BGM_v07` is named plainly (`stn`, `snr__thal`) and then
 gets `:caudate` / `:putamen` appended afterwards by `BGM._add_name_appendix()`.
