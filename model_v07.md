@@ -271,7 +271,20 @@ total current as `I`; the Humphries striatal populations expose it as `I_v`. Cau
 and Put therefore map `I_CBF` to `I_v`, everything else to `I`. One subtlety: for
 the three GPe populations the quantity entering `dv/dt` is `f(I, nonlin)` (§6.1),
 but the monitor maps the **raw** `I` — the BOLD signal sees the uncompressed
-input current.
+input current. That is deliberate and follows the same split as `I_base` below:
+`nonlin` belongs to the *neuron model*, which is everything from input current
+to spikes, while the neurovascular drive is meant to represent the *synaptic
+input* that produced the current. ANNarchy defines both in one equation block,
+but they are separate things.
+
+**This mapping is scheduled to change** (`TODO.md` §42, decided 2026-08-27).
+`I` is the signed *net* current, so inhibitory input enters negatively and
+cancels against excitation, whereas the intended drive is non-negative synaptic
+input. The drive is to be taken from the synaptic conductances instead — with
+the raw-versus-stabilized-factor choice, the treatment of `g_nmda`, and the
+excitatory/inhibitory weighting still open there. Under that mapping the
+exclusions described here and below follow by construction rather than from
+what `I` happens to contain.
 
 **`I_base` is deliberately outside `I`.** The BGM populations add
 `I_base = base_mean + offset_base` on the `dv/dt` line, not inside `I`, so the

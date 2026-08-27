@@ -103,7 +103,7 @@ now feed the triage below.)
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
-   §40, §41). Each entry gets an explicit verdict:
+   §40, §41, §42). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -454,7 +454,7 @@ ANNarchy still needs the separate route described above.
 
 ### 8. Smaller cleanups
 
-*Opened 2026-08-04 06:24 · 1 update, 2026-08-05 08:13*
+*Opened 2026-08-04 06:24 · 2 updates, last 2026-08-27 11:25*
 
 **Opened 2026-08-04 06:24:**
 
@@ -476,6 +476,16 @@ ANNarchy still needs the separate route described above.
 
 - The user doesn't want dbs to appear in `model_creation_kwargs["dbs"]`, passed to `Microcircuit(dbs_condition=...)` and `CorticalInputs(dbs_condition=...)`. The model creation, i.e. creating the BGM model, should be independent of DBS. DBS is added after model creation. Currently, the dbs information during the model creation only selects the cortical firing-rate files. SO better give directly the locations of the files.
 - rename dbs_depolarization, it actually hyperpolarizes the neurons, currently it's just a wrong naming
+
+**Update 2026-08-27 11:25:**
+
+The `normalize_input` item above was worked out while triaging the round-2
+review into §42, and splits in two. The window-alignment question — 2000 ms
+against a 2310 ms TR and a 2310 ms ramp-up — stays here as the cleanup it
+is. The *consequence* does not: because the balloon model receives exactly
+zero drive during the baseline window and then a step onto relative
+deviations, its haemodynamic onset transient lands inside the scored
+window. That belongs to the BOLD chain and is carried by **§42**.
 
 ---
 
@@ -1536,6 +1546,118 @@ a cache. Outcomes 1 and 2 change the fitted model, so they belong before
 §32; outcome 3's sensitivity check belongs with §2's interpretation
 checklist. A baseline must be captured before any weight changes, per the
 repository convention.
+
+### 42. Drive the BOLD from synaptic conductances, and document the neural→BOLD chain
+
+*Opened 2026-08-27 11:25*
+
+**Opened 2026-08-27 11:25:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F10 — two seats; evidence
+class methodological), **restructured by decision**: the review presents
+the chain as a stack of untested choices and proposes comparing 2–3
+mappings. Working through it settled most of them outright, so this entry
+records one decided change, three deliberate choices that were mistaken for
+omissions, and one genuinely open sub-question. Note the standing
+limitation the synthesis states: no seat on the panel covers the BOLD
+pipeline, so this is the nearest thing to a review of it.
+
+**Decided: the hemodynamic model stays ours.** The monitor in force is
+ANNarchy's `BoldMonitor` default `balloon_RN` — revised Stephan et al. 2007
+coefficients, non-linear BOLD equation — verified against the installed
+extension, and never overridden in `get_loss`. This is deliberate: the lab
+published this BOLD monitor separately, and this project uses that method,
+not the earlier `balloon_maith2021` convention (which the extension also
+ships). What is owed is only that no project document says so. The exact
+citation of the monitor paper must be taken from the paper, not from
+memory. While documenting, check `balloon_RN`'s acquisition-dependent
+constants — `TE = 40 ms`, `v_0 = 40.3`, `epsilon = 1.43` — against the
+Berlin acquisition, which §39 is separately recording.
+
+**Decided: the drive becomes conductance-based.** The intended neurovascular
+coupling drives the haemodynamics with *synaptic input*, and the current
+mapping (`I_CBF` → `I`, or `I_v` in the striatum) does that only
+imperfectly: `I` is the **signed net** current, so inhibitory input enters
+negatively and cancels against excitation, where the intended quantity is
+"how much synaptic input arrived" and should be non-negative. The
+information lives in the conductances — the factors multiplied onto the
+driving potentials. With `stabilize=True` (all BG populations) the current
+is
+
+    I = I_app - g_ampa*(-50)/(1 + g_ampa*dt) - g_gaba*(v - E_gaba)/(1 + g_gaba*dt)
+
+and the striatal (Humphries) models have the same shape with `g/(1 + g*dt/C)`
+and an additional `g_nmda`.
+
+*The open sub-question*: raw `g_ampa`/`g_gaba` (+ `g_nmda`), or the
+stabilized factors `g/(1 + g*dt)` resp. `g/(1 + g*dt/C)`. Recommendation
+recorded here, decision still to make: **the raw conductances**, because
+`1/(1 + g*dt)` is an integration artefact that depends explicitly on `dt` —
+a neurovascular drive that changes when the timestep changes is hard to
+defend — while the conductance itself is the quantity transmitter binding
+and its energetic cost track. Two further choices come with it: whether
+`g_nmda` enters the striatal drive, and how excitatory and inhibitory
+conductances are weighted against each other — `tau_ampa = 2` against
+`tau_gaba = 10` means they accumulate on different timescales, so a plain
+sum weights them implicitly rather than by decision.
+
+**Deliberate, and to be documented rather than changed** (the review reads
+these as gaps; they are choices):
+
+- **The GPe monitors read raw `I`, not `f(I, nonlin)`.** The nonlinearity
+  belongs to the *neuron model* — everything from input current to spikes —
+  while the neurovascular drive is about the *synaptic input* that produces
+  that current. The two are separate things that ANNarchy happens to define
+  in one equation block.
+- **`I_base` and the somatic DBS term are invisible to the monitors.** Same
+  rationale: neither is synaptic input.
+- Under the conductance-based drive above, all three exclusions follow **by
+  construction** instead of by what `I` happens to contain — which is an
+  argument for the change beyond the sign question.
+
+**Still open, and separate from the mapping: the baseline and the onset
+transient.** `normalize_input=2000` means the monitor accumulates the mapped
+variable for 2000 ms after `start()`, feeds **zero** into the balloon model
+during that window, then normalises everything afterwards as
+`(x - baseline_mean)/(|baseline_mean| + 1e-7)` (verified in the extension's
+`AccProjection` template). In this project the monitors start at
+`t.rampup = 2310 ms`, so the baseline window runs 2310–4310 ms. Two
+consequences:
+
+- The window aligns with nothing: 2000 ms against a 2310 ms TR and a
+  2310 ms ramp-up, ending 1730 ms inside the second recorded TR. That is
+  §8's existing cleanup item ("check the two are intended to differ") and
+  stays there.
+- The balloon gets zero drive for ~0.87 TR and then a step onto relative
+  deviations, so its haemodynamic onset transient lands **inside the scored
+  window**: `compute_bold_correlation_loss` trims `ceil(rampup/TR) = 1` TR
+  from the *experimental* series only and scores the simulated series from
+  its first sample. Decide whether to trim the affected leading TRs from
+  both series, extend the ramp-up so the baseline window closes before
+  scoring starts, or accept and document it.
+
+**The task.**
+
+1. Decide the open sub-question, implement the conductance-based `I_CBF`
+   mapping, and — per the repository convention — capture a baseline first:
+   evaluate one parameter set under the current signed-`I` mapping and the
+   new one, and record the per-region BOLD correlation shifts. The
+   striatal regions are where the two differ most: a v07 striatal neuron
+   receives ~61,000–69,000 GABAergic spikes/s from the missing-GABA
+   compensation streams, which under the signed mapping pull the drive
+   down and under a conductance mapping push it up.
+2. Decide the transient question above.
+3. Document the chain end to end in `model_v07.md` §3.6 — model,
+   coefficients and their source, the mapping and why it is what it is, the
+   three deliberate exclusions and their rationale, the baseline
+   mechanism, and the acquisition constants. Maith et al. 2021 Table 2 is
+   the house template for the parameter table.
+
+**Blocking.** Nothing cache-side — the mapping is a monitor setting, not a
+stream parameter. But it changes what every BOLD correlation means, so it
+belongs before §32 and before §10's gate calibration is read against BOLD
+losses.
 
 ---
 
