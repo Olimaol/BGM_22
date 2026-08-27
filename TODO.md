@@ -107,7 +107,8 @@ now feed the triage below.)
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
-   §40, §41, §42, §43, §44, §45, §46). Each entry gets an explicit verdict:
+   §40, §41, §42, §43, §44, §45, §46, §47). Each entry gets an explicit
+   verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -2019,6 +2020,115 @@ subterritories.)
 **Blocking.** Nothing blocks part 1. Parts 2–3 are cache-touching and
 belong with the phase-1/phase-2 boundary; the decision rule must be fixed
 before the comparison is run, not after.
+
+### 47. The afferent `antidromic_prob`: its size is underived, and its subset is redrawn every pulse
+
+*Opened 2026-08-27 15:15*
+
+**Opened 2026-08-27 15:15:**
+
+Opened from the round-2 community review (its F16 — one seat, evidence
+class experimentally grounded; `community_review/round2/synthesis.md`, not
+itself referenceable), **with a second and more consequential problem found
+during triage** and made the leading half. Both live at the same code site,
+`DBSstimulator._set_antidromic`'s afferent branch.
+
+**Half 1 — the magnitude is not derived (found in triage, not in the
+review).** `_set_antidromic` treats its three cases differently: the
+stimulated population itself gets `antidromic_prob = 1` gated by its own
+`dbs_on_array` (coherent — an axon of a neuron inside the VTA is certainly
+activated), passing fibres get the summed branch strengths, and **afferent
+populations get `antidromic_prob = np.mean(stim_pop.dbs_on)` = 0.4**. Only
+that last case makes an inference, and the inference does not follow:
+
+- 0.4 is measured as the **tissue fraction of the STN inside the VTA**
+  (58/145 motor voxels, §16). The quantity needed here is different: what
+  fraction of *afferent somata* is reached antidromically.
+- Antidromic invasion needs only **one** activated branch. If a `gpe_proto`
+  neuron has *n* terminal branches spread over the STN and 40 % of the STN
+  is in the field, the probability that at least one is hit is
+  1 − 0.6ⁿ — 99.4 % at n = 10, effectively 1 for a realistic arborisation.
+  Axons merely *passing* through the field are activated too, which raises
+  it further.
+- So 0.4 holds only under **strong topography with compact terminal
+  fields** — each pallidal axon arborising in a restricted STN subregion,
+  so that ~40 % of those fields fall wholly inside the VTA. That is a
+  substantial anatomical assumption and it is stated nowhere.
+
+**And the model assumes the opposite.** `gpe_proto__stn` is
+`connect_fixed_number_pre` with `number = 10`: each `gpe_proto` neuron
+contacts ~10 STN neurons drawn at random across the whole population, with
+no topography anywhere in the BG populations (only the striatal
+microcircuit has a lattice). Under the connectivity the model actually
+implements, the defensible figure is ~99 %, not 40 %. The connectivity
+assumption and the `antidromic_prob` assumption contradict each other.
+
+Why it matters for the inference rather than only for realism: if the true
+fraction is near 1, the afferent antidromic effect is ~2.5× larger than
+represented, and the free parameters that could absorb the difference are
+`axon_spikes_per_pulse` and the `gpe_proto__stn` cluster scaling — i.e.
+exactly the quantities the project intends to interpret. Note this is a
+step beyond §16, where 0.4 is listed as a measured subject value: for the
+afferent case it is a *derived* value carrying its own untested assumption.
+
+**Half 2 — the subset is redrawn every pulse (the review's F16).**
+`unif_var_dbs2` is a per-neuron, per-timestep uniform, so a different
+subset of `gpe_proto:putamen` is invaded at each pulse; only the stimulated
+STN's set is fixed (`_create_dbs_on_array`). The invasion is in fact doubly
+stochastic — the axon spike must fire first (`unif_var_dbs1` against
+`prob_axon_spike`), then the soma is invaded (`unif_var_dbs2` against
+`antidromic_prob`) — so the expected invaded fraction per pulse is
+`axon_spikes_per_pulse × 0.4`, over a set that changes every time.
+
+The measurement says fixed: the pulse-triggered cortical evoked potential
+is stable pulse-by-pulse across ~215 pulses in all six rats (Kumaravelu
+2018 Fig. 5), a reproducibility only the same axons every time can produce;
+and the same source shows antidromic propagation is unreliable at 130 Hz
+(R1 reduced against 9 Hz, Fig. 4B1) — **stochastic thinning within a fixed
+axon population**, not resampling across the nucleus. A fixed subset
+produces persistent pallidal heterogeneity (a strongly perturbed minority
+beside an untouched majority, as Kumaravelu 2016 §4.2 describes); a
+per-pulse redraw applies a diluted, identical-in-expectation perturbation
+to every neuron and cannot produce it.
+
+**A connectivity-derived mask is not available, and the reason is the same
+as half 1's.** Computing which `gpe_proto` neurons contact stimulated STN
+neurons gives ~99 % of them (0.6¹⁰ ≈ 0.6 % contact none), because the
+model's connectivity is diffuse and carries no topographic content. Under
+that connectivity the `gpe_proto` neurons are **exchangeable**, so the
+identity of the mask is meaningless and only its persistence matters — a
+fixed random draw, exactly as `_create_dbs_on_array` already is for the
+STN, is the faithful implementation. No connectivity analysis is needed or
+useful.
+
+**The task.**
+
+1. Settle the afferent `antidromic_prob`: derive it, or replace it, or
+   record it as an explicit assumption with the topography it presumes —
+   and say how it relates to the connectivity the model implements.
+2. If a mask is adopted, gate **both** mechanisms with it. Currently
+   `prob_axon_spike` is `: population`, so every `gpe_proto` neuron emits
+   axon spikes regardless. Coherently, a neuron either has its axon in the
+   field — then it fires orthodromically *and* antidromically with the
+   propagation-reliability probability — or it does not. That also makes
+   the measured 125 Hz propagation failure expressible as reliability
+   instead of conflating it with coverage.
+3. Report the consequence with §36's diagnostics: a fixed mask predicts a
+   **bimodal** `gpe_proto:putamen` rate distribution, a per-pulse redraw a
+   unimodal one.
+
+**Cost and risk.** Small: `antidromic_prob` is `: population` today and
+would become a LOCAL 0/1 mask, exactly as `dbs_on` already is, with
+`unif_var_dbs2` retained for reliability — so **the number of random
+variables is unchanged** and the global-RNG caveat in `CLAUDE.md` is not
+triggered. The change is invisible to `get_firing_rate_loss`, which scores
+population means, and visible only to §36 — so it cannot degrade the fit.
+A baseline must still be captured first, per the repository convention.
+
+**Blocking.** Not cache-side. Half 1 should be settled before §32's on-fit
+is interpreted, since it changes what a fitted `axon_spikes_per_pulse` or
+`gpe_proto__stn` scaling means; it also belongs with §16's write-up
+obligations.
 
 ---
 

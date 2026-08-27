@@ -222,7 +222,14 @@ everything, then:
 *Antidromic* (`_set_antidromic`):
 - `efferents` → `stim_pop.antidromic = 1`, `antidromic_prob = 1`
 - `afferents` → each presynaptic population: `antidromic = 1`,
-  `antidromic_prob = np.mean(stim_pop.dbs_on)`, i.e. the VTA coverage fraction
+  `antidromic_prob = np.mean(stim_pop.dbs_on)`, i.e. the VTA coverage fraction.
+  **This step is an inference, not a measurement** — the coverage fraction is
+  the share of STN *tissue* in the field, while what is needed is the share of
+  afferent *somata* reached antidromically, and one activated branch suffices
+  to invade a soma. It holds only under compact, topographically organised
+  terminal fields; under the diffuse `connect_fixed_number_pre` connectivity
+  the model actually implements it would be ~99 %. See `TODO.md` §47, which
+  also carries the fact that the invaded subset is redrawn at every pulse.
 - `passing_fibres` → `antidromic_prob` = the summed branch strengths when
   `sum_branches=True`, with a hard `ValueError` if the sum exceeds 1
 
