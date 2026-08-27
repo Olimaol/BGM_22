@@ -102,7 +102,8 @@ now feed the triage below.)
    this parameter" must be fixed in §2 before any on-fit is interpreted
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
-   plus everything the triage spawned (so far: §35, §36, §37, §38, §39). Each entry gets an explicit verdict:
+   plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
+   §40). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -1356,6 +1357,106 @@ cache follow from it.
 cache** — it is one of the five cache-invalidating findings the Roadmap
 orders inside phase 1. It also feeds §30: the φ decision cannot be made
 against an unknown medication state.
+
+### 40. Audit the GPe three-way split: `gpe_cp`'s identity, the cell types and their connectivity
+
+*Opened 2026-08-27 10:24*
+
+**Opened 2026-08-27 10:24:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F8 — three seats), **widened
+by decision beyond what the review licensed**: F8 is classed "difference,
+not deficiency" and proposes documentation only, because every targeting
+fact available to the panel is marker-defined mouse work that both Courtney
+2023 and Wichmann 2019 say is untested in primate. The decision here is
+that the split is *our own* construct — introduced in Goenner et al. 2021 by
+this lab — so it is ours to re-examine rather than merely to describe: this
+entry additionally audits whether the cell-type division and its
+connectivity still hold against current empirical work, **and whether
+Goenner 2021 read its own cited literature correctly**. An audit may
+legitimately conclude "no change licensed"; what it may not do is leave the
+question unasked.
+
+**What the model has.** Three GPe populations per loop, 100 neurons each:
+`gpe_proto`, `gpe_arky`, `gpe_cp`. `gpe_cp` shares `gpe_proto`'s neuron
+parameters exactly (`parameters.csv`, "just like gpe proto" — verified: the
+Izhikevich constants are identical) and its 75–85 Hz band, projects to all
+three striatal populations (0.5 / 0.5 / 0.8) and within GPe, and receives
+fitted cortical drive via `CorticalInputs`. It weights the GPe BOLD at 0.10,
+matched to Courtney 2023's NPAS1⁺NKX2.1⁺ abundance (`model_v07.md` §3.6).
+
+**The three tensions the review documents** (as reported in the round-2 seat
+reviews; the primary papers are to be read, not recalled, when this entry is
+worked):
+
+1. *The namesake efferent cannot exist here* (seat 5, which owns the
+   provenance). Goenner 2021 introduced GPe-Cp **for** the
+   cortico-pallido-cortical loop — the paper's central novel claim, with
+   GPe→cortex tabulated from Abecassis 2020, Chen 2015, Saunders 2015 and
+   cortex→GPe from Karube 2019, Naito & Kita 1994, Milardi 2015, Smith &
+   Wichmann 2015. In BGM_22 there is no simulated cortex, so that efferent
+   is structurally absent and `gpe_cp` is functionally a third GPe
+   population distinguished only by its afferent mix and fitted drive
+   weight. No document says so.
+2. *The identity does not close* (seat 7). Courtney 2023's NPAS1⁺NKX2.1⁺
+   class — whose ≈12 % abundance the BOLD weight was matched to —
+   "project[s] exclusively to the midbrain, the cortex and the reticular
+   nucleus of the thalamus", not to the striatum, while the model's
+   `gpe_cp` is a striatum-projecting population. Box 1 leaves room for a
+   second striatum-projecting class, so the model is not contradicted — but
+   nothing identifies its population, and `gpe_cp` is expanded nowhere in
+   the repository. Band and BOLD weight currently borrow from two different
+   identities.
+3. *The frozen wiring ratios point against the subtype-resolved
+   measurements* (seats 2 and 7). Aristieta et al. 2021 (mouse, via Giossi
+   2024) measured iSPN→arkypallidal 85 % *weaker* than iSPN→prototypic and
+   STN→arkypallidal 74 % weaker than STN→prototypic, while the model has
+   `str_d2 → gpe_arky` at *twice* `str_d2 → gpe_proto` and `stn →` equal
+   across all three GPe types. Courtney 2023 has iSPNs strongly targeting
+   the STN-projecting prototypic class and arkypallidal neurons making few
+   local collaterals, while the model gives `gpe_arky →` a third of the
+   prototypic collateral weight — all inside frozen optimizer clusters
+   (`gpe_laterals`, `str_d2__bg`), so no fitted scaling can repair a ratio.
+   In the model's favour, also from Courtney: the direct-pathway collateral
+   into GPe exists here at all (`str_d1 → gpe_cp`), is routed to the
+   non-prototypic population, and is kept an order of magnitude weaker than
+   the iSPN weights — the direction of the measured bouton asymmetry.
+
+**The task**, in two parts:
+
+1. **The audit** (the widening). Re-read Goenner 2021 and the primary
+   sources it tabulates for the GPe division, and check: does the
+   three-way split as parameterised here still match current empirical
+   work, and did Goenner 2021 interpret those sources correctly? Then the
+   same question for the intra-GPe and striatopallidal connectivity against
+   Courtney 2023, Aristieta 2021 (via Giossi 2024) and Wichmann 2019.
+   Sources must be read, not recalled. Outcome is one of: a licensed
+   change, or a reasoned "no change — the evidence is marker-defined mouse
+   work with no established primate translation", recorded either way.
+2. **The documentation** (the review's own proposal, owed regardless of the
+   audit's outcome). State in `model_v07.md` what `gpe_cp` denotes, which
+   experimental population it is meant to be, that its namesake efferent is
+   structurally absent, and the resulting claim boundary — a fitted change
+   in `gpe_cp` parameters under DBS must **not** be narrated as a
+   pallido-cortical pathway effect. Reconcile or flag the band/abundance
+   identity tension when §35's band document is written.
+
+**Relations.** The band half of the identity tension is §35's. The
+"weights the BOLD by realistic abundances while simulating 100 neurons
+each" question is the review's F22, not yet triaged. Tension 3 above
+overlaps the review's **F9** (the full 28-weight provenance and
+cluster-ratio finding, also not yet triaged, evidence class experimentally
+grounded): when F9 is triaged, decide deliberately whether the GPe-specific
+ratios are audited here or there rather than in both places. Provenance
+recording as such is §37.
+
+**Blocking:** the documentation half blocks nothing. The audit half could
+license a connectivity change, which would move every GPe spike train and
+invalidate nothing cache-side (weights are not cache parameters) — but per
+the repository convention a baseline must be captured first, and the
+ANNarchy global-RNG caveat in `CLAUDE.md` applies if any random variable is
+added or removed.
 
 ---
 

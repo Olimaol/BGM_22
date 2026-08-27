@@ -257,6 +257,15 @@ neurons relative to prototypic ones as the abundances imply. See
 `community_review/round2/synthesis.md` F22 for the proposal (the round-1
 pointer was F6).
 
+**`gpe_cp`'s BOLD weight and its projections come from two different
+identities.** The 0.10 above is Courtney's NPAS1⁺NKX2.1⁺ abundance, a class
+reported to project to midbrain, cortex and thalamic reticular nucleus and
+*not* to the striatum — while this model's `gpe_cp` projects to all three
+striatal populations. `TODO.md` §40 carries the audit of the GPe three-way
+split and owes this section the statement of what `gpe_cp` denotes, which
+experimental population it is meant to be, and the claim boundary that
+follows from its namesake cortical efferent being structurally absent here.
+
 **The input variable differs by population family.** BGM populations expose the
 total current as `I`; the Humphries striatal populations expose it as `I_v`. Cau
 and Put therefore map `I_CBF` to `I_v`, everything else to `I`. One subtlety: for
