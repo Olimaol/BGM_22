@@ -95,13 +95,14 @@ now feed the triage below.)
    gate calibration; five findings
    would invalidate input caches if accepted (the striatal-kernel state
    refit, the STN cortical-proportion table, the `ci.n_*` derivation of §8,
-   the cube size already carried by §24, and the medication state if the
-   answer is "on"), so they must be settled inside this phase rather than
+   the cube size already carried by §24, and the medication state — accepted
+   2026-08-27 as **§39**, which therefore precedes every full-length build
+   and feeds §30), so they must be settled inside this phase rather than
    after phase 2 builds them; and the acceptance criterion for "DBS changed
    this parameter" must be fixed in §2 before any on-fit is interpreted
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
-   plus everything the triage spawned (so far: §35, §36, §37, §38). Each entry gets an explicit verdict:
+   plus everything the triage spawned (so far: §35, §36, §37, §38, §39). Each entry gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -913,7 +914,7 @@ the probe bias is ~0.1 Hz, so this is hygiene, not a suspect for bad fits.
 
 ### 30. `phi_1 = phi_2 = 0` — the striatal dopamine terms are switched off, unchecked against the source paper
 
-*Opened 2026-08-10 11:25*
+*Opened 2026-08-10 11:25 · 1 update, 2026-08-27 09:37*
 
 **Opened 2026-08-10 11:25:**
 
@@ -953,6 +954,29 @@ the Liang bands — recheck the probe, and expect §4 (missing-GABA
 self-consistency) to be affected. (c) `phi` values must be set at class
 instantiation or before compile — the post-compile reset trap applies
 (`model_v07.md` §11).
+
+**Update 2026-08-27 09:37:**
+
+The community-review triage extends this entry's scope twice, from round-2
+findings F7 and F1 of `community_review/round2/synthesis.md`:
+
+- **The φ decision cannot be made against an unknown medication state.**
+  §39 (opened today from F7) records that nothing documents whether the
+  Berlin subject was scanned on or off medication. "Dopamine-depleted"
+  has no determinate value until that is known, so §39 comes first.
+- **φ is striatal only, and the review shows that is a stated scope, not
+  a complete dopamine account.** From Wichmann 2019 (macaque, human):
+  GPi/STN rates depend on disease *stage* through **extrastriatal**
+  dopamine — D2-like receptors on striatopallidal terminals in primate
+  GPe, D1/D2 on STN afferents, D1-like in GPi/SNr — with "comparatively
+  maintained pallidal and nigral dopamine levels in early parkinsonism"
+  able to hold GPi/SNr rates near normal. The model has no extrastriatal
+  dopamine term at all, so whatever that effect is in this subject is
+  absorbed by the fitted `base_mean` parameters. This entry's remit stays
+  striatal; the point is recorded here so the eventual verdict states the
+  limitation rather than implying φ settles the model's dopamine state.
+  It also bears on §35's non-striatal band derivation, which cannot cite
+  a single "parkinsonian" rate without a stage qualifier.
 
 ## From the session on 2026-08-11 (dissolving PLAN.md into this file)
 
@@ -1278,6 +1302,60 @@ triage:
 **Blocking:** nothing blocks it, and it blocks nothing structurally — but
 part 1 changes what the fitted DBS parameter values mean, so it belongs
 before §32's on-fit is interpreted, alongside §2's checklist.
+
+### 39. Record the Berlin subject's provenance: medication state, protocol, acquisition, hemispheres
+
+*Opened 2026-08-27 09:37*
+
+**Opened 2026-08-27 09:37:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F7 — three seats; evidence
+class methodological: the scientific question is already planned in §30 and
+the Roadmap, the gap is recorded provenance; the synthesis is not
+referenceable, so the substance is restated here).
+
+The model asserts a **medication-off** subject throughout: the striatal
+surround and the `get_firing_rate_loss` bands are the medication-off state
+of Liang et al. 2008 (§20), and `phi_1 = phi_2 = 0` switches the striatal
+dopamine terms off entirely (§30). But no document records what the Berlin
+subject's medication state during scanning actually *was*. Nor is the
+hemisphere convention of the ROI series written down (the VTA arithmetic
+in `get_loss` pools two electrodes), nor the acquisition parameters
+(field strength, TE), nor the on/off session protocol.
+`experimental_data/berlin_data/` is the only data directory without a
+README, while `activity_striatum/`, `cortical_proportions/`,
+`input_streams/` and `Connectivity_intrinsic_striatum/` all have one — the
+project's own standard is the counterexample.
+
+**Why this is not bookkeeping.** Seat 5's predecessor drew from the same
+clinical population and recorded the state precisely — patients scanned
+DBS-OFF *with* their usual medication — then *needed* that fact to
+interpret a fitted result (Maith et al. 2021 §4.1 explains an absent
+STN/GPi rate increase by the medicated state). If this subject was scanned
+on medication, the Liang anchors, `phi = 0` and every input cache built on
+them target the wrong physiological state, in **both** conditions of the
+inference. Seat 6, which carries the panel's only graded-dopamine
+machinery, reports that medication state *inverts* effects in its own
+models — this is not a small correction. Seat 1 frames the requirement as
+internal state consistency among the fixed ingredients: rates (chronic
+med-off), the striatal connectivity kernel (currently state-less; the
+review's F11) and φ (§30) must all describe the same physiological state.
+
+**The task.** Write `experimental_data/berlin_data/README.md` in the style
+the other data directories already follow: the subject's medication state
+during scanning, the on/off session protocol, field strength and TE, and
+the hemisphere convention of the ROI series — each marked as measured,
+reported by the source, or assumed. Where the answer is not in the
+materials at hand, it is a question to the Berlin collaborators, not an
+assumption to be made here. If the answer turns out to be "on medication",
+that is a finding, and §20's rate anchors, §30's φ decision and every v07
+cache follow from it.
+
+**Blocking:** must be settled **before phase 2 builds any full-length
+cache** — it is one of the five cache-invalidating findings the Roadmap
+orders inside phase 1. It also feeds §30: the φ decision cannot be made
+against an unknown medication state.
 
 ---
 
