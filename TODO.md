@@ -663,7 +663,7 @@ a remedy for each:
 
 ### 16. The DBS constants are unvalidated single-subject values
 
-*Opened 2026-08-04 15:42*
+*Opened 2026-08-04 15:42 · 1 update, 2026-08-27 14:26*
 
 **Opened 2026-08-04 15:42:**
 
@@ -675,6 +675,42 @@ width is 100 µs against 60 µs in the data, raised because 60 µs is below dt.
 None of these is fitted, so each is an assumption the inference inherits.
 Sensitivity to at least `population_proportion` and `dbs_pulse_width_us` should be
 checked once a DBS-on fit exists — before any of it is written up.
+
+**Update 2026-08-27 14:26:**
+
+The community-review triage accepted round-2 F15 of
+`community_review/round2/synthesis.md` (one seat; evidence class
+experimentally grounded, scope) into this entry, because it bears directly
+on what this entry's planned checks can establish.
+
+**The frequency constant cannot be checked by a sweep, and the reason is
+structural.** Every DBS term is gated by `pulse(t)` —
+`ite(modulo(time_ms*1000, 1000000./dbs_pulse_frequency_Hz) < dbs_pulse_width_us, 1., 0.)`,
+one timestep every 8 ms at 125 Hz — with no adaptation, depression or
+pulse-to-pulse interaction anywhere in the equation set. The expected
+perturbation over any interval is therefore per-pulse effect × pulse count:
+**proportional to frequency, with no threshold and no saturation.** A
+frequency sweep would provably return a straight line, so it tests nothing.
+
+That contradicts the best-established quantitative fact about STN DBS. The
+measured profile — no effect below ~40 Hz, decline between 50 and 130 Hz,
+saturation above 150 Hz — is reproduced by Kumaravelu 2016 Fig. 11 (and Su
+2019 Fig. 5) *without* being fitted to it, against the parallel frequency
+dependence of symptom suppression.
+
+**Why this is scope rather than a defect to fix.** The fit runs at 125 Hz,
+squarely therapeutic, so the fitted result is untouched. And the model
+could not measure a dose–response even if the mechanism supported one: it
+has no pathological oscillation to suppress and reads out at 2.31 s. A
+mechanistic frequency dependence would need a memory term this equation set
+does not have — a much larger change than this project needs.
+
+**What is owed.** The scope limitation is now recorded in `DBS.md` (known
+limitation 6). It must also appear in the write-up: the DBS representation
+is a **per-pulse perturbation calibrated at 125 Hz, linear in frequency by
+construction, and not to be extrapolated to other stimulation settings**.
+That half stays open here, since there is no write-up yet, and it joins the
+sensitivity checks above as things this entry owes before publication.
 
 ### 17. `dbs_depolarization` scales with `C` in Izhikevich-2007 models
 

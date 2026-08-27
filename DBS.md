@@ -358,3 +358,16 @@ terms at all. This was taken deliberately, before any real fit had been run. See
    the moment a striatal population entered the footprint.
 5. **The firing-rate gate bands are condition-independent.** `get_firing_rate_loss`
    has no DBS switch, and the rate probe runs with DBS active. See `TODO.md` §10.
+6. **The DBS effect is exactly linear in stimulation frequency, by
+   construction.** Every DBS term is gated by `pulse(t)`, and there is no
+   adaptation, depression or pulse-to-pulse interaction anywhere in the
+   equation set, so the expected perturbation over an interval is per-pulse
+   effect × pulse count — proportional to frequency, with no threshold and no
+   saturation. The measured profile is not linear: no effect below ~40 Hz,
+   decline between 50 and 130 Hz, saturation above 150 Hz (Kumaravelu 2016
+   Fig. 11, Su 2019 Fig. 5, against the frequency dependence of symptom
+   suppression). This does not affect the fit, which runs at 125 Hz, but it
+   means a frequency sweep of this model would provably return a straight
+   line and tests nothing. **Read the representation as a per-pulse
+   perturbation calibrated at 125 Hz; do not extrapolate it to other
+   stimulation settings.** See `TODO.md` §16.
