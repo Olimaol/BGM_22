@@ -363,8 +363,16 @@ terms at all. This was taken deliberately, before any real fit had been run. See
    Izhikevich-2003 models where `dv/dt = ...`. It does not bite here — every
    population in the footprint is `Izhikevich2003NoisyBaseNonlin` — but it would
    the moment a striatal population entered the footprint.
-5. **The firing-rate gate bands are condition-independent.** `get_firing_rate_loss`
-   has no DBS switch, and the rate probe runs with DBS active. See `TODO.md` §10.
+5. **The firing-rate gate bands are condition-independent, and the probe counts
+   `spiked`, not `axonal`.** `get_firing_rate_loss` has no DBS switch, and the
+   rate probe runs with DBS active. On top of that, `get_loss` monitors only
+   `["spike"]`, which ANNarchy records from the `spiked` container, while
+   DBS-evoked axon spikes go to `axonal` and are recorded only if asked for —
+   so **no measured rate contains the DBS-evoked volley**, although it does
+   reach downstream targets. The measured rate is somatic; the output is not.
+   Since the rate term is *added* to the loss and only the shunt and the
+   antidromic reset touch the somatic rate, this biases the on-fit toward small
+   DBS parameters. See `TODO.md` §49 (and §10 for the band-condition question).
 6. **The DBS effect is exactly linear in stimulation frequency, by
    construction.** Every DBS term is gated by `pulse(t)`, and there is no
    adaptation, depression or pulse-to-pulse interaction anywhere in the

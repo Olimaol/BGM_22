@@ -107,8 +107,8 @@ now feed the triage below.)
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
-   §40, §41, §42, §43, §44, §45, §46, §47, §48). Each entry gets an
-   explicit verdict:
+   §40, §41, §42, §43, §44, §45, §46, §47, §48, §49, §50). Each entry
+   gets an explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -1265,7 +1265,7 @@ gate is enabled. Whether the bands need a DBS-on variant stays with §10.
 
 ### 36. Report the fitted models' dynamical regime from the probe spikes
 
-*Opened 2026-08-26 11:58*
+*Opened 2026-08-26 11:58 · 1 update, 2026-08-28 08:39*
 
 **Opened 2026-08-26 11:58:**
 
@@ -1321,6 +1321,14 @@ probe would change cache divisibility constraints).
 **Blocking:** none for its implementation (one analysis function); the
 reporting side joins §2's interpretation checklist and the phase-1
 validation run.
+
+**Update 2026-08-28 08:39:** the diagnostics need one thing this entry did
+not anticipate. The probe records only `spiked`, while DBS-evoked axon
+spikes go to ANNarchy's separate `axonal` container (§49), so an STN
+spectrum computed under DBS from the current recordings **cannot show the
+125 Hz entrainment** — the signature these diagnostics exist to detect.
+§49 item 3 carries the recording change; this entry depends on it for the
+on condition.
 
 ### 37. Write the parameter-provenance companion for parameters.csv
 
@@ -2217,6 +2225,16 @@ is interpreted, since it changes what a fitted `axon_spikes_per_pulse` or
 `gpe_proto__stn` scaling means; it also belongs with §16's write-up
 obligations.
 
+**Scope note (added 2026-08-28 08:39, when §50 opened).** This entry owns
+the antidromic mechanism's **parameters** — how large the invaded fraction
+is and whether it is fixed or redrawn. **§50** owns its **equation** —
+whether the invasion should be a bare reset or a genuine spike, and the
+fact that it currently reaches none of the presynaptic neuron's other
+collaterals. §50 also records a constraint bearing on half 1 above: the
+reported near-constancy of GPe rates under STN DBS bounds the product
+`axon_spikes_per_pulse × antidromic_prob`, which argues against reading the
+invaded fraction as near 1.
+
 ### 48. Why there is no short-term plasticity: the fitted weights are effective quantities
 
 *Opened 2026-08-28 07:54*
@@ -2294,6 +2312,158 @@ difference.
 
 **Blocking.** Nothing. The wording boundary belongs with §32's
 interpretation.
+
+### 49. The rate term biases the DBS-on fit, and the probe cannot see DBS-evoked spikes
+
+*Opened 2026-08-28 08:39*
+
+**Opened 2026-08-28 08:39:**
+
+From the round-2 community review (accepted from
+`community_review/round2/synthesis.md`, its F19 — one seat, on facts
+checkable in the code; evidence class methodological; the synthesis is not
+referenceable, so the substance is restated here). Both code claims were
+re-verified during triage.
+
+**The bias.** `get_loss` computes `total_loss = firing_rate_loss +
+bold_loss`, so the rate term is **added** to the objective and not merely a
+gate; the band table has no DBS switch; and the probe runs under active
+DBS (`assert_dbs_state(..., "before the firing-rate probe")`). In the
+DBS-on stage this penalises any DBS parameter setting that moves a measured
+rate out of an off-calibrated band. For the stimulated `stn` that is a
+one-directional bias: of all the DBS terms, only the hyperpolarizing shunt
+and the antidromic reset touch the measured rate, and both can only lower
+it. The rate term therefore pushes the on-fit toward small DBS parameters —
+toward "DBS changes no rate", which is the direction that understates the
+effect. It survives perfect bands, so it is independent of §35.
+
+The seat's own qualification is important: for the *pallidal* populations
+condition-independent bands are supported — mean GPe/GPi rates roughly
+unchanged under STN DBS (McConnell 2012, reported by the seat as a citation
+trail through Kumaravelu 2016, not read) — so the problem concentrates in
+the stimulated nucleus rather than in the band table as a whole.
+
+**The measurement gap.** ANNarchy's `MonitorGenerator` keeps two containers:
+`"spike"` records `spiked`, and `"axon_spike"` records `axonal`, the latter
+generated only when asked for. `get_loss` builds
+`monitor_dictionary = {pop_name: ["spike"] ...}` and `get_firing_rate_10s`
+filters keys ending in `";spike"`, so **DBS-evoked axon spikes enter no
+measured rate at all**, while they do reach downstream targets through
+`pre_axon_spike`. The model's measured rate is the somatic rate; its output
+is not.
+
+**What the triage added: which quantity should the bands describe?** The
+naive fix — also record `axon_spike` and count it — is not obviously right.
+An antidromic action potential that invades the soma *is* a somatic action
+potential and an extracellular electrode counts it as a spike; that is the
+basis of antidromic identification (fixed latency plus collision test).
+But under DBS the recording is unusable in a window around each pulse, so
+experimental rates under stimulation routinely **exclude** stimulus-locked
+spikes. The target quantity is itself censored, and the model's current
+`spiked`-only rate resembles that censored measurement more closely than a
+total count would. The review's F29 (the predecessor's STN
+electrode-artifact caveat, not yet triaged) is the same issue seen from the
+data side.
+
+**The task.**
+
+1. **Remove the bias**: in the DBS-on stage, exempt `stn` from the additive
+   rate term (preferred over making the whole term gate-only, which would
+   reduce the on-stage objective to pure BOLD and discard the rate
+   plausibility of the eight populations whose condition-independent bands
+   the same source supports).
+2. **Decide and document the measured quantity**: state whether the bands
+   describe somatic spikes as an artifact-censored recording would report
+   them, or total output. Record the decision where the bands are derived
+   (§35) and in `DBS.md` limitation 5, which must say that the probe counts
+   `spiked`, not `axonal`.
+3. **Record `axon_spike` as a diagnostic** for the footprint populations
+   regardless of (2) — it does not enter the loss, but §36's spectral
+   diagnostics need it: an STN spectrum under DBS computed from `spiked`
+   alone cannot show the 125 Hz entrainment, which is the very signature
+   §36 exists to detect. Verify that `Monitor(pop, ["spike", "axon_spike"])`
+   is accepted once `add_dbs_mechanisms` has given the neuron type an
+   `axon_spike`.
+
+**Blocking.** Item 1 must be in place before §32's on-fit, since it biases
+the fit itself rather than only its reading. Items 2–3 belong with §35 and
+§36 respectively. The mechanism questions this finding surfaced are §50.
+
+### 50. The form of the antidromic mechanism: reset versus a real spike
+
+*Opened 2026-08-28 08:39*
+
+**Opened 2026-08-28 08:39:**
+
+Opened during the triage of round-2 F19, from working through what the
+antidromic term actually does. Nothing in the review states this; §47
+carries the *parameters* of the same mechanism (its magnitude and its
+per-pulse redraw), this entry carries its **equation**.
+
+**What the code does.** The antidromic soma invasion is an axon reset:
+`v += ite(unif_var_dbs2 < antidromic_prob, dbs_on*antidromic*(-v + c), 0)`
+and the matching `u += ... d` — i.e. the ordinary Izhikevich reset fired by
+a pulse instead of by threshold crossing, emitting no `spiked` event. And
+`_set_orthodromic` sets `axon_transmission = 1` only on projections whose
+post is the stimulated population (afferent branch) or whose pre is
+(efferent branch), plus the passing fibres — six projections in all
+(`model_v07.md` §11). For `gpe_proto` that means only `gpe_proto__stn`
+carries the axon spike; its four other projections — to `snr`, `gpe_arky`,
+`gpe_cp` and `str_fsi` — do not.
+
+**Why that is an asymmetric error.** Physiologically, antidromic invasion
+does two things: it suppresses the neuron's own firing *and* it drives
+every collateral at the stimulus frequency. The implementation keeps the
+first and drops the second. The other four targets are not unaffected —
+they see the neuron **fall silent**, because the repeated resets prevent it
+from completing its natural interspike interval. So the model converts
+"irregular output replaced by regular stimulus-locked output" — the
+informational lesion — into "output removed", a literal one.
+
+**It has a sign, in a scored region.** `gpe_proto → snr` is GABAergic.
+Silencing `gpe_proto` disinhibits `snr` and raises its rate; driving
+`gpe_proto` at 125 Hz would impose strong regular inhibition and lower it.
+Those are opposite directions in **GPi**, one of the seven scored BOLD
+regions and the model's output. The same applies to `gpe_proto`'s
+projections to `gpe_arky`, `gpe_cp` and `str_fsi`.
+
+**And there is an observation that discriminates them.** The reset can only
+*lower* the pallidal rate. A genuine spike would add spikes while
+suppressing natural ones, leaving the rate roughly unchanged but
+regularised — which is what is reported for GPe under STN DBS (the
+McConnell trail cited in §49). More generally, the near-constancy of GPe
+rates is a **calibration constraint on the product**
+`axon_spikes_per_pulse × antidromic_prob`: reliable invasion at 125 Hz
+would entrain a 60 Hz neuron completely, so the reported constancy bounds
+that product, or else means the invasion fails at high frequency
+(Kumaravelu 2018 reports exactly that for cortical axons at 130 Hz), or
+that the measurement is artifact-censored (§49). This bears on §47's
+magnitude question and argues against its "near 1" reading.
+
+**The alternative.** Instead of a bare reset, drive the membrane above
+threshold so a *genuine* spike occurs. It resolves three things at once:
+the event is counted in the rate as an electrode would count it, it
+propagates into **all** collaterals, and the normal reset dynamics follow
+by themselves. It is implementable within the neuron model's limits — the
+somatic DBS term already appends to `dv/dt`, and the same route carries a
+threshold push. (Refractoriness is not an argument either way: these
+neuron models define none, so natural spikes have none either.)
+
+**The open case distinction.** The argument above is clear for **afferent**
+populations. For the **stimulated STN itself** it is not: the prevailing
+reading is decoupling — somatic activity suppressed by the massive
+synchronous GABA input from stimulated afferent terminals, which this model
+does represent via the orthodromic axon spikes into STN, while the axon is
+driven. Under that reading a forced somatic spike would be *less* faithful
+for `stn` than the current reset. So the answer may differ between the
+afferent populations and the stimulated one, and must be decided
+explicitly rather than applied uniformly. The primary sources are to be
+read, not recalled, when this entry is worked.
+
+**Blocking.** A model change: capture a baseline first, per the repository
+convention. It adds no random variable, so the global-RNG caveat in
+`CLAUDE.md` is not triggered. It is not cache-side. It changes what the
+on-condition network does, so it belongs before §32.
 
 ---
 
