@@ -107,8 +107,8 @@ now feed the triage below.)
    (accepted 2026-08-26 into §2's update of that date).
 2. **The verdict pass** — §14, §15, §16, §17, §23, §24, §25, §26, §28, §30,
    plus everything the triage spawned (so far: §35, §36, §37, §38, §39,
-   §40, §41, §42, §43, §44, §45, §46, §47). Each entry gets an explicit
-   verdict:
+   §40, §41, §42, §43, §44, §45, §46, §47, §48). Each entry gets an
+   explicit verdict:
    **fix now** (implemented within this phase) or **accepted limitation**
    (rationale documented; the entry stays open on its own trigger). §16 is
    pulled into the model phase deliberately — unvalidated DBS constants are
@@ -247,7 +247,7 @@ roughly [5e-4, 2e-3], carries the same caveat.
 
 ### 2. Design the DBS-on inference properly
 
-*Opened 2026-08-04 06:24 · 4 updates, last 2026-08-28 05:56*
+*Opened 2026-08-04 06:24 · 5 updates, last 2026-08-28 07:54*
 
 **Opened 2026-08-04 06:24:**
 
@@ -365,6 +365,18 @@ a shared scale factor cancels in an on-vs-off ratio but not in a
 difference — and any absolute value reported must carry the conditional.
 This is bookkeeping to do once, here, rather than three times in three
 entries.
+
+**Update 2026-08-28 07:54:**
+
+One wording rule for the same checklist, from §48 (round-2 F18). A fitted
+weight change under DBS is an **effective** quantity, so it supports
+"effective transmission is weaker while DBS is on" but **not** "DBS changed
+the synaptic strength" or "DBS induced plasticity" — the latter assert a
+lasting change where the underlying mechanisms include ones that vanish
+when stimulation stops. Unlike the three scale factors above, this
+confound does **not** cancel in an on-versus-off comparison: it exists only
+under stimulation and therefore appears exactly as a condition
+difference.
 
 ### 3. Regenerate the input caches with a transposed layout
 
@@ -2204,6 +2216,84 @@ A baseline must still be captured first, per the repository convention.
 is interpreted, since it changes what a fitted `axon_spikes_per_pulse` or
 `gpe_proto__stn` scaling means; it also belongs with §16's write-up
 obligations.
+
+### 48. Why there is no short-term plasticity: the fitted weights are effective quantities
+
+*Opened 2026-08-28 07:54*
+
+**Opened 2026-08-28 07:54:**
+
+Opened from the round-2 community review (its F18 — two seats; evidence
+class experimentally grounded, interpretation;
+`community_review/round2/synthesis.md`, not itself referenceable), but
+**mostly as a recorded defence rather than a task**: the triage judged the
+finding largely dissolved by the project's design position, which had
+never been written down. It is written down here because two independent
+seats raised it, so a reviewer of the eventual paper will raise it too.
+
+**What the review observed.** No synapse in the model carries short-term
+plasticity — v07's projections use ANNarchy's default static synapse
+(`g_target += w`; verified during triage, the older `factor_synapse` is no
+longer used) — and DBS-evoked transmission uses the same static `w`. But
+GPe→STN short-term depression is measured and fitted: at ~100 Hz sustained
+firing unitary transmission collapses below ~0.2 within seconds (Shouno
+2017 Fig. 2, experimental points from Atherton et al. 2013; the seat does
+not state the species and flags that). Under run-long 125 Hz stimulation
+the model operates exactly where depression saturates, and transmits every
+DBS-evoked volley at full strength.
+
+**The project's position, recorded as the answer.** The fitted connection
+strengths are **effective, aggregate, system-level quantities**: they are
+the intended vehicle for the net result of whatever mechanisms produce a
+change in transmission under DBS, short-term plasticity included. The goal
+is to show the resulting effect, not to implement each mechanism — for a
+system-level model of this scope, the plasticity of every projection is
+not knowable in any case. Two facts support the position rather than
+merely asserting it:
+
+- **The approximation is structurally right, not just convenient.** In
+  tissue, depression driven by the DBS volleys attenuates *every* spike
+  crossing that synapse, the presynaptic neuron's own spontaneous ones
+  included. A lowered static weight attenuates all spikes equally. The
+  correspondence is not a coincidence of bookkeeping.
+- **It is applied in the regime where it holds.** Over 716 s of constant
+  125 Hz the depression is at steady state, which is precisely the case
+  the review itself calls absorbable ("a steady state, standing in the
+  fitted efficacies").
+
+**Decision: short-term depression is not implemented, and this is a
+rejection rather than a deferral.** Adding it to the six DBS-footprint
+projections while leaving the weights free would be double counting — the
+fit would re-absorb it, and the exchange would be an unmeasured depression
+parameter per projection (measured values exist for GPe→STN only) against
+no gain in what the model can say. The option is closed unless the goal
+changes to separating mechanisms, which is not this project's goal.
+
+**Verified during triage: the effective description is reachable.** The
+on-stage search gives each putamen cluster scaling bounds [0, 5], and
+`gpe_proto__stn` is its own cluster in `PROJ_CLUSTERS_COMMON`, so an
+effective transmission of ~0.2× — the depression steady state the Shouno /
+Atherton data imply — lies inside the search space. (Subject to §1: the
+bounds are provisional throughout.)
+
+**What remains owed: a wording boundary**, carried into §2's interpretation
+checklist. These are not the same statement:
+
+- "effective pallido-subthalamic transmission is weaker while DBS is on" —
+  supported by a fitted scaling decrease;
+- "DBS changed the synaptic strength" / "DBS induced plasticity" — not
+  supported, since it implies a lasting change where the effect would
+  vanish the moment stimulation stops.
+
+Same family as §16's non-extrapolation rule: the fitted value describes
+this operating point, and must not be given a mechanistic label it does not
+carry. Note that unlike the multiplicative scale factors collected in §2,
+this one does **not** cancel in an on-versus-off comparison — depression
+exists only under stimulation, so it appears precisely as a condition
+difference.
+
+**Blocking.** Nothing. The wording boundary belongs with §32's
+interpretation.
 
 ---
 
