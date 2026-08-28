@@ -247,7 +247,7 @@ roughly [5e-4, 2e-3], carries the same caveat.
 
 ### 2. Design the DBS-on inference properly
 
-*Opened 2026-08-04 06:24 · 3 updates, last 2026-08-27 13:51*
+*Opened 2026-08-04 06:24 · 4 updates, last 2026-08-28 05:56*
 
 **Opened 2026-08-04 06:24:**
 
@@ -335,6 +335,36 @@ two-loop design rounds to zero. Whatever pass/fail this entry pre-registers
 for the caudate loop must therefore be stated as a bound, and §44 carries
 the work of quantifying the 0.09 component so the bound is a number rather
 than a caveat.
+
+**Update 2026-08-28 05:56:**
+
+Collected here because it is only visible when the triage's findings are
+read together: **at least three multiplicative scale factors land in the
+same three fitted DBS parameters, and the fit cannot see any of them.**
+
+- **Coverage** (§16, from round-2 F17): every DBS effect is proportion ×
+  a fitted parameter, so the proportion and the parameters are degenerate.
+  0.4 is this subject's pooled motor-STN overlap, but its hemispheres span
+  0.31–0.50 and the cohort 0.24–0.40.
+- **The pooled-ROI loop weight** (§38, from F6): the GPi/GPe/STN monitors
+  weight the two loops 50/50 by population size, where the subject's
+  territory volumes give the motor loop ≈ 37 %, so the DBS-carrying
+  compartment is over-weighted by ≈ 1.34 and the fitted DBS parameters
+  absorb the reciprocal.
+- **The afferent antidromic magnitude** (§47): `antidromic_prob` is set to
+  the tissue-coverage fraction, which is derivable only under compact
+  topographic terminal fields; under the diffuse connectivity the model
+  actually implements it would be near 1, i.e. ~2.5× larger.
+
+Each is invisible to the loss because it multiplies a free parameter;
+together they mean a reported DBS parameter value is conditional on three
+unvalidated scalars at once. Two consequences for this entry: the
+acceptance rule of the update of 2026-08-26 must be applied to *changes*
+between conditions rather than to absolute magnitudes wherever possible —
+a shared scale factor cancels in an on-vs-off ratio but not in a
+difference — and any absolute value reported must carry the conditional.
+This is bookkeeping to do once, here, rather than three times in three
+entries.
 
 ### 3. Regenerate the input caches with a transposed layout
 
@@ -664,7 +694,7 @@ a remedy for each:
 
 ### 16. The DBS constants are unvalidated single-subject values
 
-*Opened 2026-08-04 15:42 · 1 update, 2026-08-27 14:26*
+*Opened 2026-08-04 15:42 · 2 updates, last 2026-08-28 05:56*
 
 **Opened 2026-08-04 15:42:**
 
@@ -712,6 +742,51 @@ is a **per-pulse perturbation calibrated at 125 Hz, linear in frequency by
 construction, and not to be extrapolated to other stimulation settings**.
 That half stays open here, since there is no write-up yet, and it joins the
 sensitivity checks above as things this entry owes before publication.
+
+**Update 2026-08-28 05:56:**
+
+Round-2 F17 (two seats, converged independently including on the
+arithmetic; evidence class methodological) bears on **this entry's own
+plan**, so the triage revised the plan rather than opening an entry. Both
+checks named in the Opened block are wrong as designed.
+
+**The `dbs_pulse_width_us` check is struck — there is nothing to check.**
+At dt = 0.1 ms the timestep grid samples the pulse cycle only at multiples
+of 100 µs, so `modulo(...) < dbs_pulse_width_us` selects exactly one
+timestep per period for *any* width in (0, 100]: 60 µs and 100 µs produce
+identical pulse trains (verified numerically during triage). The only
+residue is `_axon_spikes_per_pulse_to_prob`'s scale factor — 1.0 at 100 µs,
+1.667 at 60 µs — which a fitted `axon_spikes_per_pulse` absorbs, leaving
+the reachable probability set [0, 1] unchanged either way. A width below dt
+is simply unrepresentable, which is precisely why 100 µs is used at all, as
+the Opened block already records. Removed from this entry's plan; no
+further work.
+
+**The `population_proportion` check is not a sensitivity check, and the
+replacement costs no simulation.** Coverage enters every DBS effect
+multiplicatively with a fitted parameter — somatic ≈ proportion ×
+`dbs_depolarization` for the pooled mean; orthodromic ≈ proportion ×
+`axon_spikes_per_pulse`, since that is how many neurons emit; antidromic
+likewise, `antidromic_prob` being set to the proportion itself (§47). Only
+the *product* is visible in the pooled BOLD, so refitting at another
+coverage returns "insensitive" — which reads as "the assumption is
+harmless" when what it actually shows is that **coverage and the DBS
+parameters are degenerate**.
+
+Because the dependence is multiplicative at first order, the honest
+statement is analytic: a fit at c₀ = 0.4 giving p₀ implies p(c) = p₀·c₀/c
+elsewhere. Coverage measured across the cohort during triage from
+`experimental_data/berlin_data/vta/`: sub-01 **0.400** pooled but 0.500 lh
+and 0.307 rh; sub-03 0.317 (0.400 / 0.240); sub-04 0.236. Over the fitted
+subject's own hemispheres [0.31, 0.50] that implies [0.80, 1.29]·p₀ — a
+factor 1.6 — and over the cohort [0.24, 0.50], [0.80, 1.67]·p₀.
+
+So: **quote every fitted DBS parameter as conditional on coverage 0.4**,
+with that band attached. The grid of re-optimisations the review proposed
+is not needed; a *single* refit at one other coverage value is worth doing
+only if the first-order multiplicativity is to be confirmed (it is exact
+only to first order — the probability clip, `neg()`'s saturation below
+−90 mV, and network nonlinearity all bend it).
 
 ### 17. `dbs_depolarization` scales with `C` in Izhikevich-2007 models
 
